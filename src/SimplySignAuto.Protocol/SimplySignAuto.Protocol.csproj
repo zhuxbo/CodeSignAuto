@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../SimplySignAuto.Core/SimplySignAuto.Core.csproj" />
+  </ItemGroup>
+</Project>

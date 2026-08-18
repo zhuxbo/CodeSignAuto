@@ -1,0 +1,869 @@
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+using System.Windows.Input;
+using SimplySignAuto.Agent.Ipc;
+using SimplySignAuto.Agent.LocalJobs;
+using SimplySignAuto.Core.Jobs;
+using SimplySignAuto.Protocol;
+
+namespace SimplySignAuto.App.UI.ViewModels;
+
+public enum QuickSignState
+{
+    Idle,
+    Validating,
+    Copying,
+    Finalizing,
+    Accepted,
+    Failed,
+    Canceled,
+}
+
+public sealed class QuickSignViewModel : INotifyPropertyChanged, IDisposable
+{
+    private readonly ILocalJobClient _localJobs;
+    private readonly IAgentManagementClient _management;
+    private readonly Action<Guid> _openJob;
+    private readonly IUiDispatcher _dispatcher;
+    private readonly ITerminalJobFeed? _terminalJobs;
+    private readonly CancellationTokenSource _lifetime = new();
+    private string? _selectedPath;
+    private FileKind? _selectedKind;
+    private string _selectedFileName = string.Empty;
+    private string _selectedSizeText = string.Empty;
+    private QuickSignState _state;
+    private string? _errorCode;
+    private int _copyProgressPercent;
+    private Guid? _acceptedJobId;
+    private CancellationTokenSource? _operationCancellation;
+    private long _selectionVersion;
+    private int _submitting;
+    private int _disposed;
+    private long _acceptedTerminalSequence;
+    private string? _acceptedTerminalState;
+    private IReadOnlyList<CertificateSummary> _availableCertificates = [];
+    private CertificateSummary? _selectedCertificate;
+
+    public QuickSignViewModel(
+        ILocalJobClient localJobs,
+        IAgentManagementClient management,
+        Action<Guid> openJob,
+        IUiDispatcher? dispatcher = null)
+        : this(localJobs, management, openJob, dispatcher, null)
+    {
+    }
+
+    internal QuickSignViewModel(
+        ILocalJobClient localJobs,
+        IAgentManagementClient management,
+        Action<Guid> openJob,
+        IUiDispatcher? dispatcher,
+        ITerminalJobFeed? terminalJobs)
+    {
+        _localJobs = localJobs ?? throw new ArgumentNullException(nameof(localJobs));
+        _management = management ?? throw new ArgumentNullException(nameof(management));
+        _openJob = openJob ?? throw new ArgumentNullException(nameof(openJob));
+        _dispatcher = dispatcher ?? InlineQuickSignDispatcher.Instance;
+        _terminalJobs = terminalJobs;
+        _management.SnapshotChanged += HandleSnapshotChanged;
+        if (_terminalJobs is not null)
+        {
+            _terminalJobs.ItemsChanged += HandleTerminalJobsChanged;
+        }
+        SubmitCommand = new AsyncCommand(
+            async () => await SubmitAsync(CancellationToken.None).ConfigureAwait(false),
+            () => CanSubmit);
+        ClearCommand = new DelegateCommand(ClearSelection, () => HasSelection);
+        RefreshAvailableCertificates();
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    internal ILocalJobClient LocalJobsClient => _localJobs;
+
+    public QuickSignState State
+    {
+        get => _state;
+        private set
+        {
+            if (_state != value)
+            {
+                _state = value;
+                RaiseStateProperties();
+            }
+        }
+    }
+
+    public string SelectedFileName
+    {
+        get => _selectedFileName;
+        private set => SetField(ref _selectedFileName, value);
+    }
+
+    public string SelectedSizeText
+    {
+        get => _selectedSizeText;
+        private set => SetField(ref _selectedSizeText, value);
+    }
+
+    public string DetectedTypeText => _selectedKind switch
+    {
+        FileKind.Authenticode => "代码签名",
+        FileKind.Pdf => "PDF 文档签名",
+        _ => "尚未选择",
+    };
+
+    public bool HasSelection => _selectedPath is not null;
+
+    public string SelectedFileDisplayText => HasSelection ? SelectedFileName : "请选择签名文件";
+
+    public string SelectedFileDetailsText => HasSelection
+        ? $"{DetectedTypeText} · {SelectedSizeText}"
+        : string.Empty;
+
+    public IReadOnlyList<CertificateSummary> AvailableCertificates => _availableCertificates;
+
+    public CertificateSummary? SelectedCertificate
+    {
+        get => _selectedCertificate;
+        set
+        {
+            if (value is not null && !_availableCertificates.Contains(value))
+            {
+                throw new ArgumentException("The selected certificate is not available.", nameof(value));
+            }
+
+            if (SetField(ref _selectedCertificate, value))
+            {
+                OnPropertyChanged(nameof(CanSubmit));
+                OnPropertyChanged(nameof(ReadinessText));
+                OnPropertyChanged(nameof(InlineStatusText));
+                OnPropertyChanged(nameof(HasInlineStatus));
+                RaiseCommandStates();
+            }
+        }
+    }
+
+    public bool CanSubmit =>
+        HasSelection &&
+        SelectedCertificate is not null &&
+        Volatile.Read(ref _submitting) == 0 &&
+        State is QuickSignState.Idle or QuickSignState.Failed or QuickSignState.Canceled &&
+        ReadinessFailure() is null;
+
+    public int CopyProgressPercent
+    {
+        get => _copyProgressPercent;
+        private set => SetField(ref _copyProgressPercent, value);
+    }
+
+    public string CopyProgressText => State == QuickSignState.Copying
+        ? $"复制进度 {CopyProgressPercent}%"
+        : string.Empty;
+
+    public bool IsCopying => State == QuickSignState.Copying;
+
+    public Guid? AcceptedJobId
+    {
+        get => _acceptedJobId;
+        private set => SetField(ref _acceptedJobId, value);
+    }
+
+    public string? ErrorCode
+    {
+        get => _errorCode;
+        private set => SetField(ref _errorCode, value);
+    }
+
+    private bool HasSucceededAcceptedResult =>
+        AcceptedJobId is { } jobId &&
+        (_acceptedTerminalState == "succeeded" ||
+         _management.LatestSnapshot?.RecentJobs.Any(job =>
+             job.JobId == jobId && job.TerminalState == "succeeded") == true);
+
+    public string ReadinessText => ReadinessFailure() ?? "可以提交到本机签名队列";
+
+    public bool PdfExtensionVisible => _management.LatestSnapshot?.Pdf is { Configured: true } pdf &&
+        !string.Equals(
+            pdf.ReasonCode,
+            "pdf_support_not_installed",
+            StringComparison.Ordinal);
+
+    public string FileDialogFilter => PdfExtensionVisible
+        ? "支持的签名文件|*.exe;*.dll;*.msi;*.sys;*.cat;*.pdf|所有文件|*.*"
+        : "代码签名文件|*.exe;*.dll;*.msi;*.sys;*.cat|所有文件|*.*";
+
+    public string StatusText => State switch
+    {
+        QuickSignState.Validating => "正在验证所选文件",
+        QuickSignState.Copying => CopyProgressText,
+        QuickSignState.Finalizing => "正在完成本机提交",
+        QuickSignState.Accepted when HasSucceededAcceptedResult => "签名已完成，请在签名任务中保存",
+        QuickSignState.Accepted => "已提交，正在签名任务页中跟踪",
+        QuickSignState.Failed => MapError(ErrorCode),
+        QuickSignState.Canceled => "已取消；原文件未更改",
+        _ => HasSelection ? "文件已就绪" : "请选择要签名的文件",
+    };
+
+    public string InlineStatusText => State == QuickSignState.Idle
+        ? HasSelection ? ReadinessFailure() ?? "文件已就绪" : string.Empty
+        : StatusText;
+
+    public bool HasInlineStatus => InlineStatusText.Length > 0;
+
+    public string StatusIcon => State switch
+    {
+        QuickSignState.Accepted => "✓",
+        QuickSignState.Failed => "×",
+        QuickSignState.Canceled => "!",
+        QuickSignState.Validating or QuickSignState.Copying or QuickSignState.Finalizing => "…",
+        _ => "○",
+    };
+
+    public int PdfPage { get; set; } = 1;
+
+    public double PdfLeft { get; set; } = 36;
+
+    public double PdfBottom { get; set; } = 36;
+
+    public double PdfRight { get; set; } = 180;
+
+    public double PdfTop { get; set; } = 72;
+
+    public string PdfReason { get; set; } = string.Empty;
+
+    public string PdfLocation { get; set; } = string.Empty;
+
+    public ICommand SubmitCommand { get; }
+
+    public ICommand ClearCommand { get; }
+
+    public async Task SelectFileAsync(string path, CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        cancellationToken.ThrowIfCancellationRequested();
+        var version = Interlocked.Increment(ref _selectionVersion);
+        Interlocked.Exchange(ref _operationCancellation, null)?.Cancel();
+        try
+        {
+            await InvokeUiAsync(() =>
+            {
+                if (version == Volatile.Read(ref _selectionVersion))
+                {
+                    ReleaseAcceptedSource();
+                }
+            }, cancellationToken).ConfigureAwait(false);
+            var selection = ValidateSelection(path);
+            if (selection.Kind == FileKind.Pdf && !PdfExtensionVisible)
+            {
+                throw new LocalJobException("local_capability_unavailable");
+            }
+
+            await InvokeUiAsync(() =>
+            {
+                if (version != Volatile.Read(ref _selectionVersion))
+                {
+                    return;
+                }
+
+                _selectedPath = selection.Path;
+                _selectedKind = selection.Kind;
+                RefreshAvailableCertificates();
+                SelectedFileName = selection.Name;
+                SelectedSizeText = $"{selection.Size:N0} 字节";
+                AcceptedJobId = null;
+                ErrorCode = null;
+                CopyProgressPercent = 0;
+                State = QuickSignState.Idle;
+                RaiseSelectionProperties();
+            }, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (
+            _lifetime.IsCancellationRequested &&
+            !cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (LocalJobException error)
+        {
+            await InvokeUiAsync(() =>
+            {
+                if (version == Volatile.Read(ref _selectionVersion))
+                {
+                    ClearSelectionFields();
+                    ErrorCode = error.Code;
+                    State = QuickSignState.Failed;
+                }
+            }, cancellationToken).ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    public async Task<Guid?> SubmitAsync(CancellationToken cancellationToken)
+    {
+        ThrowIfDisposed();
+        cancellationToken.ThrowIfCancellationRequested();
+        var version = Volatile.Read(ref _selectionVersion);
+        var path = _selectedPath;
+        var kind = _selectedKind;
+        var snapshot = _management.LatestSnapshot;
+        var selectedCertificate = _selectedCertificate;
+        if (Interlocked.CompareExchange(ref _submitting, 1, 0) != 0)
+        {
+            return null;
+        }
+
+        using var operation = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            _lifetime.Token);
+        Interlocked.Exchange(ref _operationCancellation, operation)?.Cancel();
+        try
+        {
+            if (path is null || kind is null)
+            {
+                return null;
+            }
+
+            if (ReadinessFailure(snapshot, kind.Value, selectedCertificate) is { })
+            {
+                throw new LocalJobException("local_capability_unavailable");
+            }
+
+            await ApplyIfCurrentAsync(version, () =>
+            {
+                ErrorCode = null;
+                State = QuickSignState.Validating;
+            }).ConfigureAwait(false);
+            var parameters = BuildParameters(kind.Value, selectedCertificate!);
+            await ApplyIfCurrentAsync(version, () =>
+            {
+                CopyProgressPercent = 0;
+                State = QuickSignState.Copying;
+            }).ConfigureAwait(false);
+            var progress = new CopyProgress(this, version);
+            var jobId = await _localJobs
+                .CreateAndUploadAsync(path, parameters, progress, operation.Token)
+                .ConfigureAwait(false);
+            var applied = await ApplyIfCurrentAsync(version, () =>
+            {
+                _selectedPath = null;
+                ResetAcceptedTerminalState();
+                AcceptedJobId = jobId;
+                CopyProgressPercent = 0;
+                State = QuickSignState.Accepted;
+                ApplyAcceptedTerminalItem(FindLatestTerminalItem(jobId, _terminalJobs?.Items));
+                RaiseSelectionProperties();
+                _openJob(jobId);
+            }).ConfigureAwait(false);
+            if (!applied)
+            {
+                _localJobs.ReleaseAcceptedSource(jobId);
+            }
+
+            return jobId;
+        }
+        catch (OperationCanceledException) when (operation.IsCancellationRequested)
+        {
+            await ApplyIfCurrentAsync(version, () =>
+            {
+                CopyProgressPercent = 0;
+                State = QuickSignState.Canceled;
+            }).ConfigureAwait(false);
+            return null;
+        }
+        catch (LocalJobException error)
+        {
+            await ApplyIfCurrentAsync(version, () =>
+            {
+                ErrorCode = error.Code;
+                CopyProgressPercent = 0;
+                State = QuickSignState.Failed;
+            }).ConfigureAwait(false);
+            return null;
+        }
+        finally
+        {
+            Interlocked.CompareExchange(ref _operationCancellation, null, operation);
+            Interlocked.Exchange(ref _submitting, 0);
+            await InvokeUiAsync(RaiseCommandStates, CancellationToken.None).ConfigureAwait(false);
+        }
+    }
+
+    public void ClearSelection()
+    {
+        ThrowIfDisposed();
+        Interlocked.Increment(ref _selectionVersion);
+        Interlocked.Exchange(ref _operationCancellation, null)?.Cancel();
+        ReleaseAcceptedSource();
+        ClearSelectionFields();
+        ErrorCode = null;
+        CopyProgressPercent = 0;
+        State = QuickSignState.Idle;
+        RaiseSelectionProperties();
+    }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        _management.SnapshotChanged -= HandleSnapshotChanged;
+        if (_terminalJobs is not null)
+        {
+            _terminalJobs.ItemsChanged -= HandleTerminalJobsChanged;
+        }
+        _lifetime.Cancel();
+        Interlocked.Exchange(ref _operationCancellation, null)?.Cancel();
+        if (_acceptedJobId is { } jobId)
+        {
+            _acceptedJobId = null;
+            _localJobs.ReleaseAcceptedSource(jobId);
+        }
+
+        _selectedPath = null;
+    }
+
+    private Selection ValidateSelection(string path)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(path) || path.Any(char.IsControl) || !Path.IsPathFullyQualified(path))
+            {
+                throw new LocalJobException("local_source_invalid");
+            }
+
+            var canonical = Path.GetFullPath(path);
+            if (!string.Equals(canonical, path, PathComparison()))
+            {
+                throw new LocalJobException("local_source_invalid");
+            }
+
+            var attributes = File.GetAttributes(canonical);
+            if ((attributes & (FileAttributes.Directory | FileAttributes.ReparsePoint)) != 0 ||
+                new FileInfo(canonical).LinkTarget is not null)
+            {
+                throw new LocalJobException("local_source_invalid");
+            }
+
+            using var stream = new FileStream(canonical, FileMode.Open, FileAccess.Read, FileShare.Read);
+            if (stream.Length == 0)
+            {
+                throw new LocalJobException("local_source_empty");
+            }
+
+            if (stream.Length > LocalJobClient.MaximumInputBytes)
+            {
+                throw new LocalJobException("file_too_large");
+            }
+
+            Span<byte> prefix = stackalloc byte[8];
+            var read = stream.Read(prefix);
+            FileKind kind;
+            try
+            {
+                kind = SigningRequestValidator.ValidateFile(Path.GetFileName(canonical), prefix[..read]);
+            }
+            catch (ValidationException error)
+            {
+                throw new LocalJobException(error.Code);
+            }
+
+            return new Selection(canonical, Path.GetFileName(canonical), stream.Length, kind);
+        }
+        catch (LocalJobException)
+        {
+            throw;
+        }
+        catch (Exception error) when (
+            error is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            throw new LocalJobException("local_source_invalid");
+        }
+    }
+
+    private SigningParameters BuildParameters(FileKind kind, CertificateSummary certificate)
+    {
+        SigningParameters parameters = kind switch
+        {
+            FileKind.Authenticode =>
+                new AuthenticodeParameters(
+                    certificate.SerialNumber,
+                    "sha256",
+                    false),
+            FileKind.Pdf =>
+                new PdfParameters(
+                    certificate.SerialNumber,
+                    "sha256",
+                    PdfPage,
+                    new PdfBox(PdfLeft, PdfBottom, PdfRight, PdfTop),
+                    "SimplySignAutoSignature",
+                    NullIfEmpty(PdfReason),
+                    NullIfEmpty(PdfLocation)),
+            _ => throw new LocalJobException("local_capability_unavailable"),
+        };
+
+        try
+        {
+            return SigningParameters.Parse(SigningParameters.SerializeCanonical(parameters));
+        }
+        catch (ValidationException error)
+        {
+            throw new LocalJobException(error.Code);
+        }
+    }
+
+    private string? ReadinessFailure() => _selectedKind is { } kind
+        ? ReadinessFailure(kind)
+        : "请选择要签名的文件";
+
+    private string? ReadinessFailure(FileKind kind) =>
+        ReadinessFailure(_management.LatestSnapshot, kind, SelectedCertificate);
+
+    private static string? ReadinessFailure(
+        ManagementSnapshot? snapshot,
+        FileKind kind,
+        CertificateSummary? selectedCertificate)
+    {
+        if (snapshot is null)
+        {
+            return "签名代理状态未知";
+        }
+
+        if (!snapshot.ServiceAvailable || !snapshot.AgentConnected ||
+            snapshot.AgentSessionId <= 0 || snapshot.HeartbeatSessionId != snapshot.AgentSessionId ||
+            !snapshot.SimplySignProcessRunning || snapshot.SimplySignProcessSessionId != snapshot.AgentSessionId)
+        {
+            return "本机签名服务未就绪";
+        }
+
+        if (snapshot.HeartbeatAgeMilliseconds is null or < 0)
+        {
+            return "签名代理状态未知";
+        }
+
+        if (snapshot.HeartbeatAgeMilliseconds > 15_000)
+        {
+            return "签名代理状态已过期";
+        }
+
+        var capability = kind == FileKind.Authenticode ? snapshot.Authenticode : snapshot.Pdf;
+        if (!capability.Configured || !capability.Ready)
+        {
+            return kind == FileKind.Authenticode ? "代码签名能力未就绪" : "PDF 签名能力未就绪";
+        }
+
+        var availableCertificates = snapshot.Certificates
+            .Where(certificate => certificate.CatalogCurrent &&
+                (kind == FileKind.Authenticode
+                    ? certificate.AuthenticodeUsable
+                    : certificate.PdfUsable))
+            .ToArray();
+        if (availableCertificates.Length == 0)
+        {
+            return kind == FileKind.Authenticode
+                ? "没有可用的代码签名证书"
+                : "没有可用的 PDF 签名证书";
+        }
+
+        if (selectedCertificate is null || !availableCertificates.Contains(selectedCertificate))
+        {
+            return "请选择签名证书";
+        }
+
+        return null;
+    }
+
+    private void HandleSnapshotChanged(object? sender, EventArgs eventArgs)
+    {
+        var snapshot = _management.LatestSnapshot;
+        _ = InvokeUiAsync(() =>
+        {
+            RefreshAvailableCertificates();
+            if (AcceptedJobId is { } acceptedJobId &&
+                snapshot?.RecentJobs.FirstOrDefault(
+                    job => job.JobId == acceptedJobId) is { TerminalState: "failed" or "expired" })
+            {
+                ReleaseAcceptedSource();
+            }
+
+            OnPropertyChanged(nameof(ReadinessText));
+            OnPropertyChanged(nameof(CanSubmit));
+            OnPropertyChanged(nameof(StatusText));
+            OnPropertyChanged(nameof(PdfExtensionVisible));
+            OnPropertyChanged(nameof(FileDialogFilter));
+            OnPropertyChanged(nameof(InlineStatusText));
+            OnPropertyChanged(nameof(HasInlineStatus));
+            RaiseCommandStates();
+        }, _lifetime.Token);
+    }
+
+    private void HandleTerminalJobsChanged(object? sender, EventArgs eventArgs)
+    {
+        var items = _terminalJobs?.Items;
+        _ = InvokeUiAsync(() =>
+        {
+            if (AcceptedJobId is { } acceptedJobId)
+            {
+                ApplyAcceptedTerminalItem(FindLatestTerminalItem(acceptedJobId, items));
+            }
+
+            OnPropertyChanged(nameof(StatusText));
+            OnPropertyChanged(nameof(InlineStatusText));
+            OnPropertyChanged(nameof(HasInlineStatus));
+            RaiseCommandStates();
+        }, _lifetime.Token);
+    }
+
+    private void ApplyAcceptedTerminalItem(TerminalJobEventItem? terminal)
+    {
+        if (terminal is null || terminal.Sequence <= _acceptedTerminalSequence)
+        {
+            return;
+        }
+
+        _acceptedTerminalSequence = terminal.Sequence;
+        _acceptedTerminalState = terminal.Item.State;
+        if (_acceptedTerminalState is "failed" or "expired")
+        {
+            ReleaseAcceptedSource();
+        }
+    }
+
+    private static TerminalJobEventItem? FindLatestTerminalItem(
+        Guid jobId,
+        IReadOnlyList<TerminalJobEventItem>? items) =>
+        items?
+            .Where(item => item.Item.JobId == jobId)
+            .OrderByDescending(static item => item.Sequence)
+            .FirstOrDefault();
+
+    private async Task<bool> ApplyIfCurrentAsync(long version, Action action)
+    {
+        var applied = false;
+        await InvokeUiAsync(() =>
+        {
+            if (version == Volatile.Read(ref _selectionVersion))
+            {
+                action();
+                applied = true;
+            }
+        }, _lifetime.Token).ConfigureAwait(false);
+        return applied;
+    }
+
+    private async Task InvokeUiAsync(Action action, CancellationToken cancellationToken)
+    {
+        if (Volatile.Read(ref _disposed) != 0)
+        {
+            return;
+        }
+
+        try
+        {
+            await _dispatcher.InvokeAsync(() =>
+            {
+                if (Volatile.Read(ref _disposed) == 0)
+                {
+                    action();
+                }
+            }, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (Volatile.Read(ref _disposed) != 0)
+        {
+        }
+        catch (ObjectDisposedException) when (Volatile.Read(ref _disposed) != 0)
+        {
+        }
+        catch (InvalidOperationException) when (Volatile.Read(ref _disposed) != 0)
+        {
+        }
+    }
+
+    private void ApplyProgress(long version, int percent) => _ = InvokeUiAsync(() =>
+    {
+        if (version == Volatile.Read(ref _selectionVersion) && State == QuickSignState.Copying)
+        {
+            CopyProgressPercent = Math.Clamp(percent, 0, 100);
+            if (CopyProgressPercent == 100)
+            {
+                State = QuickSignState.Finalizing;
+            }
+
+            OnPropertyChanged(nameof(CopyProgressText));
+            OnPropertyChanged(nameof(StatusText));
+            OnPropertyChanged(nameof(InlineStatusText));
+        }
+    }, _lifetime.Token);
+
+    private void ClearSelectionFields()
+    {
+        _selectedPath = null;
+        _selectedKind = null;
+        RefreshAvailableCertificates();
+        SelectedFileName = string.Empty;
+        SelectedSizeText = string.Empty;
+    }
+
+    private void ReleaseAcceptedSource()
+    {
+        if (AcceptedJobId is not { } jobId)
+        {
+            ResetAcceptedTerminalState();
+            return;
+        }
+
+        AcceptedJobId = null;
+        ResetAcceptedTerminalState();
+        _localJobs.ReleaseAcceptedSource(jobId);
+    }
+
+    private void ResetAcceptedTerminalState()
+    {
+        _acceptedTerminalSequence = 0;
+        _acceptedTerminalState = null;
+    }
+
+    private void RaiseSelectionProperties()
+    {
+        OnPropertyChanged(nameof(DetectedTypeText));
+        OnPropertyChanged(nameof(HasSelection));
+        OnPropertyChanged(nameof(SelectedFileDisplayText));
+        OnPropertyChanged(nameof(SelectedFileDetailsText));
+        OnPropertyChanged(nameof(CanSubmit));
+        OnPropertyChanged(nameof(ReadinessText));
+        OnPropertyChanged(nameof(StatusText));
+        OnPropertyChanged(nameof(InlineStatusText));
+        OnPropertyChanged(nameof(HasInlineStatus));
+        RaiseCommandStates();
+    }
+
+    private void RefreshAvailableCertificates()
+    {
+        var filtered = _selectedKind is { } kind
+            ? (_management.LatestSnapshot?.Certificates ?? [])
+                .Where(certificate => certificate.CatalogCurrent &&
+                    (kind == FileKind.Authenticode
+                        ? certificate.AuthenticodeUsable
+                        : certificate.PdfUsable))
+                .ToArray()
+            : [];
+        if (_availableCertificates.SequenceEqual(filtered))
+        {
+            return;
+        }
+
+        _availableCertificates = filtered;
+        _selectedCertificate = filtered.Length == 1 ? filtered[0] : null;
+        OnPropertyChanged(nameof(AvailableCertificates));
+        OnPropertyChanged(nameof(SelectedCertificate));
+        OnPropertyChanged(nameof(CanSubmit));
+        OnPropertyChanged(nameof(ReadinessText));
+        OnPropertyChanged(nameof(InlineStatusText));
+        OnPropertyChanged(nameof(HasInlineStatus));
+    }
+
+    private void RaiseStateProperties()
+    {
+        OnPropertyChanged(nameof(State));
+        OnPropertyChanged(nameof(CanSubmit));
+        OnPropertyChanged(nameof(CopyProgressText));
+        OnPropertyChanged(nameof(IsCopying));
+        OnPropertyChanged(nameof(StatusText));
+        OnPropertyChanged(nameof(StatusIcon));
+        OnPropertyChanged(nameof(InlineStatusText));
+        OnPropertyChanged(nameof(HasInlineStatus));
+        RaiseCommandStates();
+    }
+
+    private void RaiseCommandStates()
+    {
+        ((AsyncCommand)SubmitCommand).RaiseCanExecuteChanged();
+        ((DelegateCommand)ClearCommand).RaiseCanExecuteChanged();
+    }
+
+    private void ThrowIfDisposed() =>
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+
+    private bool SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
+    {
+        if (EqualityComparer<T>.Default.Equals(field, value))
+        {
+            return false;
+        }
+
+        field = value;
+        OnPropertyChanged(propertyName);
+        return true;
+    }
+
+    private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+
+    private static string? NullIfEmpty(string value) => string.IsNullOrWhiteSpace(value) ? null : value;
+
+    private static string MapError(string? code) => code switch
+    {
+        "file_signature_mismatch" => "文件内容与扩展名不匹配",
+        "unsupported_type" => "不支持此文件类型",
+        "file_too_large" => "文件超过 512 MiB 限制",
+        "local_source_empty" => "文件为空",
+        "local_capability_unavailable" => "所选签名能力未就绪",
+        "local_job_unavailable" => "本机签名服务不可用",
+        _ => "无法提交本机签名任务",
+    };
+
+    private static StringComparison PathComparison() =>
+        OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+
+    private sealed record Selection(string Path, string Name, long Size, FileKind Kind);
+
+    private sealed class CopyProgress(QuickSignViewModel owner, long version) : IProgress<LocalCopyProgress>
+    {
+        public void Report(LocalCopyProgress value) => owner.ApplyProgress(version, value.Percent);
+    }
+
+    private sealed class DelegateCommand(Action execute, Func<bool> canExecute) : ICommand
+    {
+        public event EventHandler? CanExecuteChanged;
+
+        public bool CanExecute(object? parameter) => canExecute();
+
+        public void Execute(object? parameter) => execute();
+
+        public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private sealed class AsyncCommand(Func<Task> execute, Func<bool> canExecute) : ICommand
+    {
+        public event EventHandler? CanExecuteChanged;
+
+        public bool CanExecute(object? parameter) => canExecute();
+
+        public async void Execute(object? parameter)
+        {
+            try
+            {
+                await execute().ConfigureAwait(false);
+            }
+            catch (Exception)
+            {
+                // Command handlers expose stable error state and must never tear down the UI thread.
+            }
+        }
+
+        public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private sealed class InlineQuickSignDispatcher : IUiDispatcher
+    {
+        public static InlineQuickSignDispatcher Instance { get; } = new();
+
+        public Task InvokeAsync(Action action, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            action();
+            return Task.CompletedTask;
+        }
+    }
+}

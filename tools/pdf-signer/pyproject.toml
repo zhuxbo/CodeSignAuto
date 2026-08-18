@@ -1,0 +1,36 @@
+[project]
+name = "simplysign-pdf-signer"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "cryptography>=48,<49",
+  "pyHanko[opentype,pkcs11]==0.36.2",
+]
+
+[dependency-groups]
+dev = [
+  "pyinstaller>=6,<7",
+  "pytest>=8,<9",
+  "ruff>=0.12,<1",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+addopts = "--strict-config --strict-markers"
+pythonpath = ["."]
+testpaths = ["tests"]
+markers = [
+  "softhsm: combined real PKCS11/PAdES integration requiring a configured SoftHSM token",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "S", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106", "S603"]

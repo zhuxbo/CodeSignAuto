@@ -1,0 +1,103 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: SemVer without the v prefix
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  release:
+    if: github.ref == format('refs/tags/v{0}', inputs.version)
+    environment: release
+    runs-on: windows-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    env:
+      MAIN_SETUP: artifacts/release/SimplySignAutoSetup-${{ inputs.version }}-win-x64.exe
+      PDF_SETUP: artifacts/release/SimplySignAutoPdfSetup-${{ inputs.version }}-win-x64.exe
+
+    steps:
+      - name: Checkout selected tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+
+      - name: Check repository release hygiene
+        shell: pwsh
+        run: pwsh -NoLogo -NoProfile -File scripts/pre-release-check.ps1
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          python-version: "3.12"
+          enable-cache: false
+
+      - name: Restore locked dependencies
+        shell: pwsh
+        run: dotnet restore SimplySignAuto.sln --locked-mode -p:NuGetAudit=true -p:NuGetAuditMode=all -m:1 -nodeReuse:false
+
+      - name: Build and sign both installers
+        shell: powershell
+        env:
+          SIMPLYSIGN_SIGNING_BASE_URL: ${{ vars.SIMPLYSIGN_SIGNING_BASE_URL }}
+          SIMPLYSIGN_SIGNING_BEARER_TOKEN: ${{ secrets.SIMPLYSIGN_SIGNING_BEARER_TOKEN }}
+          SIMPLYSIGN_SIGNING_CERTIFICATE_SERIAL: ${{ vars.SIMPLYSIGN_SIGNING_CERTIFICATE_SERIAL }}
+        run: powershell.exe -NoLogo -NoProfile -File scripts/build-release.ps1 -Version "${{ inputs.version }}"
+
+      - name: Verify release closure and signatures
+        shell: pwsh
+        env:
+          SIMPLYSIGN_SIGNING_CERTIFICATE_SERIAL: ${{ vars.SIMPLYSIGN_SIGNING_CERTIFICATE_SERIAL }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $expected = @(
+            [IO.Path]::GetFullPath($env:MAIN_SETUP),
+            [IO.Path]::GetFullPath($env:PDF_SETUP)
+          ) | Sort-Object
+          $actual = @(
+            Get-ChildItem -LiteralPath artifacts/release -File -Force |
+              ForEach-Object { $_.FullName } |
+              Sort-Object
+          )
+          if (@(Compare-Object $expected $actual -CaseSensitive).Count -ne 0) {
+            throw 'release_asset_closure_invalid'
+          }
+          $expectedSerial = ($env:SIMPLYSIGN_SIGNING_CERTIFICATE_SERIAL -replace '[^0-9A-Fa-f]', '').TrimStart('0').ToUpperInvariant()
+          foreach ($path in $expected) {
+            $signature = Get-AuthenticodeSignature -LiteralPath $path
+            $actualSerial = $signature.SignerCertificate.SerialNumber.TrimStart('0').ToUpperInvariant()
+            if ($signature.Status -ne 'Valid' -or
+                $null -eq $signature.SignerCertificate -or
+                $null -eq $signature.TimeStamperCertificate -or
+                $actualSerial -cne $expectedSerial) {
+              throw 'release_asset_signature_invalid'
+            }
+          }
+
+      - name: Write release notes
+        shell: pwsh
+        run: pwsh -NoLogo -NoProfile -File scripts/write-github-release-notes.ps1 -ReleaseRoot artifacts/release -Version "${{ inputs.version }}" -OutputPath "${{ runner.temp }}/release-notes.md"
+
+      - name: Create GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ inputs.version }}" `
+            "$env:MAIN_SETUP" `
+            "$env:PDF_SETUP" `
+            --verify-tag `
+            --title "SimplySignAuto v${{ inputs.version }}" `
+            --notes-file "${{ runner.temp }}/release-notes.md"

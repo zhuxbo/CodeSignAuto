@@ -1,0 +1,140 @@
+<UserControl x:Class="SimplySignAuto.App.UI.Views.QuickSignView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             AutomationProperties.Name="本机快速签名">
+  <StackPanel Margin="{DynamicResource SpaceLarge}">
+    <TextBlock Text="快速签名"
+               FontSize="26"
+               FontWeight="SemiBold"
+               AutomationProperties.Name="快速签名" />
+
+    <Border Style="{DynamicResource StatusPanelStyle}" Margin="0,20,0,0">
+      <Grid>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <StackPanel VerticalAlignment="Center">
+          <TextBlock Text="{Binding SelectedFileDisplayText}"
+                     FontWeight="SemiBold"
+                     AutomationProperties.Name="{Binding SelectedFileDisplayText}" />
+          <TextBlock Text="{Binding SelectedFileDetailsText}"
+                     Margin="0,5,0,0"
+                     Foreground="{DynamicResource TextSecondaryBrush}"
+                     Visibility="{Binding HasSelection, Converter={StaticResource BooleanToVisibilityConverter}}" />
+        </StackPanel>
+        <StackPanel Grid.Column="1"
+                    Orientation="Horizontal"
+                    VerticalAlignment="Center"
+                    Margin="0,4,0,0">
+          <Button Content="选择文件"
+                  Click="OnChooseFile"
+                  AutomationProperties.Name="选择本机签名文件" />
+          <Button Content="清除"
+                  Command="{Binding ClearCommand}"
+                  AutomationProperties.Name="清除所选文件" />
+        </StackPanel>
+        <StackPanel Grid.Row="1"
+                    Grid.ColumnSpan="2"
+                    Orientation="Horizontal"
+                    Margin="0,10,0,0"
+                    Visibility="{Binding HasInlineStatus, Converter={StaticResource BooleanToVisibilityConverter}}">
+          <TextBlock Text="{Binding StatusIcon}"
+                     Margin="0,0,7,0"
+                     AutomationProperties.Name="快速签名状态图标" />
+          <TextBlock Text="{Binding InlineStatusText}"
+                     Foreground="{DynamicResource TextSecondaryBrush}"
+                     TextWrapping="Wrap"
+                     AutomationProperties.Name="{Binding InlineStatusText}" />
+        </StackPanel>
+        <ProgressBar Grid.Row="2"
+                     Grid.ColumnSpan="2"
+                     Value="{Binding CopyProgressPercent, Mode=OneWay}"
+                     Maximum="100"
+                     Height="8"
+                     Margin="0,10,0,0"
+                     Visibility="{Binding IsCopying, Converter={StaticResource BooleanToVisibilityConverter}}"
+                     AutomationProperties.Name="{Binding CopyProgressText}" />
+      </Grid>
+    </Border>
+
+    <Border Style="{DynamicResource StatusPanelStyle}" Margin="0,14,0,0">
+      <StackPanel>
+        <TextBlock Text="签名参数" FontSize="16" FontWeight="SemiBold" />
+        <TextBlock Text="证书、时间戳服务与 SHA-256 算法由本机安全配置固定。"
+                   Margin="0,7,0,0"
+                   Foreground="{DynamicResource TextSecondaryBrush}"
+                   TextWrapping="Wrap" />
+        <Grid Margin="0,12,0,0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="90" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Text="签名证书" VerticalAlignment="Center" />
+          <ComboBox Grid.Column="1"
+                    ItemsSource="{Binding AvailableCertificates}"
+                    SelectedItem="{Binding SelectedCertificate}"
+                    AutomationProperties.Name="选择签名证书">
+            <ComboBox.ItemTemplate>
+              <DataTemplate>
+                <StackPanel>
+                  <TextBlock Text="{Binding CommonName}" FontWeight="SemiBold" />
+                  <TextBlock Text="{Binding SerialNumber}"
+                             FontFamily="Consolas"
+                             Foreground="{DynamicResource TextSecondaryBrush}" />
+                </StackPanel>
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+        </Grid>
+        <Grid Margin="0,12,0,0">
+          <Grid.Style>
+            <Style TargetType="Grid">
+              <Setter Property="Visibility" Value="Collapsed" />
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding DetectedTypeText}" Value="PDF 文档签名">
+                  <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </Grid.Style>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="90" />
+            <ColumnDefinition Width="90" />
+            <ColumnDefinition Width="90" />
+            <ColumnDefinition Width="90" />
+            <ColumnDefinition Width="90" />
+          </Grid.ColumnDefinitions>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+          </Grid.RowDefinitions>
+          <TextBlock Text="页码" />
+          <TextBox Grid.Column="1" Text="{Binding PdfPage}" AutomationProperties.Name="PDF 签名页码" />
+          <TextBlock Grid.Row="1" Text="签名区域" Margin="0,11,0,0" />
+          <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding PdfLeft}" Margin="0,8,6,0" AutomationProperties.Name="签名区域左边界" />
+          <TextBox Grid.Row="1" Grid.Column="2" Text="{Binding PdfBottom}" Margin="0,8,6,0" AutomationProperties.Name="签名区域下边界" />
+          <TextBox Grid.Row="1" Grid.Column="3" Text="{Binding PdfRight}" Margin="0,8,6,0" AutomationProperties.Name="签名区域右边界" />
+          <TextBox Grid.Row="1" Grid.Column="4" Text="{Binding PdfTop}" Margin="0,8,0,0" AutomationProperties.Name="签名区域上边界" />
+          <TextBlock Grid.Row="2" Text="原因" Margin="0,11,0,0" />
+          <TextBox Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="4" Text="{Binding PdfReason}" Margin="0,8,0,0" AutomationProperties.Name="PDF 签名原因" />
+          <TextBlock Grid.Row="3" Text="地点" Margin="0,11,0,0" />
+          <TextBox Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="4" Text="{Binding PdfLocation}" Margin="0,8,0,0" AutomationProperties.Name="PDF 签名地点" />
+        </Grid>
+      </StackPanel>
+    </Border>
+
+    <Button Content="提交签名"
+            Command="{Binding SubmitCommand}"
+            HorizontalAlignment="Right"
+            Margin="0,14,0,0"
+            AutomationProperties.Name="提交本机签名任务" />
+  </StackPanel>
+</UserControl>

@@ -1,0 +1,13 @@
+{
+  "signingUserSid": "S-1-5-21-1000-2000-3000-4000",
+  "spoolPath": "C:\\ProgramData\\SimplySignAuto\\spool",
+  "simplySignDesktopPath": "C:\\Program Files\\Certum\\SimplySign Desktop\\SimplySignDesktop.exe",
+  "pkcs11ModulePath": "C:\\Program Files\\Certum\\SimplySign Desktop\\synthetic-pkcs11.dll",
+  "authenticode": {
+    "signToolPath": "C:\\Program Files (x86)\\Windows Kits\\10\\bin\\x64\\signtool.exe",
+    "timestampUrl": "http://time.certum.pl/"
+  },
+  "pdf": {
+    "timestampUrl": "http://time.certum.pl/"
+  }
+}

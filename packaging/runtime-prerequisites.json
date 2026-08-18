@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "architecture": "x64",
+  "minimumMajor": 10,
+  "rollForward": "Major",
+  "releaseMetadataUrl": "https://builds.dotnet.microsoft.com/dotnet/release-metadata/10.0/releases.json",
+  "maximumMetadataBytes": 2097152,
+  "maximumInstallerBytes": 134217728,
+  "approvedHosts": [
+    "builds.dotnet.microsoft.com"
+  ],
+  "allowedSignerSubjects": [
+    "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US"
+  ],
+  "runtimes": [
+    {
+      "name": "Microsoft.WindowsDesktop.App",
+      "metadataProperty": "windowsdesktop",
+      "installerName": "windowsdesktop-runtime-win-x64.exe"
+    },
+    {
+      "name": "Microsoft.AspNetCore.App",
+      "metadataProperty": "aspnetcore-runtime",
+      "installerName": "aspnetcore-runtime-win-x64.exe"
+    }
+  ]
+}

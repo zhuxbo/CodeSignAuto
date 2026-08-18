@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>SimplySignAutoSetup</AssemblyName>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <SelfContained>false</SelfContained>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <PublishTrimmed>false</PublishTrimmed>
+    <InformationalVersion>$(Version)</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'win-x64'">
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <EnableSingleFileAnalyzer>false</EnableSingleFileAnalyzer>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(SetupPayloadPath)' != ''">
+    <EmbeddedResource Include="$(SetupPayloadPath)" LogicalName="SimplySignAuto.Setup.Payload.zip" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(SetupMetadataPath)' != ''">
+    <EmbeddedResource Include="$(SetupMetadataPath)" LogicalName="SimplySignAuto.Setup.Metadata.json" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="SimplySignAuto.EndToEnd.Tests" />
+  </ItemGroup>
+</Project>

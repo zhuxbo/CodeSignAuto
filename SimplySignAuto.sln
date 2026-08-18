@@ -1,0 +1,102 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimplySignAuto.App", "src\\SimplySignAuto.App\\SimplySignAuto.App.csproj", "{7DC7A5F4-9F0A-47D8-92A4-9E11E7DEEC45}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimplySignAuto.Core", "src\\SimplySignAuto.Core\\SimplySignAuto.Core.csproj", "{B64EC8B3-F493-4523-9367-21C5C089249A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimplySignAuto.Service", "src\\SimplySignAuto.Service\\SimplySignAuto.Service.csproj", "{14BAF908-4AF3-462F-AD66-3C2A4374C6C2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimplySignAuto.Agent", "src\\SimplySignAuto.Agent\\SimplySignAuto.Agent.csproj", "{997A44BE-2D87-43CB-9EBF-A7DC0F4DE321}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimplySignAuto.Protocol", "src\\SimplySignAuto.Protocol\\SimplySignAuto.Protocol.csproj", "{DCA790FB-B8CB-4B4C-A175-B1373F5CFC10}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimplySignAuto.Core.Tests", "tests\\SimplySignAuto.Core.Tests\\SimplySignAuto.Core.Tests.csproj", "{CE0668BA-9BF3-4F8E-B9B7-969B8C577B61}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimplySignAuto.Service.Tests", "tests\\SimplySignAuto.Service.Tests\\SimplySignAuto.Service.Tests.csproj", "{C0C2A5CC-1241-4B6F-ABF7-12F5671D3CF1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimplySignAuto.Agent.Tests", "tests\\SimplySignAuto.Agent.Tests\\SimplySignAuto.Agent.Tests.csproj", "{E013B7FB-A1B2-4749-972B-5B7C6F8FE917}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimplySignAuto.Protocol.Tests", "tests\\SimplySignAuto.Protocol.Tests\\SimplySignAuto.Protocol.Tests.csproj", "{BBA12D2C-D639-4E4F-983B-0D061E5550EC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimplySignAuto.UI.Tests", "tests\\SimplySignAuto.UI.Tests\\SimplySignAuto.UI.Tests.csproj", "{D5C6B7A7-7B09-4F0B-A701-8F6EFA4B4A1A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimplySignAuto.EndToEnd.Tests", "tests\\SimplySignAuto.EndToEnd.Tests\\SimplySignAuto.EndToEnd.Tests.csproj", "{F310CF94-173B-4A3A-988B-EE9B3B3CD729}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnsignedHello", "tests\\SimplySignAuto.Agent.Tests\\Fixtures\\UnsignedHello\\UnsignedHello.csproj", "{73A0DD97-B2C3-49FE-89B7-E2147194645D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimplySignAuto.CoverageGate", "tools\\SimplySignAuto.CoverageGate\\SimplySignAuto.CoverageGate.csproj", "{46A8F7CF-FF58-4CA3-BA9C-66B6DE9A0A1E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CoverageHang", "tests\\SimplySignAuto.EndToEnd.Tests\\Fixtures\\CoverageHang\\CoverageHang.csproj", "{9A9825B7-E3DD-4632-83C5-452D72E55A0A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimplySignAuto.Setup", "src\\SimplySignAuto.Setup\\SimplySignAuto.Setup.csproj", "{440DF82B-08EE-4785-905D-FA41FB4AA798}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7DC7A5F4-9F0A-47D8-92A4-9E11E7DEEC45}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7DC7A5F4-9F0A-47D8-92A4-9E11E7DEEC45}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7DC7A5F4-9F0A-47D8-92A4-9E11E7DEEC45}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7DC7A5F4-9F0A-47D8-92A4-9E11E7DEEC45}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B64EC8B3-F493-4523-9367-21C5C089249A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B64EC8B3-F493-4523-9367-21C5C089249A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B64EC8B3-F493-4523-9367-21C5C089249A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B64EC8B3-F493-4523-9367-21C5C089249A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{14BAF908-4AF3-462F-AD66-3C2A4374C6C2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{14BAF908-4AF3-462F-AD66-3C2A4374C6C2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{14BAF908-4AF3-462F-AD66-3C2A4374C6C2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{14BAF908-4AF3-462F-AD66-3C2A4374C6C2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{997A44BE-2D87-43CB-9EBF-A7DC0F4DE321}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{997A44BE-2D87-43CB-9EBF-A7DC0F4DE321}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{997A44BE-2D87-43CB-9EBF-A7DC0F4DE321}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{997A44BE-2D87-43CB-9EBF-A7DC0F4DE321}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DCA790FB-B8CB-4B4C-A175-B1373F5CFC10}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DCA790FB-B8CB-4B4C-A175-B1373F5CFC10}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DCA790FB-B8CB-4B4C-A175-B1373F5CFC10}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DCA790FB-B8CB-4B4C-A175-B1373F5CFC10}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CE0668BA-9BF3-4F8E-B9B7-969B8C577B61}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CE0668BA-9BF3-4F8E-B9B7-969B8C577B61}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CE0668BA-9BF3-4F8E-B9B7-969B8C577B61}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CE0668BA-9BF3-4F8E-B9B7-969B8C577B61}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C0C2A5CC-1241-4B6F-ABF7-12F5671D3CF1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C0C2A5CC-1241-4B6F-ABF7-12F5671D3CF1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C0C2A5CC-1241-4B6F-ABF7-12F5671D3CF1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C0C2A5CC-1241-4B6F-ABF7-12F5671D3CF1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E013B7FB-A1B2-4749-972B-5B7C6F8FE917}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E013B7FB-A1B2-4749-972B-5B7C6F8FE917}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E013B7FB-A1B2-4749-972B-5B7C6F8FE917}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E013B7FB-A1B2-4749-972B-5B7C6F8FE917}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BBA12D2C-D639-4E4F-983B-0D061E5550EC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BBA12D2C-D639-4E4F-983B-0D061E5550EC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BBA12D2C-D639-4E4F-983B-0D061E5550EC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BBA12D2C-D639-4E4F-983B-0D061E5550EC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D5C6B7A7-7B09-4F0B-A701-8F6EFA4B4A1A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D5C6B7A7-7B09-4F0B-A701-8F6EFA4B4A1A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D5C6B7A7-7B09-4F0B-A701-8F6EFA4B4A1A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D5C6B7A7-7B09-4F0B-A701-8F6EFA4B4A1A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F310CF94-173B-4A3A-988B-EE9B3B3CD729}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F310CF94-173B-4A3A-988B-EE9B3B3CD729}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F310CF94-173B-4A3A-988B-EE9B3B3CD729}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F310CF94-173B-4A3A-988B-EE9B3B3CD729}.Release|Any CPU.Build.0 = Release|Any CPU
+		{73A0DD97-B2C3-49FE-89B7-E2147194645D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{73A0DD97-B2C3-49FE-89B7-E2147194645D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{73A0DD97-B2C3-49FE-89B7-E2147194645D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{73A0DD97-B2C3-49FE-89B7-E2147194645D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{46A8F7CF-FF58-4CA3-BA9C-66B6DE9A0A1E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{46A8F7CF-FF58-4CA3-BA9C-66B6DE9A0A1E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{46A8F7CF-FF58-4CA3-BA9C-66B6DE9A0A1E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{46A8F7CF-FF58-4CA3-BA9C-66B6DE9A0A1E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9A9825B7-E3DD-4632-83C5-452D72E55A0A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9A9825B7-E3DD-4632-83C5-452D72E55A0A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9A9825B7-E3DD-4632-83C5-452D72E55A0A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9A9825B7-E3DD-4632-83C5-452D72E55A0A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{440DF82B-08EE-4785-905D-FA41FB4AA798}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{440DF82B-08EE-4785-905D-FA41FB4AA798}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{440DF82B-08EE-4785-905D-FA41FB4AA798}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{440DF82B-08EE-4785-905D-FA41FB4AA798}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

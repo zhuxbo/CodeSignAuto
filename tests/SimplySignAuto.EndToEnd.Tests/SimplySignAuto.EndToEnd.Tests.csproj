@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="Fixtures/CoverageHang/**/*.cs" />
+    <Compile Include="../../scripts/AcceptanceContracts.cs" Link="AcceptanceContracts.cs" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="coverlet.collector">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <ProjectReference Include="../../src/SimplySignAuto.App/SimplySignAuto.App.csproj" />
+    <ProjectReference Include="../../src/SimplySignAuto.Setup/SimplySignAuto.Setup.csproj" />
+    <ProjectReference Include="../SimplySignAuto.Agent.Tests/Fixtures/UnsignedHello/UnsignedHello.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="Fixtures/CoverageHang/CoverageHang.csproj"
+                      ReferenceOutputAssembly="false"
+                      AdditionalProperties="Configuration=$(Configuration)" />
+    <ProjectReference Include="../../tools/SimplySignAuto.CoverageGate/SimplySignAuto.CoverageGate.csproj" />
+  </ItemGroup>
+</Project>

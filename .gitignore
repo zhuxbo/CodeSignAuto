@@ -1,0 +1,26 @@
+.superpowers/
+.DS_Store
+._*
+__MACOSX/
+
+# .NET build output
+**/bin/
+**/obj/
+TestResults/
+
+# Python helper build and cache output
+tools/pdf-signer/.venv/
+tools/pdf-signer/build/
+tools/pdf-signer/dist/
+tools/pdf-signer/cache/
+tools/pdf-signer/.pytest_cache/
+tools/pdf-signer/.ruff_cache/
+tools/pdf-signer/**/__pycache__/
+
+# Local runtime state and secrets
+artifacts/
+*.user
+*.suo
+*.pfx
+*.key
+*.secrets.json
