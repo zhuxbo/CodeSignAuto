@@ -97,13 +97,17 @@ public sealed class SimplySignControllerTests
     {
         var clock = new ManualClock(DateTimeOffset.UnixEpoch);
         var processSource = new FakeProcessSource([11]);
+        var runner = new CapturingRunner
+        {
+            BeforeStartDetached = () => processSource.RunningSessions = [AgentSessionId],
+        };
         var calls = 0;
         var controller = CreateController(
             new DelegateProbe((_, _) =>
                 Task.FromResult(calls++ == 0
                     ? ProbeResult.NotReadyFor(AgentSessionId, "process_session_mismatch", processRunning: true, processSessionId: 0)
                     : ProbeResult.ReadyFor(AgentSessionId))),
-            new CapturingRunner(),
+            runner,
             clock,
             processSource);
 
@@ -459,6 +463,8 @@ public sealed class SimplySignControllerTests
         public ProcessLaunchResult DetachedResult { get; set; } =
             ProcessLaunchResult.Success("SimplySignDesktop.exe", TimeSpan.Zero);
 
+        public Action? BeforeStartDetached { get; init; }
+
         public Task<ProcessResult> RunAsync(
             string executable,
             IReadOnlyList<string> arguments,
@@ -476,6 +482,7 @@ public sealed class SimplySignControllerTests
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            BeforeStartDetached?.Invoke();
             DetachedArguments.Add(arguments.ToArray());
             return Task.FromResult(DetachedResult);
         }
@@ -506,18 +513,22 @@ public sealed class SimplySignControllerTests
 
     private sealed class FakeProcessSource(IReadOnlyList<int> runningSessions) : ISimplySignProcessSource
     {
+        public IReadOnlyList<int> RunningSessions { get; set; } = runningSessions;
+
         public List<int> RequestedSessionIds { get; } = [];
 
         public bool IsRunningInSession(int sessionId)
         {
             RequestedSessionIds.Add(sessionId);
-            return runningSessions.Contains(sessionId);
+            return RunningSessions.Contains(sessionId);
         }
 
         public SimplySignProcessState Read(int verifiedSessionId) =>
-            runningSessions.Count == 0
+            RunningSessions.Count == 0
                 ? new SimplySignProcessState(false, null)
-                : new SimplySignProcessState(true, runningSessions.Contains(verifiedSessionId) ? verifiedSessionId : runningSessions[0]);
+                : new SimplySignProcessState(
+                    true,
+                    RunningSessions.Contains(verifiedSessionId) ? verifiedSessionId : RunningSessions[0]);
     }
 
     private class ManualClock(DateTimeOffset utcNow) : ISimplySignClock

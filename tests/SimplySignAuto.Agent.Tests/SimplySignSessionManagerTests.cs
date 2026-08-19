@@ -168,21 +168,23 @@ public sealed class SimplySignSessionManagerTests
     }
 
     [Fact]
-    public async Task Startup_offline_attempts_login_at_most_twice_then_refreshes_catalog()
+    public async Task Startup_offline_reports_login_required_without_starting_login()
     {
         var driver = new ControlledDriver();
-        var catalog = new ControlledCatalog { FailuresRemaining = 31 };
+        var catalog = new ControlledCatalog { FailuresRemaining = int.MaxValue };
         await using var manager = CreateManager(driver, catalog);
 
         var snapshot = await manager.PrepareStartupAsync(default);
 
-        Assert.True(snapshot.Ready);
-        Assert.Equal(2, driver.LoginCalls);
-        Assert.NotNull(catalog.Current);
+        Assert.Equal(SimplySignSessionState.LoginRequired, snapshot.State);
+        Assert.Equal("login_required", snapshot.ReasonCode);
+        Assert.Equal(0, driver.LoginCalls);
+        Assert.Equal(1, catalog.RefreshCalls);
+        Assert.Null(catalog.Current);
     }
 
     [Fact]
-    public async Task Agent_startup_handler_preserves_global_manager_two_attempt_limit()
+    public async Task Agent_startup_handler_does_not_log_in_an_offline_session()
     {
         var driver = new ControlledDriver();
         var catalog = new ControlledCatalog { FailuresRemaining = int.MaxValue };
@@ -194,11 +196,12 @@ public sealed class SimplySignSessionManagerTests
 
         Assert.Equal(SimplySignSessionState.Failed, result.State);
         Assert.Equal("simplysign_login_failed", result.ErrorCode);
-        Assert.Equal(2, driver.LoginCalls);
+        Assert.Equal(0, driver.LoginCalls);
+        Assert.Equal(1, catalog.RefreshCalls);
     }
 
     [Fact]
-    public async Task New_request_id_starts_a_new_bounded_offline_round_after_cooldown()
+    public async Task New_startup_request_id_rechecks_offline_state_without_logging_in()
     {
         var driver = new ControlledDriver();
         var catalog = new ControlledCatalog { FailuresRemaining = int.MaxValue };
@@ -211,14 +214,14 @@ public sealed class SimplySignSessionManagerTests
         Assert.Equal(
             SimplySignSessionState.Failed,
             (await requests.ExecuteAsync(first, default)).State);
-        Assert.Equal(2, driver.LoginCalls);
+        Assert.Equal(0, driver.LoginCalls);
         await driver.DelayAsync(TimeSpan.FromSeconds(60), default);
         Assert.Equal(
             SimplySignSessionState.Failed,
             (await requests.ExecuteAsync(restartedService, default)).State);
 
-        Assert.Equal(4, driver.LoginCalls);
-        Assert.Equal(122, catalog.RefreshCalls);
+        Assert.Equal(0, driver.LoginCalls);
+        Assert.Equal(2, catalog.RefreshCalls);
     }
 
     [Fact]
@@ -242,7 +245,7 @@ public sealed class SimplySignSessionManagerTests
         var catalog = new ControlledCatalog { FailuresRemaining = int.MaxValue };
         await using var manager = CreateManager(driver, catalog);
 
-        var snapshot = await manager.PrepareStartupAsync(default);
+        var snapshot = await manager.EnsureReadyAsync(SessionTrigger.BeforeSign, default);
 
         Assert.Equal(SimplySignSessionState.Failed, snapshot.State);
         Assert.Equal(2, snapshot.Attempt);
@@ -255,7 +258,7 @@ public sealed class SimplySignSessionManagerTests
     }
 
     [Fact]
-    public async Task Reconnect_does_not_reset_attempt_count_or_repeat_completed_startup()
+    public async Task Reconnect_rechecks_offline_state_without_starting_login()
     {
         var driver = new ControlledDriver();
         var catalog = new ControlledCatalog { FailuresRemaining = int.MaxValue };
@@ -264,9 +267,11 @@ public sealed class SimplySignSessionManagerTests
         var completed = await manager.PrepareStartupAsync(default);
         var reconnected = await manager.PrepareStartupAsync(default);
 
-        Assert.Same(completed, reconnected);
-        Assert.Equal(2, reconnected.Attempt);
-        Assert.Equal(2, driver.LoginCalls);
+        Assert.Equal(SimplySignSessionState.LoginRequired, completed.State);
+        Assert.Equal(SimplySignSessionState.LoginRequired, reconnected.State);
+        Assert.Equal(0, reconnected.Attempt);
+        Assert.Equal(0, driver.LoginCalls);
+        Assert.Equal(2, catalog.RefreshCalls);
     }
 
     [Fact]
@@ -506,7 +511,30 @@ public sealed class SimplySignSessionManagerTests
     }
 
     [Fact]
-    public async Task Idle_health_updates_process_diagnostic_only()
+    public async Task Idle_health_invalidates_ready_session_when_the_process_has_exited_without_logging_in()
+    {
+        var driver = new ControlledDriver();
+        var catalog = new ControlledCatalog();
+        await using var manager = CreateManager(driver, catalog);
+        var ready = await manager.PrepareStartupAsync(default);
+        Assert.True(ready.Ready);
+
+        driver.ProcessState = new SimplySignProcessState(false, null);
+
+        var snapshot = await manager.CheckAsync(SessionTrigger.BackgroundHealth, default);
+
+        Assert.False(snapshot.Ready);
+        Assert.Equal(SimplySignSessionState.LoginRequired, snapshot.State);
+        Assert.Equal("login_required", snapshot.ReasonCode);
+        Assert.False(snapshot.SimplySignProcessRunning);
+        Assert.Null(catalog.Current);
+        Assert.Equal(2, driver.ProcessChecks);
+        Assert.Equal(1, catalog.RefreshCalls);
+        Assert.Equal(0, driver.LoginCalls);
+    }
+
+    [Fact]
+    public async Task Explicit_preparation_does_not_log_in_when_the_process_is_missing()
     {
         var driver = new ControlledDriver
         {
@@ -515,11 +543,12 @@ public sealed class SimplySignSessionManagerTests
         var catalog = new ControlledCatalog();
         await using var manager = CreateManager(driver, catalog);
 
-        var snapshot = await manager.CheckAsync(SessionTrigger.BackgroundHealth, default);
+        var snapshot = await manager.PrepareStartupAsync(default);
 
+        Assert.False(snapshot.Ready);
+        Assert.Equal(SimplySignSessionState.LoginRequired, snapshot.State);
         Assert.False(snapshot.SimplySignProcessRunning);
-        Assert.Equal(1, driver.ProcessChecks);
-        Assert.Equal(0, catalog.RefreshCalls);
+        Assert.Null(snapshot.SimplySignProcessSessionId);
         Assert.Equal(0, driver.LoginCalls);
     }
 
@@ -719,7 +748,7 @@ public sealed class SimplySignSessionManagerTests
     {
         public int VerifiedSessionId => SessionId;
         public DateTimeOffset UtcNow { get; private set; } = DateTimeOffset.UnixEpoch;
-        public SimplySignProcessState ProcessState { get; init; } = new(true, SessionId);
+        public SimplySignProcessState ProcessState { get; set; } = new(true, SessionId);
         public int ProcessChecks { get; private set; }
         public int CloseCalls { get; private set; }
         public int DeleteOtpCalls { get; private set; }
@@ -727,7 +756,7 @@ public sealed class SimplySignSessionManagerTests
         public Exception? LoadOtpError { get; init; }
         public Action? BeforeClose { get; set; }
         public Action? BeforeDeleteOtp { get; set; }
-        public Action? BeforeLogin { get; init; }
+        public Action? BeforeLogin { get; set; }
 
         public SimplySignProcessState CheckProcessOnly()
         {

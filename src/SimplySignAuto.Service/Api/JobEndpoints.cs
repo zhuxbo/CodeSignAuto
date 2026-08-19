@@ -62,13 +62,13 @@ public static class JobEndpoints
         routes.MapPost("/jobs", (HttpContext context, IJobStore jobs, ISpoolStore spool, IJobDispatcher dispatcher,
                 IUploadedContentValidator contentValidator,
                 JobRetentionPolicy retention, TimeProvider timeProvider,
-                IAgentHealthStatusSource agentHealth) =>
-            CreateAsync(context, jobs, spool, dispatcher, contentValidator, retention, timeProvider, agentHealth));
+                IAgentHealthStatusSource agentHealth, IAgentOnDemandLogin onDemandLogin) =>
+            CreateAsync(context, jobs, spool, dispatcher, contentValidator, retention, timeProvider, agentHealth, onDemandLogin));
         routes.MapPost("/sign", (HttpContext context, IJobStore jobs, ISpoolStore spool, IJobDispatcher dispatcher,
                 IJobCompletionNotifier notifier, JobRetentionPolicy retention,
                 IUploadedContentValidator contentValidator, TimeProvider timeProvider,
-                IAgentHealthStatusSource agentHealth, int waitSeconds = 120) =>
-            SignAsync(context, jobs, spool, dispatcher, notifier, contentValidator, retention, timeProvider, agentHealth, waitSeconds));
+                IAgentHealthStatusSource agentHealth, IAgentOnDemandLogin onDemandLogin, int waitSeconds = 120) =>
+            SignAsync(context, jobs, spool, dispatcher, notifier, contentValidator, retention, timeProvider, agentHealth, onDemandLogin, waitSeconds));
         routes.MapGet("/jobs/{jobId:guid}", GetAsync);
         routes.MapGet("/jobs/{jobId:guid}/result", DownloadAsync);
         return routes;
@@ -82,10 +82,11 @@ public static class JobEndpoints
         IUploadedContentValidator contentValidator,
         JobRetentionPolicy retention,
         TimeProvider timeProvider,
-        IAgentHealthStatusSource agentHealth)
+        IAgentHealthStatusSource agentHealth,
+        IAgentOnDemandLogin onDemandLogin)
     {
         var outcome = await TryCreateAsync(
-            context, jobs, spool, dispatcher, contentValidator, retention, timeProvider, agentHealth);
+            context, jobs, spool, dispatcher, contentValidator, retention, timeProvider, agentHealth, onDemandLogin);
         return outcome.Error ?? Results.Accepted(
             $"/v1/jobs/{outcome.Job!.Id:D}",
             CreateJobResponse.From(outcome.Job));
@@ -101,6 +102,7 @@ public static class JobEndpoints
         JobRetentionPolicy retention,
         TimeProvider timeProvider,
         IAgentHealthStatusSource agentHealth,
+        IAgentOnDemandLogin onDemandLogin,
         int waitSeconds)
     {
         if (waitSeconds is < 1 or > 120)
@@ -109,7 +111,7 @@ public static class JobEndpoints
         }
 
         var outcome = await TryCreateAsync(
-            context, jobs, spool, dispatcher, contentValidator, retention, timeProvider, agentHealth);
+            context, jobs, spool, dispatcher, contentValidator, retention, timeProvider, agentHealth, onDemandLogin);
         if (outcome.Error is not null)
         {
             return outcome.Error;
@@ -266,7 +268,8 @@ public static class JobEndpoints
         IUploadedContentValidator contentValidator,
         JobRetentionPolicy retention,
         TimeProvider timeProvider,
-        IAgentHealthStatusSource agentHealth)
+        IAgentHealthStatusSource agentHealth,
+        IAgentOnDemandLogin onDemandLogin)
     {
         var jobId = Guid.NewGuid();
         var retainSpool = false;
@@ -326,6 +329,11 @@ public static class JobEndpoints
                         HeaderUtilities.RemoveQuotes(disposition.FileNameStar.HasValue ? disposition.FileNameStar : disposition.FileName).Value);
                     var extension = Path.GetExtension(originalName).ToLowerInvariant();
                     fileKind = SigningRequestValidator.ValidateExtension(originalName);
+                    if (ShouldAttemptAutomaticLogin(agentHealth, timeProvider, fileKind.Value))
+                    {
+                        _ = await onDemandLogin.LoginAsync(context.RequestAborted).ConfigureAwait(false);
+                    }
+
                     if (ValidateAdmission(context, agentHealth, timeProvider, fileKind, parameters) is { } fileProblem)
                     {
                         return new(null, fileProblem);
@@ -514,6 +522,54 @@ public static class JobEndpoints
         return usable
             ? null
             : AdmissionProblem(context, "certificate_not_usable");
+    }
+
+    private static bool ShouldAttemptAutomaticLogin(
+        IAgentHealthStatusSource agentHealth,
+        TimeProvider timeProvider,
+        FileKind requiredKind)
+    {
+        var health = agentHealth.CurrentHealth;
+        var heartbeat = health?.Heartbeat;
+        if (health is null ||
+            heartbeat is null ||
+            health.ConnectionId == Guid.Empty ||
+            health.SessionId <= 0 ||
+            heartbeat.SessionId != health.SessionId ||
+            !AgentCapabilityPolicy.IsValid(health.Capabilities) ||
+            health.LastHeartbeatUtc is not { } receivedAt)
+        {
+            return false;
+        }
+
+        var age = timeProvider.GetUtcNow().ToUniversalTime() - receivedAt.ToUniversalTime();
+        if (age < TimeSpan.Zero || age > AgentPipeServer.HeartbeatTimeout)
+        {
+            return false;
+        }
+
+        var alias = requiredKind == FileKind.Pdf ? "pdf" : "authenticode";
+        if (!health.Capabilities.Contains(alias, StringComparer.Ordinal))
+        {
+            return false;
+        }
+
+        var capability = requiredKind == FileKind.Pdf ? heartbeat.Pdf : heartbeat.Authenticode;
+        if (requiredKind == FileKind.Pdf && capability?.ReasonCode is
+            "pdf_support_not_installed" or "pdf_helper_tampered")
+        {
+            return false;
+        }
+
+        var capabilityReady = capability is
+        {
+            Ready: true,
+            ReasonCode: "ready",
+            Session: { State: SimplySignSessionState.Ready } session,
+        } &&
+            session.SessionId == health.SessionId &&
+            session.SessionGeneration == heartbeat.SessionGeneration;
+        return heartbeat.SimplySignProcessSessionId != health.SessionId || !capabilityReady;
     }
 
     private static FileKind ParameterKind(SigningParameters parameters) => parameters switch

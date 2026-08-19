@@ -251,6 +251,85 @@ public sealed class JobEndpointsTests
     }
 
     [Theory]
+    [InlineData("/v1/jobs", false)]
+    [InlineData("/v1/jobs", true)]
+    [InlineData("/v1/sign?waitSeconds=1", false)]
+    [InlineData("/v1/sign?waitSeconds=1", true)]
+    public async Task Logged_out_session_is_prepared_before_file_spool_and_then_accepts_the_request(
+        string uri,
+        bool fileFirst)
+    {
+        var dispatcher = new RecordingDispatcher();
+        var health = new MutableAgentHealthStatusSource(TestAgentHealth.ProcessMissing(CapabilityNow));
+        var preparation = new RecordingAdmissionPreparation(health, TestAgentHealth.Ready(CapabilityNow));
+        await using var factory = await TestServiceFactory.StartAsync(services =>
+        {
+            services.AddSingleton<IJobDispatcher>(dispatcher);
+            services.AddSingleton<IAgentHealthStatusSource>(health);
+            services.AddSingleton<IAgentOnDemandLogin>(preparation);
+            services.AddSingleton<TimeProvider>(new FixedJobTimeProvider(CapabilityNow));
+        });
+        using var client = factory.CreateAuthenticatedClient();
+
+        using var response = await client.SendAsync(TestUploads.AuthenticodeRequest(uri, fileFirst));
+
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        Assert.Single(await factory.Services.GetRequiredService<IJobStore>().GetAllAsync());
+        Assert.Single(factory.SpoolJobDirectories());
+        Assert.Single(dispatcher.JobIds);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Failed_automatic_login_returns_503_without_job_or_spool_mutation(bool fileFirst)
+    {
+        var dispatcher = new RecordingDispatcher();
+        var spool = new MutationRecordingSpoolStore();
+        var health = new MutableAgentHealthStatusSource(TestAgentHealth.ProcessMissing(CapabilityNow));
+        var preparation = new RecordingAdmissionPreparation(health, replacement: null);
+        await using var factory = await TestServiceFactory.StartAsync(services =>
+        {
+            services.AddSingleton<IJobDispatcher>(dispatcher);
+            services.AddSingleton<ISpoolStore>(spool);
+            services.AddSingleton<IAgentHealthStatusSource>(health);
+            services.AddSingleton<IAgentOnDemandLogin>(preparation);
+            services.AddSingleton<TimeProvider>(new FixedJobTimeProvider(CapabilityNow));
+        });
+        using var client = factory.CreateAuthenticatedClient();
+
+        using var response = await client.SendAsync(TestUploads.AuthenticodeRequest(fileFirst: fileFirst));
+        var problem = await response.Content.ReadFromJsonAsync<ApiProblem>();
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.Equal("service_unavailable", problem!.Code);
+        Assert.Empty(await factory.Services.GetRequiredService<IJobStore>().GetAllAsync());
+        Assert.Empty(factory.SpoolJobDirectories());
+        Assert.Empty(dispatcher.JobIds);
+        Assert.Equal(0, spool.MutationCalls);
+    }
+
+    [Fact]
+    public async Task Running_but_login_required_session_is_reauthenticated_before_spool()
+    {
+        var health = new MutableAgentHealthStatusSource(TestAgentHealth.LoginRequired(CapabilityNow));
+        var preparation = new RecordingAdmissionPreparation(health, TestAgentHealth.Ready(CapabilityNow));
+        await using var factory = await TestServiceFactory.StartAsync(services =>
+        {
+            services.AddSingleton<IAgentHealthStatusSource>(health);
+            services.AddSingleton<IAgentOnDemandLogin>(preparation);
+            services.AddSingleton<TimeProvider>(new FixedJobTimeProvider(CapabilityNow));
+        });
+        using var client = factory.CreateAuthenticatedClient();
+
+        using var response = await client.SendAsync(TestUploads.AuthenticodeRequest());
+
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        Assert.Single(await factory.Services.GetRequiredService<IJobStore>().GetAllAsync());
+        Assert.Single(factory.SpoolJobDirectories());
+    }
+
+    [Theory]
     [InlineData("missing", HttpStatusCode.BadRequest, "certificate_not_found")]
     [InlineData("ambiguous", HttpStatusCode.BadRequest, "certificate_serial_ambiguous")]
     [InlineData("unusable", HttpStatusCode.BadRequest, "certificate_not_usable")]
@@ -1079,6 +1158,23 @@ internal sealed class FixedAgentHealthStatusSource(AgentHealthSnapshot? health) 
     public AgentHealthSnapshot? CurrentHealth => health;
 }
 
+internal sealed class MutableAgentHealthStatusSource(AgentHealthSnapshot? health) : IAgentHealthStatusSource
+{
+    public AgentHealthSnapshot? CurrentHealth { get; set; } = health;
+}
+
+internal sealed class RecordingAdmissionPreparation(
+    MutableAgentHealthStatusSource health,
+    AgentHealthSnapshot? replacement) : IAgentOnDemandLogin
+{
+    public Task<bool> LoginAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        health.CurrentHealth = replacement;
+        return Task.FromResult(replacement is not null);
+    }
+}
+
 internal static class TestAgentHealth
 {
     public static AgentHealthSnapshot Ready(
@@ -1094,6 +1190,82 @@ internal static class TestAgentHealth
             ["authenticode", "pdf"],
             heartbeatAt ?? now,
             heartbeat);
+    }
+
+    public static AgentHealthSnapshot LoginRequired(DateTimeOffset now)
+    {
+        var session = new SimplySignSessionSnapshot(
+            SimplySignSessionState.LoginRequired,
+            1,
+            now,
+            now,
+            null,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            "login_required",
+            0,
+            null,
+            true,
+            7);
+        var capability = new CapabilitySnapshot(
+            true,
+            false,
+            false,
+            null,
+            false,
+            false,
+            null,
+            false,
+            false,
+            null,
+            false,
+            "login_required",
+            session: session);
+        var heartbeat = new AgentHeartbeat(
+            7,
+            "login_required",
+            "login_required",
+            "login_required",
+            "login_required",
+            null,
+            7,
+            capability,
+            capability,
+            1,
+            certificates: [Certificate("6F09D233")]);
+        return new AgentHealthSnapshot(
+            Guid.Parse("dddddddd-dddd-dddd-dddd-dddddddddddd"),
+            7,
+            ["authenticode", "pdf"],
+            now,
+            heartbeat);
+    }
+
+    public static AgentHealthSnapshot ProcessMissing(DateTimeOffset now)
+    {
+        var ready = Ready(now);
+        var heartbeat = ready.Heartbeat!;
+        return ready with
+        {
+            Heartbeat = new AgentHeartbeat(
+                heartbeat.SessionId,
+                "not_ready",
+                heartbeat.TokenStatus,
+                heartbeat.CertificateStatus,
+                heartbeat.KeyStatus,
+                heartbeat.CurrentJobId,
+                simplySignProcessSessionId: null,
+                heartbeat.Authenticode,
+                heartbeat.Pdf,
+                heartbeat.SessionGeneration,
+                heartbeat.SessionTransitions,
+                heartbeat.Certificates),
+        };
     }
 
     public static CertificateSummary Certificate(

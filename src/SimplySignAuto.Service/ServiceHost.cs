@@ -232,6 +232,7 @@ public static class ServiceHost
             AddCleanup(builder);
             builder.Services.TryAddSingleton<IJobDispatcher, NullJobDispatcher>();
             builder.Services.TryAddSingleton<IAgentHealthStatusSource, DisconnectedAgentHealthStatusSource>();
+            builder.Services.TryAddSingleton<IAgentOnDemandLogin, UnavailableAgentOnDemandLogin>();
             return;
         }
 
@@ -262,6 +263,7 @@ public static class ServiceHost
         builder.Services.AddSingleton<IAgentPipeTransport>(services => services.GetRequiredService<AgentPipeServer>());
         builder.Services.AddSingleton<IAgentControlTransport>(services =>
             services.GetRequiredService<AgentPipeServer>());
+        builder.Services.AddSingleton<IAgentOnDemandLogin, AgentOnDemandLogin>();
         builder.Services.AddSingleton<IAgentStartupPreparationTransport>(services =>
             services.GetRequiredService<AgentPipeServer>());
         builder.Services.AddSingleton<AgentStartupPreparationCoordinator>();

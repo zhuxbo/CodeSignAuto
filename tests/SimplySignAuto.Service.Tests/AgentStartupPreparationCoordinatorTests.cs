@@ -7,6 +7,43 @@ namespace SimplySignAuto.Service.Tests;
 public sealed class AgentStartupPreparationCoordinatorTests
 {
     [Fact]
+    public async Task On_demand_login_shares_one_inflight_relogin_command()
+    {
+        var transport = new RecordingControlTransport();
+        var login = new AgentOnDemandLogin(transport);
+
+        var first = login.LoginAsync(default);
+        var second = login.LoginAsync(default);
+        var request = await transport.Request.Task.WaitAsync(TimeSpan.FromSeconds(1));
+
+        Assert.Equal(AdminControlContract.Relogin, request.Operation);
+        Assert.Equal(1, transport.Calls);
+        transport.Completion.SetResult(new AgentControlResponse(
+            request.RequestId,
+            request.Operation,
+            ProtocolV3TestFixtures.Heartbeat(),
+            null,
+            null,
+            null,
+            null,
+            null));
+        Assert.True(await first);
+        Assert.True(await second);
+    }
+
+    [Fact]
+    public async Task Completed_on_demand_attempt_is_not_reused_for_a_later_request()
+    {
+        var transport = new ImmediateFailureControlTransport();
+        var login = new AgentOnDemandLogin(transport);
+
+        Assert.False(await login.LoginAsync(default));
+        Assert.False(await login.LoginAsync(default));
+
+        Assert.Equal(2, transport.Calls);
+    }
+
+    [Fact]
     public async Task Delayed_first_verified_connection_starts_once_and_completion_prevents_same_process_reconnect_duplicate()
     {
         var transport = new RecordingPreparationTransport();
@@ -61,17 +98,11 @@ public sealed class AgentStartupPreparationCoordinatorTests
     }
 
     [Fact]
-    public async Task Connection_replacement_resends_running_request_but_failed_result_retries_with_new_request_after_reconnect()
+    public async Task Connection_replacement_resends_running_request_but_failed_result_completes_without_retry()
     {
         var transport = new RecordingPreparationTransport();
         var requestId = Guid.NewGuid();
-        var retryRequestId = Guid.NewGuid();
-        var requestIds = new Queue<Guid>([requestId, retryRequestId]);
-        var retryDelay = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var coordinator = new AgentStartupPreparationCoordinator(
-            transport,
-            requestIds.Dequeue,
-            cancellationToken => retryDelay.Task.WaitAsync(cancellationToken));
+        var coordinator = new AgentStartupPreparationCoordinator(transport, () => requestId);
         using var cancellation = new CancellationTokenSource();
         var run = coordinator.RunAsync(cancellation.Token);
         var firstConnection = Guid.NewGuid();
@@ -86,38 +117,26 @@ public sealed class AgentStartupPreparationCoordinatorTests
         Assert.Equal(requestId, resumed.Command.RequestId);
         transport.Complete(replacement, new PrepareSimplySignSessionResult(
             requestId, SimplySignSessionState.Failed, "simplysign_login_failed"));
-        await WaitUntilAsync(() => coordinator.Current.Status == AgentStartupPreparationStatus.Pending);
+        await WaitUntilAsync(() => coordinator.Current.Status == AgentStartupPreparationStatus.Completed);
         Assert.Equal("simplysign_login_failed", coordinator.Current.Result!.ErrorCode);
-        Assert.Null(coordinator.Current.RequestId);
+        Assert.Equal(requestId, coordinator.Current.RequestId);
         Assert.False(transport.HasPendingSend);
 
         transport.Disconnect(replacement);
-        var retryConnection = Guid.NewGuid();
-        transport.Connect(retryConnection);
-        retryDelay.SetResult();
-        var retry = await transport.NextSendAsync();
-        Assert.Equal(retryConnection, retry.ConnectionId);
-        Assert.Equal(retryRequestId, retry.Command.RequestId);
-        transport.Complete(retryConnection, new PrepareSimplySignSessionResult(
-            retryRequestId, SimplySignSessionState.Ready, null));
-        await WaitUntilAsync(() => coordinator.Current.Status == AgentStartupPreparationStatus.Completed);
+        transport.Connect(Guid.NewGuid());
+        await Task.Delay(20);
+        Assert.False(transport.HasPendingSend);
         Assert.False(run.IsCompleted);
         cancellation.Cancel();
         await run;
     }
 
     [Fact]
-    public async Task Failed_result_retries_with_new_request_on_the_same_verified_connection_after_cooldown()
+    public async Task Failed_result_does_not_start_a_background_retry_on_the_same_connection()
     {
         var transport = new RecordingPreparationTransport();
         var requestId = Guid.NewGuid();
-        var retryRequestId = Guid.NewGuid();
-        var requestIds = new Queue<Guid>([requestId, retryRequestId]);
-        var retryDelay = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var coordinator = new AgentStartupPreparationCoordinator(
-            transport,
-            requestIds.Dequeue,
-            cancellationToken => retryDelay.Task.WaitAsync(cancellationToken));
+        var coordinator = new AgentStartupPreparationCoordinator(transport, () => requestId);
         using var cancellation = new CancellationTokenSource();
         var run = coordinator.RunAsync(cancellation.Token);
         var connectionId = Guid.NewGuid();
@@ -126,13 +145,11 @@ public sealed class AgentStartupPreparationCoordinatorTests
 
         transport.Complete(connectionId, new PrepareSimplySignSessionResult(
             requestId, SimplySignSessionState.Failed, "simplysign_login_failed"));
-        await WaitUntilAsync(() => coordinator.Current.Status == AgentStartupPreparationStatus.Pending);
+        await WaitUntilAsync(() => coordinator.Current.Status == AgentStartupPreparationStatus.Completed);
         Assert.False(transport.HasPendingSend);
 
-        retryDelay.SetResult();
-        var retry = await transport.NextSendAsync();
-        Assert.Equal(connectionId, retry.ConnectionId);
-        Assert.Equal(retryRequestId, retry.Command.RequestId);
+        await Task.Delay(20);
+        Assert.False(transport.HasPendingSend);
         cancellation.Cancel();
         await run;
     }
@@ -272,5 +289,44 @@ public sealed class AgentStartupPreparationCoordinatorTests
 
         public void Complete(Guid connectionId, PrepareSimplySignSessionResult result) =>
             MessageReceived?.Invoke(this, new AgentMessageReceivedEventArgs(connectionId, result));
+    }
+
+    private sealed class RecordingControlTransport : IAgentControlTransport
+    {
+        public TaskCompletionSource<AgentControlRequest> Request { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource<AgentControlResponse> Completion { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public int Calls { get; private set; }
+
+        public Task<AgentControlResponse> SendControlAsync(
+            AgentControlRequest request,
+            CancellationToken cancellationToken)
+        {
+            Calls++;
+            Request.TrySetResult(request);
+            return Completion.Task.WaitAsync(cancellationToken);
+        }
+    }
+
+    private sealed class ImmediateFailureControlTransport : IAgentControlTransport
+    {
+        public int Calls { get; private set; }
+
+        public Task<AgentControlResponse> SendControlAsync(
+            AgentControlRequest request,
+            CancellationToken cancellationToken)
+        {
+            Calls++;
+            return Task.FromResult(new AgentControlResponse(
+                request.RequestId,
+                request.Operation,
+                null,
+                null,
+                null,
+                null,
+                "management_unavailable",
+                Guid.NewGuid()));
+        }
     }
 }

@@ -106,8 +106,11 @@ curl --fail-with-body \
 
 两个 part 的先后顺序不限。额外、重复或缺失 part 会返回 `invalid_parameters`。服务会同时核对扩展名和文件 magic，不只信任上传文件名。
 
-服务只接受当前 Agent 会话中对应签名能力已就绪的请求。连接断开、heartbeat
-过期或对应能力未就绪时返回 `503 service_unavailable`；PDF 扩展缺失或校验失败时
+服务只接受当前 Agent 会话中对应签名能力已就绪的请求。空闲会话不做后台保活；如果
+Agent 连接和 heartbeat 仍有效，但 SimplySign 进程或对应能力处于需要登录状态，服务会
+在写入 spool 和创建任务前通过 Agent 控制通道发起一次登录，并发请求共享同一次进行中的
+登录。登录失败、连接断开、heartbeat 过期或登录后能力仍未就绪时返回
+`503 service_unavailable`，且不创建任务、不保留上传文件；PDF 扩展缺失或校验失败时
 分别返回 `pdf_support_not_installed` 或 `pdf_helper_tampered`。能够在入队前确定的
 参数结构、文件类型和证书错误会直接返回 problem JSON，不创建任务，也不留下
 spool 文件。`parameters` part 位于文件前时，这些错误会在读取文件内容前返回。

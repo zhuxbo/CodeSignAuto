@@ -57,8 +57,17 @@ public static class ReadinessStatusMapper
             AddReason(reasons, "heartbeat_stale");
         }
 
+        if (!snapshot.SimplySignProcessRunning)
+        {
+            AddReason(reasons, "process_missing");
+        }
+        else if (snapshot.SimplySignProcessSessionId != snapshot.AgentSessionId)
+        {
+            AddReason(reasons, "process_session_mismatch");
+        }
+
         var infrastructureReady = reasons.Count == 0;
-        var authenticodeReady = snapshot.Certificates.Any(
+        var authenticodeReady = infrastructureReady && snapshot.Certificates.Any(
             static certificate => certificate.CatalogCurrent && certificate.AuthenticodeUsable);
         var pdfExtensionMissing = !snapshot.Pdf.Configured ||
             string.Equals(
@@ -69,11 +78,12 @@ public static class ReadinessStatusMapper
             snapshot.Pdf.ReasonCode,
             "pdf_helper_tampered",
             StringComparison.Ordinal);
-        var pdfReady = !pdfExtensionMissing &&
+        var pdfReady = infrastructureReady &&
+            !pdfExtensionMissing &&
             !pdfExtensionTampered &&
             snapshot.Certificates.Any(
             static certificate => certificate.CatalogCurrent && certificate.PdfUsable);
-        if (!authenticodeReady)
+        if (infrastructureReady && !authenticodeReady)
         {
             AddReason(
                 reasons,
@@ -83,11 +93,11 @@ public static class ReadinessStatusMapper
                     : "heartbeat_invalid");
         }
 
-        if (pdfExtensionTampered)
+        if (infrastructureReady && pdfExtensionTampered)
         {
             AddReason(reasons, "pdf_helper_tampered");
         }
-        else if (!pdfExtensionMissing && !pdfReady)
+        else if (infrastructureReady && !pdfExtensionMissing && !pdfReady)
         {
             AddReason(
                 reasons,

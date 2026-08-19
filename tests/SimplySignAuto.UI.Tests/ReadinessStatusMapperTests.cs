@@ -131,11 +131,11 @@ public sealed class ReadinessStatusMapperTests
             processSessionId: null,
             certificates: []));
 
-        Assert.Equal(["certificate_missing"], status.Reasons);
+        Assert.Equal(["process_missing"], status.Reasons);
     }
 
     [Fact]
-    public void Process_observation_is_diagnostic_and_cannot_override_current_ready_sessions()
+    public void Missing_process_cannot_leave_cached_capabilities_or_overall_status_ready()
     {
         var status = ReadinessStatusMapper.Map(Snapshot(
             Ready(),
@@ -143,8 +143,10 @@ public sealed class ReadinessStatusMapperTests
             processRunning: false,
             processSessionId: null));
 
-        Assert.Equal(OverallReadiness.Ready, status.Overall);
-        Assert.Empty(status.Reasons);
+        Assert.Equal(OverallReadiness.ActionRequired, status.Overall);
+        Assert.False(status.AuthenticodeReady);
+        Assert.False(status.PdfReady);
+        Assert.Equal(["process_missing"], status.Reasons);
     }
 
     [Theory]

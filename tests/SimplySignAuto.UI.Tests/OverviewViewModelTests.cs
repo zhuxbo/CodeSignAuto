@@ -270,8 +270,8 @@ public sealed class OverviewViewModelTests
         Assert.Equal("×", viewModel.PdfStatusIcon);
         Assert.Equal("排队 3 · 执行中 1", viewModel.QueueStatusText);
         Assert.Equal("PDF 文档签名 · 正在验证 · 已运行 5 秒", viewModel.CurrentJobText);
-        Assert.Empty(viewModel.ReasonMessages);
-        Assert.False(viewModel.HasDiagnostics);
+        Assert.Equal(["SimplySign 未运行"], viewModel.ReasonMessages);
+        Assert.True(viewModel.HasDiagnostics);
     }
 
     [Theory]

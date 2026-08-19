@@ -153,7 +153,7 @@ public sealed class SimplySignSessionManager : ISimplySignSessionManager
     {
         try
         {
-            return await EnsureReadyAsync(SessionTrigger.Startup, _lifetime.Token).ConfigureAwait(false);
+            return await CheckAsync(SessionTrigger.Startup, _lifetime.Token).ConfigureAwait(false);
         }
         finally
         {
@@ -504,6 +504,25 @@ public sealed class SimplySignSessionManager : ISimplySignSessionManager
     {
         var process = _driver.CheckProcessOnly();
         var current = GetSnapshot();
+        if (current.Ready && !IsVerifiedProcess(process))
+        {
+            _catalog.Invalidate();
+            _ = Publish(
+                SimplySignSessionState.Checking,
+                "checking",
+                current.Attempt,
+                nextRetryAtUtc: null,
+                current.SessionGeneration,
+                process);
+            return Publish(
+                SimplySignSessionState.LoginRequired,
+                "login_required",
+                current.Attempt,
+                nextRetryAtUtc: null,
+                current.SessionGeneration,
+                process);
+        }
+
         return Publish(
             current.State,
             current.ReasonCode,
@@ -667,14 +686,32 @@ public sealed class SimplySignSessionManager : ISimplySignSessionManager
         return invalidated.SessionGeneration;
     }
 
-    private SimplySignSessionSnapshot PublishReady(long generation, int attempt) =>
-        Publish(
+    private SimplySignSessionSnapshot PublishReady(long generation, int attempt)
+    {
+        var process = _driver.CheckProcessOnly();
+        if (!IsVerifiedProcess(process))
+        {
+            _catalog.Invalidate();
+            return Publish(
+                SimplySignSessionState.LoginRequired,
+                "login_required",
+                attempt,
+                nextRetryAtUtc: null,
+                generation,
+                process);
+        }
+
+        return Publish(
             SimplySignSessionState.Ready,
             "ready",
             attempt,
             nextRetryAtUtc: null,
             generation,
-            _driver.CheckProcessOnly());
+            process);
+    }
+
+    private bool IsVerifiedProcess(SimplySignProcessState process) =>
+        process.ProcessRunning && process.SessionId == _driver.VerifiedSessionId;
 
     private SimplySignSessionSnapshot Publish(
         SimplySignSessionState state,

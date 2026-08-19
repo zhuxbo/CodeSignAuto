@@ -38,11 +38,9 @@ public interface IAgentStartupPreparationRuntime
 
 public sealed class AgentStartupPreparationCoordinator : IAgentStartupPreparationRuntime
 {
-    private static readonly TimeSpan FailedResultRetryDelay = TimeSpan.FromSeconds(60);
     private readonly object _sync = new();
     private readonly IAgentStartupPreparationTransport _transport;
     private readonly Func<Guid> _requestIdFactory;
-    private readonly Func<CancellationToken, Task> _retryDelayAsync;
     private readonly Channel<CoordinatorEvent> _events = Channel.CreateUnbounded<CoordinatorEvent>(
         new UnboundedChannelOptions
         {
@@ -60,21 +58,9 @@ public sealed class AgentStartupPreparationCoordinator : IAgentStartupPreparatio
     public AgentStartupPreparationCoordinator(
         IAgentStartupPreparationTransport transport,
         Func<Guid>? requestIdFactory = null)
-        : this(
-            transport,
-            requestIdFactory,
-            cancellationToken => Task.Delay(FailedResultRetryDelay, cancellationToken))
-    {
-    }
-
-    internal AgentStartupPreparationCoordinator(
-        IAgentStartupPreparationTransport transport,
-        Func<Guid>? requestIdFactory,
-        Func<CancellationToken, Task> retryDelayAsync)
     {
         _transport = transport ?? throw new ArgumentNullException(nameof(transport));
         _requestIdFactory = requestIdFactory ?? Guid.NewGuid;
-        _retryDelayAsync = retryDelayAsync ?? throw new ArgumentNullException(nameof(retryDelayAsync));
     }
 
     public AgentStartupPreparationSnapshot Current
@@ -127,10 +113,7 @@ public sealed class AgentStartupPreparationCoordinator : IAgentStartupPreparatio
                         }
                         break;
                     case ResultReceived received:
-                        if (Complete(received.ConnectionId, received.Result))
-                        {
-                            await RetryAfterFailureAsync(cancellationToken).ConfigureAwait(false);
-                        }
+                        Complete(received.ConnectionId, received.Result);
                         break;
                 }
             }
@@ -217,7 +200,7 @@ public sealed class AgentStartupPreparationCoordinator : IAgentStartupPreparatio
         }
     }
 
-    private bool Complete(Guid connectionId, PrepareSimplySignSessionResult result)
+    private void Complete(Guid connectionId, PrepareSimplySignSessionResult result)
     {
         lock (_sync)
         {
@@ -226,48 +209,12 @@ public sealed class AgentStartupPreparationCoordinator : IAgentStartupPreparatio
                 _lastSentConnectionId != connectionId ||
                 _transport.CurrentConnection?.ConnectionId != connectionId)
             {
-                return false;
-            }
-
-            _result = result;
-            if (result.State == SimplySignSessionState.Ready)
-            {
-                Volatile.Write(ref _status, (int)AgentStartupPreparationStatus.Completed);
-                return false;
-            }
-
-            _requestId = null;
-            Volatile.Write(ref _status, (int)AgentStartupPreparationStatus.Pending);
-            return true;
-        }
-    }
-
-    private async Task RetryAfterFailureAsync(CancellationToken cancellationToken)
-    {
-        await _retryDelayAsync(cancellationToken).ConfigureAwait(false);
-        var current = _transport.CurrentConnection;
-        if (current is null)
-        {
-            return;
-        }
-
-        lock (_sync)
-        {
-            if (_status != (int)AgentStartupPreparationStatus.Pending)
-            {
                 return;
             }
 
-            if (_lastSentConnectionId == current.ConnectionId)
-            {
-                _lastSentConnectionId = null;
-            }
+            _result = result;
+            Volatile.Write(ref _status, (int)AgentStartupPreparationStatus.Completed);
         }
-
-        await HandleConnectedAsync(
-            current.ConnectionId,
-            current.ProcessId,
-            cancellationToken).ConfigureAwait(false);
     }
 
     private void OnConnectionStateChanged(object? sender, AgentConnectionStateChangedEventArgs args) =>

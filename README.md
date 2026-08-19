@@ -94,7 +94,7 @@ Service，并在公共桌面创建指向固定安装路径的“SimplySignAuto�
 
 ## 导入 SimplySign 激活信息
 
-首次部署由 Administrator 在自己的 WPF 控制台“激活凭证”页导入完整 `otpauth://` URI。控制台经受双向身份校验的本机管理管道把 URI 单次转发给 Service，Service 不写磁盘或日志，再交给签名用户 Agent 解析并用该用户的 CurrentUser DPAPI 保存；管理员进程不会生成管理员自己的 `otp.dat`。成功后输入框和剪贴板会清理，协议响应不回传 secret。此后 Agent 自动计算 TOTP、调用 `/autologin`，并在每次签名前重新检查 PKCS#11 token、证书和私钥。
+首次部署由 Administrator 在自己的 WPF 控制台“激活凭证”页导入完整 `otpauth://` URI。控制台经受双向身份校验的本机管理管道把 URI 单次转发给 Service，Service 不写磁盘或日志，再交给签名用户 Agent 解析并用该用户的 CurrentUser DPAPI 保存；管理员进程不会生成管理员自己的 `otp.dat`。成功后输入框和剪贴板会清理，协议响应不回传 secret。导入凭证本身不会登录或启动 SimplySign；管理员可以在概览页点击“登录”。空闲时软件不做后台登录或重试；HTTP API 收到参数与文件类型均可接受的签名请求后，才会在创建任务和写入 spool 前按需计算 TOTP、调用 `/autologin`，并重新检查 PKCS#11 token、证书和私钥。登录或校验失败时直接返回 `503`，不保留任务或上传文件。
 
 需要重新测试激活导入时，先确认没有活动签名任务，再在“激活凭证”页点击“清除”并确认。软件会关闭当前 SimplySign 会话、删除当前签名用户由本产品保存的 DPAPI 激活内容，并清空当前证书列表；之后可重新导入新的 `otpauth://` URI。该操作不会删除 Certum 账户或签名证书。若导入时提示“签名代理尚未就绪”，首次安装应先重启 Windows；已经重启时等待 Service 与签名用户 Agent 启动后再试。
 
@@ -231,7 +231,7 @@ curl --fail-with-body -H "Authorization: Bearer $TOKEN" "$BASE_URL/v1/health/rea
 
 Agent 发布全局七态会话：`UNKNOWN`、`CHECKING`、`READY`、`LOGIN_REQUIRED`、`LOGINNING`、`WAIT_TOKEN`、`FAILED`。Service 启动准备或签名前若 SimplySign 已在线，只探测并刷新一次证书目录，不调用 `/autologin`；离线时一个逻辑触发最多调用两次 `/autologin`，并发任务共享同一轮。生成 TOTP 时要求当前 counter 至少还剩 3 秒；不足 3 秒会等待下一 counter，而不是浪费一次尝试。首次 token 等待窗口失败后可在下一 counter 再试一次；第二次失败进入 `FAILED` 并至少冷却 60 秒。
 
-每个任务在签名前取得绑定当前证书目录快照的 ready lease；旧 heartbeat、旧目录或上一任务的 `READY` 不是签名依据。空闲时没有登录 keepalive：每 5 分钟的健康检查只做零等待进程探测，不登录、不等待 token、也不刷新证书目录。SimplySign 会话空闲约 1800 秒过期时不会在后台自动重登；下一次签名会按上述最多两次的规则恢复会话、刷新目录并继续签名。Agent/pipe 在探测或登录失败后保持运行，readiness 继续 fail closed，后续签名可在冷却结束后恢复。
+每个任务在签名前取得绑定当前证书目录快照的 ready lease；旧 heartbeat、旧目录或上一任务的 `READY` 不是签名依据。空闲时没有登录 keepalive：每 5 分钟的健康检查只做零等待进程探测，不登录、不等待 token、也不刷新证书目录。SimplySign 会话空闲约 1800 秒过期后，界面会如实显示需要登录；管理员仍可手工点击“登录”。HTTP API 收到签名请求时，如果当前 Agent 连接和 heartbeat 有效但签名会话未就绪，会在写入 spool 和创建任务前通过与界面相同的控制通道发起一次登录；并发请求共享同一次进行中的登录。登录失败直接返回 503，不创建任务，也不遗留上传文件。Agent/pipe 在探测或登录失败后保持运行，后续请求可再次尝试。
 
 `agent --background` 只启动签名用户的 headless Agent 且不保留命令行窗口；脱敏诊断写入该用户 `%LOCALAPPDATA%\SimplySignAuto\logs\desktop-agent.log`，按 64 MiB 硬上限循环覆盖。无参数启动只运行管理员控制台。需要前台观察 Agent 时使用 `agent --console`，安装、配置和版本命令仍保持正常终端输入输出。
 

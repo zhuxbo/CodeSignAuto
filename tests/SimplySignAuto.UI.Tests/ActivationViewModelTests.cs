@@ -313,7 +313,7 @@ public sealed class ActivationViewModelTests
         Assert.Equal(29, vm.TotpRemainingSeconds);
         Assert.Equal(1, backend.GenerateTotpCalls);
         Assert.Equal(0, backend.ClipboardSetCalls);
-        Assert.Equal("用于其他机器人工登录；本机自动登录无需显示", vm.TotpInstruction);
+        Assert.Equal("用于其他机器人工登录；本机按需登录无需显示", vm.TotpInstruction);
     }
 
     [Fact]

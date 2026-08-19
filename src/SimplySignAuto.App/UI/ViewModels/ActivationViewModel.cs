@@ -141,7 +141,7 @@ public sealed class ActivationViewModel : INotifyPropertyChanged, IDisposable
 
     public IReadOnlyList<CertificateCardViewModel> Certificates => _certificates;
 
-    public string TotpInstruction => "用于其他机器人工登录；本机自动登录无需显示";
+    public string TotpInstruction => "用于其他机器人工登录；本机按需登录无需显示";
 
     public bool CanValidateLogin =>
         _management.LatestSnapshot is { ActiveJobCount: 0, CurrentJob: null };
