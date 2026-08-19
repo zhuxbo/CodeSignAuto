@@ -11,12 +11,6 @@ $ProgressPreference = 'SilentlyContinue'
 $SemVerPattern = '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$'
 $Utf8NoBom = [System.Text.UTF8Encoding]::new($false)
 $SbomCreatedUtc = '1980-01-01T00:00:00Z'
-$PdfFontUri = 'https://raw.githubusercontent.com/notofonts/noto-cjk/Sans2.004/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf'
-$PdfFontSha256 = '2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b'
-$PdfFontLength = 16437364
-$PdfFontLicenseUri = 'https://raw.githubusercontent.com/notofonts/noto-cjk/Sans2.004/LICENSE'
-$PdfFontLicenseSha256 = '6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2'
-$PdfFontLicenseLength = 4301
 $ReleaseNativeTypeBase64 = 'dXNpbmcgU3lzdGVtOyB1c2luZyBTeXN0ZW0uUnVudGltZS5JbnRlcm9wU2VydmljZXM7IHVzaW5nIE1pY3Jvc29mdC5XaW4zMi5TYWZlSGFuZGxlczsgbmFtZXNwYWNlIFNpbXBseVNpZ25BdXRvLlJlbGVhc2UgeyBbU3RydWN0TGF5b3V0KExheW91dEtpbmQuU2VxdWVudGlhbCldIHB1YmxpYyBzdHJ1Y3QgRmlsZUluZm9ybWF0aW9uIHsgcHVibGljIHVpbnQgRmlsZUF0dHJpYnV0ZXM7IHB1YmxpYyBTeXN0ZW0uUnVudGltZS5JbnRlcm9wU2VydmljZXMuQ29tVHlwZXMuRklMRVRJTUUgQ3JlYXRpb25UaW1lOyBwdWJsaWMgU3lzdGVtLlJ1bnRpbWUuSW50ZXJvcFNlcnZpY2VzLkNvbVR5cGVzLkZJTEVUSU1FIExhc3RBY2Nlc3NUaW1lOyBwdWJsaWMgU3lzdGVtLlJ1bnRpbWUuSW50ZXJvcFNlcnZpY2VzLkNvbVR5cGVzLkZJTEVUSU1FIExhc3RXcml0ZVRpbWU7IHB1YmxpYyB1aW50IFZvbHVtZVNlcmlhbE51bWJlcjsgcHVibGljIHVpbnQgRmlsZVNpemVIaWdoOyBwdWJsaWMgdWludCBGaWxlU2l6ZUxvdzsgcHVibGljIHVpbnQgbk51bWJlck9mTGlua3M7IHB1YmxpYyB1aW50IEZpbGVJbmRleEhpZ2g7IHB1YmxpYyB1aW50IEZpbGVJbmRleExvdzsgfSBwdWJsaWMgc3RhdGljIGNsYXNzIE5hdGl2ZU1ldGhvZHMgeyBbRGxsSW1wb3J0KCJrZXJuZWwzMi5kbGwiLCBTZXRMYXN0RXJyb3I9dHJ1ZSldIFtyZXR1cm46IE1hcnNoYWxBcyhVbm1hbmFnZWRUeXBlLkJvb2wpXSBwdWJsaWMgc3RhdGljIGV4dGVybiBib29sIEdldEZpbGVJbmZvcm1hdGlvbkJ5SGFuZGxlKFNhZmVGaWxlSGFuZGxlIGhhbmRsZSwgb3V0IEZpbGVJbmZvcm1hdGlvbiBpbmZvcm1hdGlvbik7IH0gfQ=='
 $SigningClientScript = Join-Path $PSScriptRoot 'sign-via-simplysign.ps1'
 . $SigningClientScript
@@ -241,52 +235,6 @@ function Get-LowerSha256 {
     param([Parameter(Mandatory = $true)][string]$Path)
 
     return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
-}
-
-function Get-PinnedReleaseInput {
-    param(
-        [Parameter(Mandatory = $true)][uri]$Uri,
-        [Parameter(Mandatory = $true)][string]$Path,
-        [Parameter(Mandatory = $true)][long]$ExpectedLength,
-        [Parameter(Mandatory = $true)][string]$ExpectedSha256
-    )
-
-    if ($Uri.Scheme -cne 'https' -or
-        $ExpectedLength -le 0 -or
-        $ExpectedSha256 -notmatch '^[0-9a-f]{64}$' -or
-        (Test-Path -LiteralPath $Path)) {
-        Fail-Release 'release_dependency_input_invalid'
-    }
-    $partPath = $Path + '.part'
-    if (Test-Path -LiteralPath $partPath) {
-        Fail-Release 'release_dependency_input_invalid'
-    }
-
-    $curl = [System.IO.Path]::GetFullPath((Join-Path $env:SystemRoot 'System32/curl.exe'))
-    if (-not (Test-Path -LiteralPath $curl -PathType Leaf)) {
-        Fail-Release 'release_dependency_downloader_missing'
-    }
-    & $curl @(
-        '--fail', '--silent', '--show-error', '--location',
-        '--proto', '=https', '--proto-redir', '=https',
-        '--connect-timeout', '15', '--max-time', '120',
-        '--output', $partPath, $Uri.AbsoluteUri)
-    if ($LASTEXITCODE -ne 0) {
-        if (Test-Path -LiteralPath $partPath) {
-            Remove-Item -LiteralPath $partPath -Force
-        }
-        Fail-Release 'release_dependency_download_failed'
-    }
-
-    $item = Get-Item -LiteralPath $partPath -Force
-    if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0 -or
-        $item.Length -ne $ExpectedLength -or
-        (Get-LowerSha256 -Path $partPath) -cne $ExpectedSha256) {
-        Remove-Item -LiteralPath $partPath -Force
-        Fail-Release 'release_dependency_integrity_invalid'
-    }
-    [System.IO.File]::Move($partPath, $Path)
-    return $Path
 }
 
 function Get-CertificateSha256 {
@@ -849,7 +797,7 @@ function Publish-SetupArtifact {
         'publish', $SetupProject,
         '-c', 'Release',
         '-r', 'win-x64',
-        '--self-contained', 'true',
+        '--self-contained', 'false',
         '--no-restore',
         '-m:1',
         '-nodeReuse:false',
@@ -984,50 +932,11 @@ if (@($first.Files | Where-Object { $_.path -ceq 'SimplySignAuto.runtimeconfig.j
 
 $pdfHelperRoot = Join-Path $RepoRoot 'tools/pdf-signer'
 $uv = (Get-Command uv -CommandType Application -ErrorAction Stop).Path
-$pdfFontInputRoot = Join-Path $BuildRoot 'pdf-font-input'
-[System.IO.Directory]::CreateDirectory($pdfFontInputRoot) | Out-Null
-$pdfFontPath = Get-PinnedReleaseInput `
-    -Uri $PdfFontUri `
-    -Path (Join-Path $pdfFontInputRoot 'NotoSansCJKsc-Regular.otf') `
-    -ExpectedLength $PdfFontLength `
-    -ExpectedSha256 $PdfFontSha256
-$pdfFontLicensePath = Get-PinnedReleaseInput `
-    -Uri $PdfFontLicenseUri `
-    -Path (Join-Path $pdfFontInputRoot 'NotoSansCJK-OFL.txt') `
-    -ExpectedLength $PdfFontLicenseLength `
-    -ExpectedSha256 $PdfFontLicenseSha256
-$fontEnvironmentName = 'SIMPLYSIGN_PDF_FONT_PATH'
-$fontLicenseEnvironmentName = 'SIMPLYSIGN_PDF_FONT_LICENSE_PATH'
-$previousFontPath = [Environment]::GetEnvironmentVariable(
-    $fontEnvironmentName,
-    [EnvironmentVariableTarget]::Process)
-$previousFontLicensePath = [Environment]::GetEnvironmentVariable(
-    $fontLicenseEnvironmentName,
-    [EnvironmentVariableTarget]::Process)
-try {
-    [Environment]::SetEnvironmentVariable(
-        $fontEnvironmentName,
-        $pdfFontPath,
-        [EnvironmentVariableTarget]::Process)
-    [Environment]::SetEnvironmentVariable(
-        $fontLicenseEnvironmentName,
-        $pdfFontLicensePath,
-        [EnvironmentVariableTarget]::Process)
-    Invoke-Checked -FilePath $uv -WorkingDirectory $pdfHelperRoot -ArgumentList @('sync', '--frozen')
-    Invoke-Checked -FilePath $uv -WorkingDirectory $pdfHelperRoot -ArgumentList @('run', 'pytest', '-q')
-    Invoke-Checked -FilePath $uv -WorkingDirectory $pdfHelperRoot -ArgumentList @('run', 'ruff', 'check', '.')
-    Invoke-Checked -FilePath $uv -WorkingDirectory $pdfHelperRoot -ArgumentList @(
-        'run', 'pyinstaller', '--clean', '--noconfirm', 'pdf-signer.spec')
-} finally {
-    [Environment]::SetEnvironmentVariable(
-        $fontEnvironmentName,
-        $previousFontPath,
-        [EnvironmentVariableTarget]::Process)
-    [Environment]::SetEnvironmentVariable(
-        $fontLicenseEnvironmentName,
-        $previousFontLicensePath,
-        [EnvironmentVariableTarget]::Process)
-}
+Invoke-Checked -FilePath $uv -WorkingDirectory $pdfHelperRoot -ArgumentList @('sync', '--frozen')
+Invoke-Checked -FilePath $uv -WorkingDirectory $pdfHelperRoot -ArgumentList @('run', 'pytest', '-q')
+Invoke-Checked -FilePath $uv -WorkingDirectory $pdfHelperRoot -ArgumentList @('run', 'ruff', 'check', '.')
+Invoke-Checked -FilePath $uv -WorkingDirectory $pdfHelperRoot -ArgumentList @(
+    'run', 'pyinstaller', '--clean', '--noconfirm', 'pdf-signer.spec')
 $builtPdfHelperPath = Join-Path $pdfHelperRoot 'dist/SimplySignPdfSigner.exe'
 if (-not (Test-Path -LiteralPath $builtPdfHelperPath -PathType Leaf)) {
     Fail-Release 'release_pdf_helper_missing'

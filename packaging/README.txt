@@ -28,8 +28,8 @@ Package contents
 - SimplySignAuto.exe and e_sqlite3.dll: framework-dependent Service, headless
   Agent and administrator WPF app payload.
 - install-prerequisites.ps1 and runtime-prerequisites.json: signed prerequisite
-  checker and strict runtime policy. Missing supported .NET runtimes are
-  downloaded and installed online with passive, no-restart options.
+  checker and strict runtime policy. Missing supported .NET runtimes stop setup
+  before product mutation; the installer never downloads or installs runtimes.
 - release-files.cat: signed catalog closing the complete embedded payload.
 - agent.example.json and service.example.json: advanced schema references only;
   standard setup generates protected configuration automatically.
@@ -42,6 +42,8 @@ Package contents
 The main installer contains only the base product and enables Authenticode.
 The PDF installer contains extension.json, the signed SimplySignPdfSigner
 executable, and the two license documents. The helper is never downloaded by the product.
+Visible PDF stamps select a font that covers the required text from the protected
+Windows Fonts directory; no font file is bundled in the helper.
 Both embedded archives are internal build inputs, not user-facing ZIP files.
 
 Standard install

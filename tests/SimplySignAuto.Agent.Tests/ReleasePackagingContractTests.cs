@@ -44,6 +44,11 @@ public sealed class ReleasePackagingContractTests
             "src",
             "SimplySignAuto.App",
             "SimplySignAuto.App.csproj"));
+        var setupProject = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "src",
+            "SimplySignAuto.Setup",
+            "SimplySignAuto.Setup.csproj"));
         var script = ReadBuildScript();
         var publishPropertyGroupStart = project.IndexOf(
             "<PropertyGroup Condition=\"'$(RuntimeIdentifier)' == 'win-x64'\">",
@@ -63,6 +68,9 @@ public sealed class ReleasePackagingContractTests
         Assert.Contains("<EnableSingleFileAnalyzer>false</EnableSingleFileAnalyzer>", publishProperties, StringComparison.Ordinal);
         Assert.Contains("<PublishReadyToRun>false</PublishReadyToRun>", project, StringComparison.Ordinal);
         Assert.Contains("<PublishTrimmed>false</PublishTrimmed>", project, StringComparison.Ordinal);
+        Assert.DoesNotContain("<SelfContained>true</SelfContained>", setupProject, StringComparison.Ordinal);
+        Assert.Equal(2, Count(script, "'--self-contained', 'false'"));
+        Assert.DoesNotContain("'--self-contained', 'true'", script, StringComparison.Ordinal);
         Assert.Contains("'--self-contained', 'false'", script, StringComparison.Ordinal);
         Assert.Contains("'-p:PublishSingleFile=true'", script, StringComparison.Ordinal);
         Assert.Contains("'-p:EnableCompressionInSingleFile=false'", script, StringComparison.Ordinal);
@@ -311,25 +319,19 @@ public sealed class ReleasePackagingContractTests
     }
 
     [Fact]
-    public void Release_pdf_helper_bundles_one_pinned_chinese_font_and_its_license()
+    public void Release_pdf_helper_uses_only_trusted_windows_fonts()
     {
         var repositoryRoot = FindRepositoryRoot();
         var script = ReadBuildScript();
         var spec = File.ReadAllText(Path.Combine(repositoryRoot, "tools", "pdf-signer", "pdf-signer.spec"));
         var notices = File.ReadAllText(Path.Combine(repositoryRoot, "THIRD-PARTY-NOTICES.txt"));
-        var download = script.IndexOf("Get-PinnedReleaseInput", StringComparison.Ordinal);
-        var helperTests = script.IndexOf("'run', 'pytest', '-q'", StringComparison.Ordinal);
 
-        Assert.Contains("notofonts/noto-cjk/Sans2.004", script, StringComparison.Ordinal);
-        Assert.Contains("Join-Path $env:SystemRoot 'System32/curl.exe'", script, StringComparison.Ordinal);
-        Assert.Contains("2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b", script, StringComparison.Ordinal);
-        Assert.Contains("6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2", script, StringComparison.Ordinal);
-        Assert.True(download >= 0 && helperTests > download);
-        Assert.Contains("SIMPLYSIGN_PDF_FONT_PATH", spec, StringComparison.Ordinal);
-        Assert.Contains("SIMPLYSIGN_PDF_FONT_LICENSE_PATH", spec, StringComparison.Ordinal);
-        Assert.Contains("(str(font_path), \"fonts\")", spec, StringComparison.Ordinal);
-        Assert.Contains("(str(font_license_path), \"licenses\")", spec, StringComparison.Ordinal);
-        Assert.Contains("Noto Sans CJK SC 2.004", notices, StringComparison.Ordinal);
+        Assert.DoesNotContain("Get-PinnedReleaseInput", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("notofonts/noto-cjk", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("SIMPLYSIGN_PDF_FONT_PATH", spec, StringComparison.Ordinal);
+        Assert.DoesNotContain("SIMPLYSIGN_PDF_FONT_LICENSE_PATH", spec, StringComparison.Ordinal);
+        Assert.Contains("datas = []", spec, StringComparison.Ordinal);
+        Assert.DoesNotContain("Noto Sans CJK SC 2.004", notices, StringComparison.Ordinal);
     }
 
     [WindowsFact]

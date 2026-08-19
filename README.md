@@ -21,7 +21,7 @@ SimplySignAuto 在 Windows Server 2025 Desktop Experience 上提供 HTTP 签名 
   或受支持的 Windows 10 Enterprise/IoT Enterprise LTSC、Windows 11，均为
   x64；系统时间必须可靠同步。
 - 需要稳定版 .NET Windows Desktop Runtime 与 ASP.NET Core Runtime 10 或
-  更高主版本；独立 Setup 可在安装主程序前在线被动安装缺失 runtime。
+  更高主版本；Setup 不下载或安装 runtime，缺失时不会开始产品安装。
 - 已安装 Certum SimplySign Desktop，并存在 `C:\Windows\System32\SimplySignPKCS.dll`；Setup 在创建用户或修改系统前检查两者，缺失时直接提示安装。
 - Authenticode 能力需要 Windows SDK x64 `signtool.exe`；只使用 PDF 时不需要 SignTool。
 - 产品自身不终止 TLS，也不导入或更新服务端证书。若使用 HTTPS，部署者负责反向代理、证书更新、外部主机名和代理到本机 HTTP 端口的访问控制。
@@ -87,7 +87,9 @@ Service，并在公共桌面创建指向固定安装路径的“SimplySignAuto�
    相同；主程序按扩展清单的 `schemaVersion` 判断格式兼容性，清单中的
    `productVersion` 仅标记扩展构建来源。安装包离线验证 helper 的长度、
    SHA-256、代码签名和发布者后原子安装扩展；管理控制台在下一次状态刷新后
-   显示 PDF 入口。无需 PDF 时不要安装该扩展。
+   显示 PDF 入口。PDF 可见签章按实际文本从受保护的 Windows Fonts 目录选择
+   覆盖全部所需字形的系统字体；没有合格字体时返回
+   `pdf_appearance_font_missing`。无需 PDF 时不要安装该扩展。
 
 同一主程序 Setup 同时负责全新安装和受控原地升级。检测到现有安装时，Setup
 只接受签名、catalog、install instance、owner marker、SID、账户/profile、ACL、

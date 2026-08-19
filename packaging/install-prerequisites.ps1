@@ -17,7 +17,6 @@ if ([string]::IsNullOrWhiteSpace($ManifestPath)) {
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 
-$script:SecureDownloadDirectory = $null
 $releasePublisherCertificateSha256 = '__SIMPLYSIGNAUTO_PUBLISHER_CERTIFICATE_SHA256__'
 $releaseNativeTypeBase64 = 'dXNpbmcgU3lzdGVtOyB1c2luZyBTeXN0ZW0uUnVudGltZS5JbnRlcm9wU2VydmljZXM7IHVzaW5nIE1pY3Jvc29mdC5XaW4zMi5TYWZlSGFuZGxlczsgbmFtZXNwYWNlIFNpbXBseVNpZ25BdXRvLlJlbGVhc2UgeyBbU3RydWN0TGF5b3V0KExheW91dEtpbmQuU2VxdWVudGlhbCldIHB1YmxpYyBzdHJ1Y3QgRmlsZUluZm9ybWF0aW9uIHsgcHVibGljIHVpbnQgRmlsZUF0dHJpYnV0ZXM7IHB1YmxpYyBTeXN0ZW0uUnVudGltZS5JbnRlcm9wU2VydmljZXMuQ29tVHlwZXMuRklMRVRJTUUgQ3JlYXRpb25UaW1lOyBwdWJsaWMgU3lzdGVtLlJ1bnRpbWUuSW50ZXJvcFNlcnZpY2VzLkNvbVR5cGVzLkZJTEVUSU1FIExhc3RBY2Nlc3NUaW1lOyBwdWJsaWMgU3lzdGVtLlJ1bnRpbWUuSW50ZXJvcFNlcnZpY2VzLkNvbVR5cGVzLkZJTEVUSU1FIExhc3RXcml0ZVRpbWU7IHB1YmxpYyB1aW50IFZvbHVtZVNlcmlhbE51bWJlcjsgcHVibGljIHVpbnQgRmlsZVNpemVIaWdoOyBwdWJsaWMgdWludCBGaWxlU2l6ZUxvdzsgcHVibGljIHVpbnQgbk51bWJlck9mTGlua3M7IHB1YmxpYyB1aW50IEZpbGVJbmRleEhpZ2g7IHB1YmxpYyB1aW50IEZpbGVJbmRleExvdzsgfSBwdWJsaWMgc3RhdGljIGNsYXNzIE5hdGl2ZU1ldGhvZHMgeyBbRGxsSW1wb3J0KCJrZXJuZWwzMi5kbGwiLCBTZXRMYXN0RXJyb3I9dHJ1ZSldIFtyZXR1cm46IE1hcnNoYWxBcyhVbm1hbmFnZWRUeXBlLkJvb2wpXSBwdWJsaWMgc3RhdGljIGV4dGVybiBib29sIEdldEZpbGVJbmZvcm1hdGlvbkJ5SGFuZGxlKFNhZmVGaWxlSGFuZGxlIGhhbmRsZSwgb3V0IEZpbGVJbmZvcm1hdGlvbiBpbmZvcm1hdGlvbik7IH0gfQ=='
 
@@ -502,33 +501,14 @@ function Get-RuntimeManifest {
             'architecture',
             'minimumMajor',
             'rollForward',
-            'releaseMetadataUrl',
-            'maximumMetadataBytes',
-            'maximumInstallerBytes',
-            'approvedHosts',
-            'allowedSignerSubjects',
             'runtimes'
         )
 
         if ($manifest.schemaVersion -isnot [int] -or $manifest.schemaVersion -ne 1 -or
             $manifest.architecture -cne 'x64' -or
             $manifest.minimumMajor -isnot [int] -or $manifest.minimumMajor -ne 10 -or
-            $manifest.rollForward -cne 'Major' -or
-            $manifest.releaseMetadataUrl -cne 'https://builds.dotnet.microsoft.com/dotnet/release-metadata/10.0/releases.json' -or
-            $manifest.maximumMetadataBytes -isnot [int] -or $manifest.maximumMetadataBytes -ne 2097152 -or
-            $manifest.maximumInstallerBytes -isnot [int] -or $manifest.maximumInstallerBytes -ne 134217728) {
+            $manifest.rollForward -cne 'Major') {
             throw [System.FormatException]::new('manifest_value_invalid')
-        }
-
-        $hosts = @($manifest.approvedHosts)
-        if ($hosts.Count -ne 1 -or $hosts[0] -cne 'builds.dotnet.microsoft.com') {
-            throw [System.FormatException]::new('manifest_hosts_invalid')
-        }
-
-        $subjects = @($manifest.allowedSignerSubjects)
-        if ($subjects.Count -ne 1 -or
-            $subjects[0] -cne 'CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US') {
-            throw [System.FormatException]::new('manifest_signers_invalid')
         }
 
         $runtimes = @($manifest.runtimes)
@@ -536,20 +516,12 @@ function Get-RuntimeManifest {
             throw [System.FormatException]::new('manifest_runtimes_invalid')
         }
 
-        $expectedRuntimes = @{
-            'Microsoft.WindowsDesktop.App' = @('windowsdesktop', 'windowsdesktop-runtime-win-x64.exe')
-            'Microsoft.AspNetCore.App' = @('aspnetcore-runtime', 'aspnetcore-runtime-win-x64.exe')
-        }
+        $expectedRuntimes = @('Microsoft.WindowsDesktop.App', 'Microsoft.AspNetCore.App')
         $seen = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
         foreach ($runtime in $runtimes) {
-            Test-ExactProperties $runtime @('name', 'metadataProperty', 'installerName')
+            Test-ExactProperties $runtime @('name')
             $name = [string]$runtime.name
-            if (-not $expectedRuntimes.ContainsKey($name) -or -not $seen.Add($name)) {
-                throw [System.FormatException]::new('manifest_runtime_invalid')
-            }
-
-            $expected = $expectedRuntimes[$name]
-            if ($runtime.metadataProperty -cne $expected[0] -or $runtime.installerName -cne $expected[1]) {
+            if ($name -notin $expectedRuntimes -or -not $seen.Add($name)) {
                 throw [System.FormatException]::new('manifest_runtime_invalid')
             }
         }
@@ -781,427 +753,6 @@ function Get-MissingRuntimes {
     return $missing.ToArray()
 }
 
-function Test-ApprovedHttpsUri {
-    param(
-        [Parameter(Mandatory = $true)]
-        [Uri]$Uri,
-
-        [Parameter(Mandatory = $true)]
-        [string[]]$ApprovedHosts
-    )
-
-    if (-not $Uri.IsAbsoluteUri -or $Uri.Scheme -cne 'https' -or $Uri.Port -ne 443 -or
-        -not [string]::IsNullOrEmpty($Uri.UserInfo) -or [string]::IsNullOrWhiteSpace($Uri.DnsSafeHost)) {
-        return $false
-    }
-
-    foreach ($hostName in $ApprovedHosts) {
-        if ([string]::Equals($Uri.DnsSafeHost, $hostName, [StringComparison]::OrdinalIgnoreCase)) {
-            return $true
-        }
-    }
-
-    return $false
-}
-
-function Invoke-HttpDownload {
-    param(
-        [Parameter(Mandatory = $true)]
-        [Uri]$Uri,
-
-        [Parameter(Mandatory = $true)]
-        [long]$MaximumBytes,
-
-        [string]$DestinationPath,
-
-        [Parameter(Mandatory = $true)]
-        [string[]]$ApprovedHosts
-    )
-
-    try {
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    }
-    catch {
-        Stop-PrerequisiteCheck 'download' 'download_failed'
-    }
-
-    $totalTimeoutMilliseconds = 120000
-    $downloadWatch = [Diagnostics.Stopwatch]::StartNew()
-    $current = $Uri
-    for ($redirectCount = 0; $redirectCount -le 3; $redirectCount++) {
-        $remainingTotal = $totalTimeoutMilliseconds - [long]$downloadWatch.ElapsedMilliseconds
-        if ($remainingTotal -le 0) {
-            Stop-PrerequisiteCheck 'download' 'download_timeout'
-        }
-
-        $requestTimeout = [int][Math]::Min(30000, $remainingTotal)
-        if (-not (Test-ApprovedHttpsUri $current $ApprovedHosts)) {
-            Stop-PrerequisiteCheck 'download' 'redirect_rejected'
-        }
-
-        $request = [System.Net.HttpWebRequest]::CreateHttp($current)
-        $request.Method = 'GET'
-        $request.AllowAutoRedirect = $false
-        $request.Timeout = $requestTimeout
-        $request.ReadWriteTimeout = $requestTimeout
-        $request.UseDefaultCredentials = $false
-        $request.Credentials = $null
-        $request.PreAuthenticate = $false
-        $request.Proxy = $null
-        $request.UserAgent = 'SimplySignAuto-Prerequisite/1'
-        $response = $null
-        try {
-            $response = [System.Net.HttpWebResponse]$request.GetResponse()
-            $status = [int]$response.StatusCode
-            if ($status -in @(301, 302, 303, 307, 308)) {
-                if ($redirectCount -eq 3 -or [string]::IsNullOrWhiteSpace($response.Headers['Location'])) {
-                    Stop-PrerequisiteCheck 'download' 'redirect_rejected'
-                }
-
-                try {
-                    $next = New-Object Uri($current, $response.Headers['Location'])
-                }
-                catch {
-                    Stop-PrerequisiteCheck 'download' 'redirect_rejected'
-                }
-
-                if (-not (Test-ApprovedHttpsUri $next $ApprovedHosts)) {
-                    Stop-PrerequisiteCheck 'download' 'redirect_rejected'
-                }
-
-                $current = $next
-                continue
-            }
-
-            if ($status -ne 200) {
-                Stop-PrerequisiteCheck 'download' 'download_failed'
-            }
-
-            if ($response.ContentLength -gt $MaximumBytes) {
-                Stop-PrerequisiteCheck 'download' 'download_too_large'
-            }
-
-            $inputStream = $null
-            $outputStream = $null
-            $memoryStream = $null
-            try {
-                $inputStream = $response.GetResponseStream()
-                if ([string]::IsNullOrWhiteSpace($DestinationPath)) {
-                    $memoryStream = New-Object System.IO.MemoryStream
-                    $outputStream = $memoryStream
-                }
-                else {
-                    $outputStream = New-Object System.IO.FileStream(
-                        $DestinationPath,
-                        [System.IO.FileMode]::CreateNew,
-                        [System.IO.FileAccess]::Write,
-                        [System.IO.FileShare]::None)
-                }
-
-                $buffer = New-Object byte[] 81920
-                $total = [long]0
-                while ($true) {
-                    $remainingTotal = $totalTimeoutMilliseconds - [long]$downloadWatch.ElapsedMilliseconds
-                    if ($remainingTotal -le 0) {
-                        Stop-PrerequisiteCheck 'download' 'download_timeout'
-                    }
-
-                    $remainingMilliseconds = [int][Math]::Min(30000, $remainingTotal)
-                    if ($inputStream.CanTimeout) {
-                        $inputStream.ReadTimeout = $remainingMilliseconds
-                    }
-                    $read = $inputStream.Read($buffer, 0, $buffer.Length)
-                    if ($downloadWatch.ElapsedMilliseconds -ge $totalTimeoutMilliseconds) {
-                        Stop-PrerequisiteCheck 'download' 'download_timeout'
-                    }
-                    if ($read -le 0) {
-                        break
-                    }
-
-                    $total += $read
-                    if ($total -gt $MaximumBytes) {
-                        Stop-PrerequisiteCheck 'download' 'download_too_large'
-                    }
-
-                    $outputStream.Write($buffer, 0, $read)
-                }
-
-                if ($null -ne $memoryStream) {
-                    return $memoryStream.ToArray()
-                }
-
-                return
-            }
-            finally {
-                if ($null -ne $outputStream) { $outputStream.Dispose() }
-                if ($null -ne $inputStream) { $inputStream.Dispose() }
-                if ($null -ne $memoryStream) { $memoryStream.Dispose() }
-            }
-        }
-        catch {
-            if ($_.Exception.Message -match '^[a-z_]+\|[a-z0-9_]+$') {
-                throw
-            }
-
-            $exception = $_.Exception
-            while ($null -ne $exception) {
-                if (($exception -is [System.Net.WebException] -and
-                        $exception.Status -eq [System.Net.WebExceptionStatus]::Timeout) -or
-                    ($exception -is [System.Net.Sockets.SocketException] -and
-                        $exception.SocketErrorCode -eq [System.Net.Sockets.SocketError]::TimedOut)) {
-                    Stop-PrerequisiteCheck 'download' 'download_timeout'
-                }
-                $exception = $exception.InnerException
-            }
-            if ($downloadWatch.ElapsedMilliseconds -ge $totalTimeoutMilliseconds) {
-                Stop-PrerequisiteCheck 'download' 'download_timeout'
-            }
-
-            Stop-PrerequisiteCheck 'download' 'download_failed'
-        }
-        finally {
-            if ($null -ne $response) { $response.Dispose() }
-        }
-    }
-
-    Stop-PrerequisiteCheck 'download' 'redirect_rejected'
-}
-
-function Invoke-BoundedDownload {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Url,
-
-        [Parameter(Mandatory = $true)]
-        [long]$MaximumBytes,
-
-        [string]$DestinationPath,
-
-        [Parameter(Mandatory = $true)]
-        [string[]]$ApprovedHosts
-    )
-
-    try {
-        $uri = [Uri]$Url
-    }
-    catch {
-        Stop-PrerequisiteCheck 'download' 'download_url_invalid'
-    }
-
-    if (-not (Test-ApprovedHttpsUri $uri $ApprovedHosts)) {
-        Stop-PrerequisiteCheck 'download' 'download_url_invalid'
-    }
-
-    return Invoke-HttpDownload $uri $MaximumBytes $DestinationPath $ApprovedHosts
-}
-
-function Get-InstallerSelections {
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
-        'PSUseSingularNouns',
-        '',
-        Justification = 'The metadata operation resolves one selection for every missing runtime.')]
-    param(
-        [Parameter(Mandatory = $true)]
-        [byte[]]$MetadataBytes,
-
-        [Parameter(Mandatory = $true)]
-        [object]$Manifest,
-
-        [Parameter(Mandatory = $true)]
-        [object[]]$MissingRuntimes
-    )
-
-    try {
-        $encoding = New-Object System.Text.UTF8Encoding($false, $true)
-        $metadataJson = $encoding.GetString($MetadataBytes)
-        $metadata = ConvertFrom-StrictJson $metadataJson
-        $channelProperty = $metadata.PSObject.Properties['channel-version']
-        $releasesProperty = $metadata.PSObject.Properties['releases']
-        if ($null -eq $channelProperty -or $channelProperty.Value -cne '10.0' -or
-            $null -eq $releasesProperty) {
-            Stop-PrerequisiteCheck 'metadata' 'metadata_invalid'
-        }
-
-        $stable = @($releasesProperty.Value | Where-Object {
-            $property = $_.PSObject.Properties['release-version']
-            $null -ne $property -and [string]$property.Value -cmatch '^10\.0\.(0|[1-9][0-9]*)$'
-        } | Sort-Object {
-            [Version]([string]$_.PSObject.Properties['release-version'].Value)
-        } -Descending)
-        if ($stable.Count -eq 0) {
-            Stop-PrerequisiteCheck 'metadata' 'stable_release_missing'
-        }
-
-        $release = $stable[0]
-        $releaseVersion = [string]$release.PSObject.Properties['release-version'].Value
-        $selections = New-Object System.Collections.Generic.List[object]
-        foreach ($runtime in $MissingRuntimes) {
-            $componentProperty = $release.PSObject.Properties[[string]$runtime.metadataProperty]
-            if ($null -eq $componentProperty) {
-                Stop-PrerequisiteCheck 'metadata' 'metadata_invalid'
-            }
-
-            $component = $componentProperty.Value
-            $versionProperty = $component.PSObject.Properties['version']
-            $filesProperty = $component.PSObject.Properties['files']
-            if ($null -eq $versionProperty -or $versionProperty.Value -cne $releaseVersion -or
-                $null -eq $filesProperty) {
-                Stop-PrerequisiteCheck 'metadata' 'metadata_invalid'
-            }
-
-            $files = @($filesProperty.Value | Where-Object {
-                $name = $_.PSObject.Properties['name']
-                $rid = $_.PSObject.Properties['rid']
-                $null -ne $name -and $name.Value -ceq $runtime.installerName -and
-                    $null -ne $rid -and $rid.Value -ceq 'win-x64'
-            })
-            if ($files.Count -ne 1) {
-                Stop-PrerequisiteCheck 'metadata' 'metadata_invalid'
-            }
-
-            $file = $files[0]
-            $urlProperty = $file.PSObject.Properties['url']
-            $hashProperty = $file.PSObject.Properties['hash']
-            if ($null -eq $urlProperty -or $null -eq $hashProperty -or
-                [string]$hashProperty.Value -cnotmatch '^[0-9A-Fa-f]{128}$') {
-                Stop-PrerequisiteCheck 'metadata' 'metadata_invalid'
-            }
-
-            $uri = $null
-            try {
-                $uri = [Uri]([string]$urlProperty.Value)
-            }
-            catch {
-                Stop-PrerequisiteCheck 'metadata' 'metadata_invalid'
-            }
-            if ($null -eq $uri -or -not (Test-ApprovedHttpsUri $uri @($Manifest.approvedHosts))) {
-                Stop-PrerequisiteCheck 'metadata' 'metadata_invalid'
-            }
-
-            $expectedPath = if ($runtime.metadataProperty -ceq 'windowsdesktop') {
-                "/dotnet/WindowsDesktop/$releaseVersion/windowsdesktop-runtime-$releaseVersion-win-x64.exe"
-            }
-            else {
-                "/dotnet/aspnetcore/Runtime/$releaseVersion/aspnetcore-runtime-$releaseVersion-win-x64.exe"
-            }
-            if ($uri.AbsolutePath -cne $expectedPath -or -not [string]::IsNullOrEmpty($uri.Query) -or
-                -not [string]::IsNullOrEmpty($uri.Fragment)) {
-                Stop-PrerequisiteCheck 'metadata' 'metadata_invalid'
-            }
-
-            [void]$selections.Add([pscustomobject]@{
-                Runtime = $runtime
-                ReleaseVersion = $releaseVersion
-                Url = $uri.AbsoluteUri
-                Hash = ([string]$hashProperty.Value).ToLowerInvariant()
-            })
-        }
-
-        return $selections.ToArray()
-    }
-    catch {
-        if ($_.Exception.Message -match '^[a-z_]+\|[a-z0-9_]+$') {
-            throw
-        }
-
-        Stop-PrerequisiteCheck 'metadata' 'metadata_invalid'
-    }
-}
-
-function New-SecureDownloadDirectory {
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
-        'PSUseShouldProcessForStateChangingFunctions',
-        '',
-        Justification = 'The checker requires a non-interactive private temp directory and always cleans it.')]
-    param()
-
-    try {
-        $tempRoot = 'C:\Windows\Temp'
-        $rootItem = Get-Item -LiteralPath $tempRoot -Force -ErrorAction Stop
-        if (-not $rootItem.PSIsContainer -or
-            ($rootItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
-            throw [System.Security.SecurityException]::new('temp_root_invalid')
-        }
-
-        $path = Join-Path $tempRoot ('SimplySignAuto-Prerequisite-' + [Guid]::NewGuid().ToString('N'))
-        [void][System.IO.Directory]::CreateDirectory($path)
-        $administrators = New-Object Security.Principal.SecurityIdentifier(
-            [Security.Principal.WellKnownSidType]::BuiltinAdministratorsSid,
-            $null)
-        $system = New-Object Security.Principal.SecurityIdentifier(
-            [Security.Principal.WellKnownSidType]::LocalSystemSid,
-            $null)
-        $security = New-Object Security.AccessControl.DirectorySecurity
-        $security.SetAccessRuleProtection($true, $false)
-        $security.SetOwner($administrators)
-        foreach ($identity in @($administrators, $system)) {
-            $rule = New-Object Security.AccessControl.FileSystemAccessRule(
-                $identity,
-                [Security.AccessControl.FileSystemRights]::FullControl,
-                [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit',
-                [Security.AccessControl.PropagationFlags]::None,
-                [Security.AccessControl.AccessControlType]::Allow)
-            [void]$security.AddAccessRule($rule)
-        }
-
-        Set-Acl -LiteralPath $path -AclObject $security -ErrorAction Stop
-        $actual = Get-Acl -LiteralPath $path -ErrorAction Stop
-        if (-not $actual.AreAccessRulesProtected) {
-            throw [System.Security.SecurityException]::new('acl_not_protected')
-        }
-
-        $allowed = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
-        [void]$allowed.Add($administrators.Value)
-        [void]$allowed.Add($system.Value)
-        $actualIdentities = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
-        foreach ($access in @($actual.Access)) {
-            $sid = $access.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value
-            if (-not $allowed.Contains($sid) -or
-                $access.AccessControlType -ne [Security.AccessControl.AccessControlType]::Allow -or
-                (($access.FileSystemRights -band [Security.AccessControl.FileSystemRights]::FullControl) -ne
-                    [Security.AccessControl.FileSystemRights]::FullControl)) {
-                throw [System.Security.SecurityException]::new('acl_invalid')
-            }
-            [void]$actualIdentities.Add($sid)
-        }
-
-        $owner = $actual.GetOwner([Security.Principal.SecurityIdentifier]).Value
-        if (-not $allowed.Contains($owner) -or $actualIdentities.Count -ne 2 -or
-            -not $actualIdentities.Contains($administrators.Value) -or
-            -not $actualIdentities.Contains($system.Value)) {
-            throw [System.Security.SecurityException]::new('acl_invalid')
-        }
-
-        return $path
-    }
-    catch {
-        Stop-PrerequisiteCheck 'download' 'secure_temp_failed'
-    }
-}
-
-function Test-InstallerSignature {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Path,
-
-        [Parameter(Mandatory = $true)]
-        [object]$Manifest
-    )
-
-    try {
-        $signature = Get-AuthenticodeSignature -LiteralPath $Path -ErrorAction Stop
-        if ($signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid -or
-            $null -eq $signature.SignerCertificate -or
-            @($Manifest.allowedSignerSubjects) -cnotcontains $signature.SignerCertificate.Subject) {
-            Stop-PrerequisiteCheck 'signature' 'signature_invalid'
-        }
-    }
-    catch {
-        if ($_.Exception.Message -match '^[a-z_]+\|[a-z0-9_]+$') { throw }
-        Stop-PrerequisiteCheck 'signature' 'signature_invalid'
-    }
-}
-
 function Stop-ProcessTree {
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
         'PSUseShouldProcessForStateChangingFunctions',
@@ -1237,35 +788,6 @@ function Stop-ProcessTree {
     }
     finally {
         $killer.Dispose()
-    }
-}
-
-function Invoke-InstallerProcess {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Path
-    )
-
-    try {
-        $process = Start-Process -FilePath $Path `
-            -ArgumentList @('/install', '/passive', '/norestart') `
-            -Wait:$false `
-            -PassThru `
-            -ErrorAction Stop
-        if (-not $process.WaitForExit(900000)) {
-            $terminated = Stop-ProcessTree $process.Id
-            if (-not $terminated -or -not $process.WaitForExit(30000)) {
-                Stop-PrerequisiteCheck 'install' 'process_cleanup_failed'
-            }
-
-            Stop-PrerequisiteCheck 'install' 'install_timeout'
-        }
-
-        return $process.ExitCode
-    }
-    catch {
-        if ($_.Exception.Message -match '^[a-z_]+\|[a-z0-9_]+$') { throw }
-        Stop-PrerequisiteCheck 'install' 'install_failed'
     }
 }
 
@@ -1343,29 +865,6 @@ function Invoke-PrerequisiteProbe {
     }
 }
 
-function Clear-DownloadDirectory {
-    param(
-        [string]$Path
-    )
-
-    if ([string]::IsNullOrWhiteSpace($Path) -or -not [System.IO.Directory]::Exists($Path)) {
-        return
-    }
-
-    try {
-        $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
-        if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
-            [System.IO.Directory]::Delete($Path, $false)
-        }
-        else {
-            [System.IO.Directory]::Delete($Path, $true)
-        }
-    }
-    catch {
-        Stop-PrerequisiteCheck 'cleanup' 'cleanup_failed'
-    }
-}
-
 function Invoke-PrerequisiteCheck {
     $manifest = Get-RuntimeManifest $ManifestPath
     Write-PrerequisiteStatus 'manifest' 'ready'
@@ -1375,60 +874,8 @@ function Invoke-PrerequisiteCheck {
     Write-PrerequisiteStatus 'preflight' 'ready'
 
     $missing = @(Get-MissingRuntimes $manifest)
-    if ($missing.Count -eq 0) {
-        Write-PrerequisiteStatus 'detection' 'ready'
-        Invoke-PrerequisiteProbe
-        Write-PrerequisiteStatus 'probe' 'ready'
-        Write-PrerequisiteStatus 'complete' 'ready'
-        return 0
-    }
-
-    Write-PrerequisiteStatus 'detection' 'install_required'
-    $metadataBytes = Invoke-BoundedDownload `
-        ([string]$manifest.releaseMetadataUrl) `
-        ([long]$manifest.maximumMetadataBytes) `
-        $null `
-        @($manifest.approvedHosts)
-    Write-PrerequisiteStatus 'download' 'ready'
-    $selections = @(Get-InstallerSelections $metadataBytes $manifest $missing)
-    Write-PrerequisiteStatus 'metadata' 'ready'
-
-    $script:SecureDownloadDirectory = New-SecureDownloadDirectory
-    foreach ($selection in $selections) {
-        $filePath = Join-Path $script:SecureDownloadDirectory ([string]$selection.Runtime.installerName)
-        Invoke-BoundedDownload `
-            ([string]$selection.Url) `
-            ([long]$manifest.maximumInstallerBytes) `
-            $filePath `
-            @($manifest.approvedHosts)
-        Write-PrerequisiteStatus 'download' 'ready'
-
-        $actualHash = (Get-FileHash -LiteralPath $filePath -Algorithm SHA512 -ErrorAction Stop).Hash.ToLowerInvariant()
-        if ($actualHash -cne [string]$selection.Hash) {
-            Stop-PrerequisiteCheck 'download' 'hash_mismatch'
-        }
-
-        Test-InstallerSignature $filePath $manifest
-        Write-PrerequisiteStatus 'signature' 'ready'
-        $exitCode = Invoke-InstallerProcess $filePath
-        if ($exitCode -eq 3010) {
-            Write-PrerequisiteStatus 'install' 'restart_required'
-            return 3010
-        }
-
-        if ($exitCode -eq 1602) {
-            Stop-PrerequisiteCheck 'install' 'install_cancelled'
-        }
-
-        if ($exitCode -ne 0) {
-            Stop-PrerequisiteCheck 'install' 'install_failed'
-        }
-
-        Write-PrerequisiteStatus 'install' 'ready'
-    }
-
-    if (@(Get-MissingRuntimes $manifest).Count -ne 0) {
-        Stop-PrerequisiteCheck 'detection' 'runtime_missing_after_install'
+    if ($missing.Count -ne 0) {
+        Stop-PrerequisiteCheck 'detection' 'required_runtime_missing'
     }
 
     Write-PrerequisiteStatus 'detection' 'ready'
@@ -1473,16 +920,4 @@ catch {
     }
     $result = 1
 }
-finally {
-    try {
-        Clear-DownloadDirectory $script:SecureDownloadDirectory
-    }
-    catch {
-        if ($result -eq 0) {
-            Write-PrerequisiteStatus 'cleanup' 'cleanup_failed'
-            $result = 1
-        }
-    }
-}
-
 exit $result

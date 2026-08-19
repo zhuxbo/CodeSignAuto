@@ -597,18 +597,38 @@ def test_pyinstaller_spec_collects_only_required_runtime_graph_without_secrets()
         assert forbidden not in spec
 
 
-def test_frozen_helper_uses_only_its_packaged_appearance_font(
+def test_frozen_helper_uses_only_trusted_windows_appearance_fonts(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    external_font = tmp_path / "external.otf"
-    monkeypatch.setenv("SIMPLYSIGN_PDF_FONT_PATH", str(external_font))
+    windows_root = tmp_path / "Windows"
     monkeypatch.setattr(sys, "frozen", True, raising=False)
     monkeypatch.setattr(sys, "_MEIPASS", str(tmp_path / "bundle"), raising=False)
-
-    assert simplysign_pdf_signer._appearance_font_candidates() == (
-        tmp_path / "bundle" / "fonts" / "NotoSansCJKsc-Regular.otf",
+    monkeypatch.setattr(
+        simplysign_pdf_signer,
+        "_windows_fonts_directory",
+        lambda: windows_root / "Fonts",
     )
+
+    assert simplysign_pdf_signer._appearance_font_candidates() == tuple(
+        windows_root / "Fonts" / name
+        for name in simplysign_pdf_signer.WINDOWS_APPEARANCE_FONTS
+    )
+
+
+def test_windows_signature_stamp_rejects_missing_appearance_font(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(simplysign_pdf_signer.os, "name", "nt")
+    monkeypatch.setattr(
+        simplysign_pdf_signer,
+        "_windows_fonts_directory",
+        lambda: tmp_path / "Windows" / "Fonts",
+    )
+
+    with pytest.raises(RuntimeError, match="^pdf_appearance_font_missing$"):
+        simplysign_pdf_signer._signature_stamp_style("组织名称")
 
 
 def test_pyinstaller_spec_excludes_cli_and_image_surfaces_and_keeps_text_and_native_crypto(
@@ -617,12 +637,6 @@ def test_pyinstaller_spec_excludes_cli_and_image_surfaces_and_keeps_text_and_nat
 ) -> None:
     spec_path = SCRIPT.parent / "pdf-signer.spec"
     captured: dict[str, object] = {}
-    font_path = tmp_path / "NotoSansCJKsc-Regular.otf"
-    license_path = tmp_path / "NotoSansCJK-OFL.txt"
-    font_path.write_bytes(b"controlled-font")
-    license_path.write_text("controlled-license", encoding="utf-8")
-    monkeypatch.setenv("SIMPLYSIGN_PDF_FONT_PATH", str(font_path))
-    monkeypatch.setenv("SIMPLYSIGN_PDF_FONT_LICENSE_PATH", str(license_path))
 
     def fake_collect_dynamic_libs(package: str) -> list[tuple[str, str]]:
         return [(f"controlled/{package}.pyd", package)]
@@ -648,10 +662,7 @@ def test_pyinstaller_spec_excludes_cli_and_image_surfaces_and_keeps_text_and_nat
 
     options = captured["options"]
     assert options["optimize"] == 2
-    assert options["datas"] == [
-        (str(font_path), "fonts"),
-        (str(license_path), "licenses"),
-    ]
+    assert options["datas"] == []
     assert options["binaries"] == [
         ("controlled/pkcs11.pyd", "pkcs11"),
         ("controlled/cryptography.pyd", "cryptography"),

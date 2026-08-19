@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ctypes
 import hashlib
 import json
 import logging
@@ -46,7 +47,6 @@ SESSION_LOSS_EXCEPTIONS = (
     DeviceRemoved,
     TokenNotPresent,
 )
-BUNDLED_APPEARANCE_FONT_NAME = "NotoSansCJKsc-Regular.otf"
 WINDOWS_APPEARANCE_FONTS = (
     "NotoSansSC-VF.ttf",
     "Deng.ttf",
@@ -782,20 +782,25 @@ def _font_supports_text(font_path: Path, text: str) -> bool:
         return False
 
 
-def _appearance_font_candidates() -> tuple[Path, ...]:
-    if getattr(sys, "frozen", False):
-        resource_root = getattr(sys, "_MEIPASS", None)
-        if isinstance(resource_root, str) and resource_root:
-            return (Path(resource_root) / "fonts" / BUNDLED_APPEARANCE_FONT_NAME,)
-        return ()
+def _windows_fonts_directory() -> Path | None:
+    if os.name != "nt":
+        return Path(os.environ.get("WINDIR", r"C:\Windows")) / "Fonts"
 
-    candidates: list[Path] = []
-    release_font_path = os.environ.get("SIMPLYSIGN_PDF_FONT_PATH")
-    if release_font_path:
-        candidates.append(Path(release_font_path))
-    windows_root = Path(os.environ.get("WINDIR", r"C:\Windows"))
-    candidates.extend(windows_root / "Fonts" / name for name in WINDOWS_APPEARANCE_FONTS)
-    return tuple(candidates)
+    buffer = ctypes.create_unicode_buffer(32768)
+    length = ctypes.windll.kernel32.GetWindowsDirectoryW(buffer, len(buffer))
+    if length == 0 or length >= len(buffer):
+        return None
+    windows_root = Path(buffer.value)
+    if not windows_root.is_absolute():
+        return None
+    return windows_root / "Fonts"
+
+
+def _appearance_font_candidates() -> tuple[Path, ...]:
+    fonts_directory = _windows_fonts_directory()
+    if fonts_directory is None:
+        return ()
+    return tuple(fonts_directory / name for name in WINDOWS_APPEARANCE_FONTS)
 
 
 def _signature_stamp_style(required_text: str) -> SignatureTextStampStyle:
@@ -807,7 +812,11 @@ def _signature_stamp_style(required_text: str) -> SignatureTextStampStyle:
             (
                 candidate
                 for candidate in _appearance_font_candidates()
-                if candidate.is_file() and _font_supports_text(candidate, required_text)
+                if (
+                    candidate.is_file()
+                    and not candidate.is_symlink()
+                    and _font_supports_text(candidate, required_text)
+                )
             ),
             None,
         )
