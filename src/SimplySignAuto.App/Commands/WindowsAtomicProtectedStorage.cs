@@ -359,6 +359,12 @@ internal static class WindowsNoFollowSecurity
         return handle is not null;
     }
 
+    internal static bool FileEntryExists(string path)
+    {
+        using var handle = Open(path, directory: false, throwIfMissing: false);
+        return handle is not null;
+    }
+
     public static WindowsNoFollowSecuritySnapshot ReadDirectory(string path) =>
         Read(path, directory: true);
 
@@ -367,6 +373,15 @@ internal static class WindowsNoFollowSecurity
 
     internal static SafeFileHandle OpenDirectoryHandle(string path) =>
         Open(path, directory: true, throwIfMissing: true, shareDelete: false)!;
+
+    internal static SafeFileHandle OpenRenameDirectoryHandle(string path) =>
+        Open(
+            path,
+            directory: true,
+            throwIfMissing: true,
+            additionalAccess: Delete,
+            shareWrite: false,
+            shareDelete: false)!;
 
     internal static SafeFileHandle OpenReadFileHandle(string path) =>
         Open(path, directory: false, throwIfMissing: true, GenericRead)!;

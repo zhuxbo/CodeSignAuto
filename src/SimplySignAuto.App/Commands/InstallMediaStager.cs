@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Security.Principal;
@@ -21,7 +22,9 @@ internal sealed record InstallMediaPlan(
     string TargetExecutablePath,
     string PublisherIdentity,
     long RequiredBytes,
-    IReadOnlyList<InstallMediaFilePlan> Files);
+    IReadOnlyList<InstallMediaFilePlan> Files,
+    string? BackupRoot = null,
+    string? FailedRoot = null);
 
 internal interface IInstallMediaStager
 {
@@ -29,6 +32,17 @@ internal interface IInstallMediaStager
     Task StageAsync(InstallMediaPlan plan, CancellationToken cancellationToken);
     Task AuthorizeAsync(InstallMediaPlan plan, string signingUserSid, CancellationToken cancellationToken);
     Task RollbackAsync(InstallMediaPlan plan);
+}
+
+internal interface IUpgradeMediaTransaction : IInstallMediaStager
+{
+    Task VerifyUpgradeTargetReplaceableAsync(
+        InstallMediaPlan plan,
+        CancellationToken cancellationToken);
+
+    Task ActivateUpgradeAsync(InstallMediaPlan plan, CancellationToken cancellationToken);
+
+    Task CommitUpgradeAsync(InstallMediaPlan plan, CancellationToken cancellationToken);
 }
 
 internal interface IInstallMediaVerifier
@@ -68,7 +82,7 @@ internal static class InstallMediaPreflight
     }
 }
 
-internal sealed class WindowsInstallMediaStager : IInstallMediaStager
+internal sealed class WindowsInstallMediaStager : IInstallMediaStager, IUpgradeMediaTransaction
 {
     private static readonly SecurityIdentifier LocalSystem =
         new(WellKnownSidType.LocalSystemSid, null);
@@ -77,12 +91,18 @@ internal sealed class WindowsInstallMediaStager : IInstallMediaStager
     private readonly IInstallMediaVerifier _verifier;
     private readonly Func<string> _nonceFactory;
     private readonly IAtomicProtectedDirectoryOperations _directoryOperations;
+    private readonly bool _upgrade;
     private InstallMediaPlan? _activePlan;
     private SourceMediaLease? _sourceLease;
+    private SourceMediaLease? _oldTargetLease;
     private LocalFileIdentity? _ownedDirectoryIdentity;
     private bool _stagingCreated;
     private bool _promoted;
     private bool _rollbackSafe;
+    private bool _authorized;
+    private bool _backupCreated;
+    private LocalFileIdentity? _existingTargetIdentity;
+    private IReadOnlyList<InstallMediaFilePlan>? _oldFiles;
 
     public WindowsInstallMediaStager()
         : this(
@@ -90,7 +110,8 @@ internal sealed class WindowsInstallMediaStager : IInstallMediaStager
             Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
             new WindowsInstallMediaVerifier(),
             () => Guid.NewGuid().ToString("N"),
-            new WindowsAtomicProtectedDirectoryOperations())
+            new WindowsAtomicProtectedDirectoryOperations(),
+            upgrade: false)
     {
     }
 
@@ -104,7 +125,8 @@ internal sealed class WindowsInstallMediaStager : IInstallMediaStager
             programFilesRoot,
             verifier,
             nonceFactory,
-            new WindowsAtomicProtectedDirectoryOperations())
+            new WindowsAtomicProtectedDirectoryOperations(),
+            upgrade: false)
     {
     }
 
@@ -113,7 +135,8 @@ internal sealed class WindowsInstallMediaStager : IInstallMediaStager
         string programFilesRoot,
         IInstallMediaVerifier verifier,
         Func<string> nonceFactory,
-        IAtomicProtectedDirectoryOperations directoryOperations)
+        IAtomicProtectedDirectoryOperations directoryOperations,
+        bool upgrade = false)
     {
         _sourceRoot = Path.GetFullPath(sourceRoot ?? throw new ArgumentNullException(nameof(sourceRoot)));
         _programFilesRoot = Path.GetFullPath(programFilesRoot ?? throw new ArgumentNullException(nameof(programFilesRoot)));
@@ -121,6 +144,7 @@ internal sealed class WindowsInstallMediaStager : IInstallMediaStager
         _nonceFactory = nonceFactory ?? throw new ArgumentNullException(nameof(nonceFactory));
         _directoryOperations = directoryOperations ??
             throw new ArgumentNullException(nameof(directoryOperations));
+        _upgrade = upgrade;
     }
 
     public async Task<InstallMediaPlan> PlanAsync(CancellationToken cancellationToken)
@@ -140,9 +164,12 @@ internal sealed class WindowsInstallMediaStager : IInstallMediaStager
             VerifySourceAncestors(_sourceRoot);
             VerifyTargetAncestors(_programFilesRoot);
             var targetRoot = InstallMediaPaths.GetTargetRoot(_programFilesRoot);
-            if (EntryExists(targetRoot))
+            var targetExists = EntryExists(targetRoot);
+            if (_upgrade ? !targetExists : targetExists)
             {
-                throw new SetupException("install_media_target_exists");
+                throw new SetupException(_upgrade
+                    ? "owned_resource_mismatch"
+                    : "install_media_target_exists");
             }
 
             var nonce = _nonceFactory();
@@ -154,7 +181,19 @@ internal sealed class WindowsInstallMediaStager : IInstallMediaStager
             var stagingRoot = Path.GetFullPath(Path.Combine(
                 _programFilesRoot,
                 $"{InstallMediaPaths.ProductDirectoryName}.part-{nonce}"));
-            if (EntryExists(stagingRoot))
+            var backupRoot = _upgrade
+                ? Path.GetFullPath(Path.Combine(
+                    _programFilesRoot,
+                    $"{InstallMediaPaths.ProductDirectoryName}.backup-{nonce}"))
+                : null;
+            var failedRoot = _upgrade
+                ? Path.GetFullPath(Path.Combine(
+                    _programFilesRoot,
+                    $"{InstallMediaPaths.ProductDirectoryName}.failed-{nonce}"))
+                : null;
+            if (EntryExists(stagingRoot) ||
+                backupRoot is not null && EntryExists(backupRoot) ||
+                failedRoot is not null && EntryExists(failedRoot))
             {
                 throw new SetupException("install_media_target_exists");
             }
@@ -175,6 +214,21 @@ internal sealed class WindowsInstallMediaStager : IInstallMediaStager
                 Path.Combine(_sourceRoot, InstallMediaPaths.VerificationScriptFileName));
             ValidatePublisherHash(publisher);
             await _verifier.VerifyMediaAsync(_sourceRoot, publisher, cancellationToken).ConfigureAwait(false);
+            if (_upgrade)
+            {
+                _existingTargetIdentity = ReadDirectoryIdentity(targetRoot);
+                var installedPublisher = _verifier.VerifyInitialPublisher(
+                    Path.Combine(targetRoot, InstallMediaPaths.ExecutableFileName),
+                    Path.Combine(targetRoot, InstallMediaPaths.VerificationScriptFileName));
+                if (!string.Equals(installedPublisher, publisher, StringComparison.Ordinal))
+                {
+                    throw new SetupException("install_media_publisher_mismatch");
+                }
+
+                await _verifier.VerifyMediaAsync(targetRoot, publisher, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
             lease = await SourceMediaLease.CaptureAsync(_sourceRoot, cancellationToken).ConfigureAwait(false);
             if (!beforeVerification.RefersToSameSnapshot(lease))
             {
@@ -200,7 +254,9 @@ internal sealed class WindowsInstallMediaStager : IInstallMediaStager
                 Path.Combine(targetRoot, InstallMediaPaths.ExecutableFileName),
                 publisher,
                 requiredBytes,
-                files);
+                files,
+                backupRoot,
+                failedRoot);
             _sourceLease = lease;
             lease = null;
             _activePlan = plan;
@@ -267,6 +323,17 @@ internal sealed class WindowsInstallMediaStager : IInstallMediaStager
             await _verifier.VerifyMediaAsync(plan.StagingRoot, plan.PublisherIdentity, cancellationToken)
                 .ConfigureAwait(false);
             await VerifyTreeAsync(plan.StagingRoot, plan.Files, true, cancellationToken).ConfigureAwait(false);
+            if (_upgrade)
+            {
+                if (!EntryExists(plan.TargetRoot) ||
+                    !SameIdentity(_existingTargetIdentity, ReadDirectoryIdentity(plan.TargetRoot)))
+                {
+                    throw new SetupException("owned_resource_mismatch");
+                }
+
+                return;
+            }
+
             if (EntryExists(plan.TargetRoot))
             {
                 throw new SetupException("install_media_target_exists");
@@ -310,14 +377,16 @@ internal sealed class WindowsInstallMediaStager : IInstallMediaStager
     {
         ValidateActivePlan(plan);
         cancellationToken.ThrowIfCancellationRequested();
-        if (!_promoted || !SameIdentity(_ownedDirectoryIdentity, ReadDirectoryIdentity(plan.TargetRoot)))
+        var authorizedRoot = _upgrade ? plan.StagingRoot : plan.TargetRoot;
+        if ((!_upgrade && !_promoted) ||
+            !SameIdentity(_ownedDirectoryIdentity, ReadDirectoryIdentity(authorizedRoot)))
         {
             throw new SetupException("setup_state_uncertain");
         }
 
         try
         {
-            await VerifyTreeAsync(plan.TargetRoot, plan.Files, true, cancellationToken).ConfigureAwait(false);
+            await VerifyTreeAsync(authorizedRoot, plan.Files, true, cancellationToken).ConfigureAwait(false);
             var signingUser = new SecurityIdentifier(signingUserSid);
             if (!string.Equals(signingUser.Value, signingUserSid, StringComparison.Ordinal))
             {
@@ -326,36 +395,43 @@ internal sealed class WindowsInstallMediaStager : IInstallMediaStager
 
             foreach (var file in plan.Files)
             {
-                WindowsInstallAcl.ApplyFile(file.FinalPath, InstallAclProfile.SigningUserRead, signingUser);
+                WindowsInstallAcl.ApplyFile(
+                    CombineRelative(authorizedRoot, file.RelativePath),
+                    InstallAclProfile.SigningUserRead,
+                    signingUser);
             }
 
             foreach (var directory in ExpectedDirectories(plan.Files)
                          .OrderByDescending(path => path.Length))
             {
                 WindowsInstallAcl.ApplyDirectory(
-                    CombineRelative(plan.TargetRoot, directory),
+                    CombineRelative(authorizedRoot, directory),
                     InstallAclProfile.SigningUserRead,
                     signingUser);
             }
 
-            WindowsInstallAcl.ApplyDirectory(plan.TargetRoot, InstallAclProfile.SigningUserRead, signingUser);
-            WindowsInstallAcl.VerifyDirectory(plan.TargetRoot, InstallAclProfile.SigningUserRead, signingUser);
+            WindowsInstallAcl.ApplyDirectory(authorizedRoot, InstallAclProfile.SigningUserRead, signingUser);
+            WindowsInstallAcl.VerifyDirectory(authorizedRoot, InstallAclProfile.SigningUserRead, signingUser);
             foreach (var directory in ExpectedDirectories(plan.Files))
             {
                 WindowsInstallAcl.VerifyDirectory(
-                    CombineRelative(plan.TargetRoot, directory),
+                    CombineRelative(authorizedRoot, directory),
                     InstallAclProfile.SigningUserRead,
                     signingUser);
             }
 
             foreach (var file in plan.Files)
             {
-                WindowsInstallAcl.VerifyFile(file.FinalPath, InstallAclProfile.SigningUserRead, signingUser);
+                WindowsInstallAcl.VerifyFile(
+                    CombineRelative(authorizedRoot, file.RelativePath),
+                    InstallAclProfile.SigningUserRead,
+                    signingUser);
             }
 
-            await VerifyTreeAsync(plan.TargetRoot, plan.Files, false, cancellationToken).ConfigureAwait(false);
-            await _verifier.VerifyMediaAsync(plan.TargetRoot, plan.PublisherIdentity, cancellationToken)
+            await VerifyTreeAsync(authorizedRoot, plan.Files, false, cancellationToken).ConfigureAwait(false);
+            await _verifier.VerifyMediaAsync(authorizedRoot, plan.PublisherIdentity, cancellationToken)
                 .ConfigureAwait(false);
+            _authorized = true;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -371,10 +447,180 @@ internal sealed class WindowsInstallMediaStager : IInstallMediaStager
         }
     }
 
+    public async Task VerifyUpgradeTargetReplaceableAsync(
+        InstallMediaPlan plan,
+        CancellationToken cancellationToken)
+    {
+        ValidateUpgradePlan(plan);
+        if (!_authorized || _oldTargetLease is not null ||
+            !SameIdentity(_existingTargetIdentity, ReadDirectoryIdentity(plan.TargetRoot)))
+        {
+            throw new SetupException("upgrade_state_uncertain");
+        }
+
+        SourceMediaLease? before = null;
+        SourceMediaLease? after = null;
+        try
+        {
+            before = await SourceMediaLease.CaptureAsync(plan.TargetRoot, cancellationToken)
+                .ConfigureAwait(false);
+            before.Dispose();
+            var installedPublisher = _verifier.VerifyInitialPublisher(
+                Path.Combine(plan.TargetRoot, InstallMediaPaths.ExecutableFileName),
+                Path.Combine(plan.TargetRoot, InstallMediaPaths.VerificationScriptFileName));
+            if (!string.Equals(installedPublisher, plan.PublisherIdentity, StringComparison.Ordinal))
+            {
+                throw new SetupException("install_media_publisher_mismatch");
+            }
+
+            await _verifier.VerifyMediaAsync(plan.TargetRoot, plan.PublisherIdentity, cancellationToken)
+                .ConfigureAwait(false);
+            after = await SourceMediaLease.CaptureAsync(
+                    plan.TargetRoot,
+                    cancellationToken,
+                    requireRenameAccess: true)
+                .ConfigureAwait(false);
+            if (!before.RefersToSameSnapshot(after))
+            {
+                throw new SetupException("install_media_source_changed");
+            }
+
+            await after.VerifyUnchangedAsync(cancellationToken).ConfigureAwait(false);
+            _oldFiles = after.Files.Select(file => new InstallMediaFilePlan(
+                    file.RelativePath,
+                    file.Path,
+                    CombineRelative(plan.TargetRoot, file.RelativePath),
+                    file.Length,
+                    file.Sha256))
+                .ToArray();
+            _oldTargetLease = after;
+            after = null;
+        }
+        catch (SetupException error) when (error.Code is
+            "install_media_copy_failed" or "install_media_source_changed")
+        {
+            throw new SetupException("restart_required");
+        }
+        catch (IOException)
+        {
+            throw new SetupException("restart_required");
+        }
+        catch (Win32Exception error) when (IsRenameBlocked(error))
+        {
+            throw new SetupException("restart_required");
+        }
+        finally
+        {
+            before?.Dispose();
+            after?.Dispose();
+        }
+    }
+
+    public async Task ActivateUpgradeAsync(
+        InstallMediaPlan plan,
+        CancellationToken cancellationToken)
+    {
+        ValidateUpgradePlan(plan);
+        if (!_authorized || _oldTargetLease is null || _oldFiles is null ||
+            plan.BackupRoot is null || plan.FailedRoot is null ||
+            !SameIdentity(_existingTargetIdentity, ReadDirectoryIdentity(plan.TargetRoot)))
+        {
+            throw new SetupException("upgrade_state_uncertain");
+        }
+
+        try
+        {
+            await _oldTargetLease.VerifyUnchangedAsync(cancellationToken).ConfigureAwait(false);
+            _oldTargetLease.Dispose();
+            _oldTargetLease = null;
+            Directory.Move(plan.TargetRoot, plan.BackupRoot);
+            _backupCreated = true;
+            if (!SameIdentity(_existingTargetIdentity, ReadDirectoryIdentity(plan.BackupRoot)))
+            {
+                throw new SetupException("upgrade_state_uncertain");
+            }
+
+            Directory.Move(plan.StagingRoot, plan.TargetRoot);
+            _promoted = true;
+            if (!SameIdentity(_ownedDirectoryIdentity, ReadDirectoryIdentity(plan.TargetRoot)))
+            {
+                throw new SetupException("upgrade_state_uncertain");
+            }
+
+            await VerifyTreeAsync(plan.TargetRoot, plan.Files, false, cancellationToken)
+                .ConfigureAwait(false);
+            await _verifier.VerifyMediaAsync(plan.TargetRoot, plan.PublisherIdentity, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (SetupException)
+        {
+            throw;
+        }
+        catch (Exception error) when (IsRenameBlocked(error))
+        {
+            throw new SetupException("restart_required");
+        }
+        catch
+        {
+            throw new SetupException("upgrade_state_uncertain");
+        }
+    }
+
+    public async Task CommitUpgradeAsync(
+        InstallMediaPlan plan,
+        CancellationToken cancellationToken)
+    {
+        ValidateUpgradePlan(plan);
+        if (!_promoted || !_backupCreated || _oldFiles is null || plan.BackupRoot is null ||
+            !SameIdentity(_ownedDirectoryIdentity, ReadDirectoryIdentity(plan.TargetRoot)) ||
+            !SameIdentity(_existingTargetIdentity, ReadDirectoryIdentity(plan.BackupRoot)))
+        {
+            throw new SetupException("upgrade_state_uncertain");
+        }
+
+        try
+        {
+            await VerifyTreeAsync(plan.TargetRoot, plan.Files, false, cancellationToken)
+                .ConfigureAwait(false);
+            await _verifier.VerifyMediaAsync(plan.TargetRoot, plan.PublisherIdentity, cancellationToken)
+                .ConfigureAwait(false);
+            await VerifyRollbackTreeAsync(plan.BackupRoot, _oldFiles, requireComplete: true)
+                .ConfigureAwait(false);
+            Directory.Delete(plan.BackupRoot, recursive: true);
+            if (EntryExists(plan.BackupRoot))
+            {
+                throw new SetupException("upgrade_state_uncertain");
+            }
+
+            _backupCreated = false;
+            ClearState();
+        }
+        catch (SetupException)
+        {
+            throw;
+        }
+        catch
+        {
+            throw new SetupException("upgrade_state_uncertain");
+        }
+    }
+
     public async Task RollbackAsync(InstallMediaPlan plan)
     {
         ValidateActivePlan(plan);
         ReleaseSourceLease();
+        _oldTargetLease?.Dispose();
+        _oldTargetLease = null;
+        if (_upgrade)
+        {
+            await RollbackUpgradeAsync(plan).ConfigureAwait(false);
+            return;
+        }
+
         if (!_stagingCreated)
         {
             ClearState();
@@ -601,6 +847,100 @@ internal sealed class WindowsInstallMediaStager : IInstallMediaStager
         }
     }
 
+    private void ValidateUpgradePlan(InstallMediaPlan plan)
+    {
+        ValidateActivePlan(plan);
+        if (!_upgrade)
+        {
+            throw new SetupException("upgrade_state_uncertain");
+        }
+    }
+
+    private async Task RollbackUpgradeAsync(InstallMediaPlan plan)
+    {
+        if (!_stagingCreated)
+        {
+            ClearState();
+            return;
+        }
+
+        if (!_rollbackSafe || plan.BackupRoot is null || plan.FailedRoot is null)
+        {
+            throw new SetupException("upgrade_state_uncertain");
+        }
+
+        try
+        {
+            if (_promoted)
+            {
+                if (!_backupCreated || _oldFiles is null ||
+                    !SameIdentity(_ownedDirectoryIdentity, ReadDirectoryIdentity(plan.TargetRoot)) ||
+                    !SameIdentity(_existingTargetIdentity, ReadDirectoryIdentity(plan.BackupRoot)))
+                {
+                    throw new SetupException("upgrade_state_uncertain");
+                }
+
+                await VerifyRollbackTreeAsync(plan.TargetRoot, plan.Files, requireComplete: true)
+                    .ConfigureAwait(false);
+                await VerifyRollbackTreeAsync(plan.BackupRoot, _oldFiles, requireComplete: true)
+                    .ConfigureAwait(false);
+                Directory.Move(plan.TargetRoot, plan.FailedRoot);
+                Directory.Move(plan.BackupRoot, plan.TargetRoot);
+                _backupCreated = false;
+                _promoted = false;
+                if (!SameIdentity(_existingTargetIdentity, ReadDirectoryIdentity(plan.TargetRoot)) ||
+                    !SameIdentity(_ownedDirectoryIdentity, ReadDirectoryIdentity(plan.FailedRoot)))
+                {
+                    throw new SetupException("upgrade_state_uncertain");
+                }
+
+                await VerifyRollbackTreeAsync(plan.FailedRoot, plan.Files, requireComplete: true)
+                    .ConfigureAwait(false);
+                Directory.Delete(plan.FailedRoot, recursive: true);
+            }
+            else if (_backupCreated)
+            {
+                if (_oldFiles is null || EntryExists(plan.TargetRoot) ||
+                    !SameIdentity(_existingTargetIdentity, ReadDirectoryIdentity(plan.BackupRoot)))
+                {
+                    throw new SetupException("upgrade_state_uncertain");
+                }
+
+                await VerifyRollbackTreeAsync(plan.BackupRoot, _oldFiles, requireComplete: true)
+                    .ConfigureAwait(false);
+                Directory.Move(plan.BackupRoot, plan.TargetRoot);
+                _backupCreated = false;
+            }
+
+            if (EntryExists(plan.StagingRoot))
+            {
+                if (!SameIdentity(_ownedDirectoryIdentity, ReadDirectoryIdentity(plan.StagingRoot)))
+                {
+                    throw new SetupException("upgrade_state_uncertain");
+                }
+
+                await VerifyRollbackTreeAsync(plan.StagingRoot, plan.Files, requireComplete: _authorized)
+                    .ConfigureAwait(false);
+                Directory.Delete(plan.StagingRoot, recursive: true);
+            }
+
+            if (!SameIdentity(_existingTargetIdentity, ReadDirectoryIdentity(plan.TargetRoot)))
+            {
+                throw new SetupException("upgrade_state_uncertain");
+            }
+
+            ClearState();
+        }
+        catch (SetupException)
+        {
+            throw;
+        }
+        catch
+        {
+            throw new SetupException("upgrade_state_uncertain");
+        }
+    }
+
     private void CreateOwnedDirectory(string trustedAnchor, string path, bool root)
     {
         var created = false;
@@ -647,11 +987,17 @@ internal sealed class WindowsInstallMediaStager : IInstallMediaStager
 
     private void ClearState()
     {
+        _oldTargetLease?.Dispose();
+        _oldTargetLease = null;
         _activePlan = null;
         _ownedDirectoryIdentity = null;
         _stagingCreated = false;
         _promoted = false;
         _rollbackSafe = false;
+        _authorized = false;
+        _backupCreated = false;
+        _existingTargetIdentity = null;
+        _oldFiles = null;
     }
 
     private static void ValidatePublisherHash(string publisher)
@@ -827,6 +1173,15 @@ internal sealed class WindowsInstallMediaStager : IInstallMediaStager
     private static bool SameIdentity(LocalFileIdentity? expected, LocalFileIdentity actual) =>
         expected is { } value && value.RefersToSameFile(actual);
 
+    internal static bool IsRenameBlocked(Exception error)
+    {
+        ArgumentNullException.ThrowIfNull(error);
+        var code = error is Win32Exception windows
+            ? windows.NativeErrorCode
+            : error.HResult & 0xffff;
+        return code is 32 or 33;
+    }
+
     private sealed record MediaTreeEntry(string Path, string RelativePath, bool Directory);
 
     private static void EnsureWindows()
@@ -902,27 +1257,36 @@ internal sealed class WindowsInstallMediaStager : IInstallMediaStager
             return true;
         }
 
-        public static async Task<SourceMediaLease> CaptureAsync(string root, CancellationToken cancellationToken)
+        public static async Task<SourceMediaLease> CaptureAsync(
+            string root,
+            CancellationToken cancellationToken,
+            bool requireRenameAccess = false)
         {
             SafeFileHandle? rootHandle = null;
             var directories = new List<SourceDirectoryLease>();
             var files = new Dictionary<string, SourceFileLease>(StringComparer.Ordinal);
             try
             {
-                rootHandle = WindowsNoFollowSecurity.OpenDirectoryHandle(root);
+                rootHandle = requireRenameAccess
+                    ? WindowsNoFollowSecurity.OpenRenameDirectoryHandle(root)
+                    : WindowsNoFollowSecurity.OpenDirectoryHandle(root);
                 var rootIdentity = ReadIdentity(rootHandle);
                 foreach (var entry in EnumerateTree(root))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     if (entry.Directory)
                     {
-                        var handle = WindowsNoFollowSecurity.OpenDirectoryHandle(entry.Path);
+                        var handle = requireRenameAccess
+                            ? WindowsNoFollowSecurity.OpenRenameDirectoryHandle(entry.Path)
+                            : WindowsNoFollowSecurity.OpenDirectoryHandle(entry.Path);
                         directories.Add(new SourceDirectoryLease(
                             entry.RelativePath, handle, ReadIdentity(handle)));
                         continue;
                     }
 
-                    var fileHandle = WindowsNoFollowSecurity.OpenReadFileHandleExclusive(entry.Path);
+                    var fileHandle = requireRenameAccess
+                        ? WindowsNoFollowSecurity.OpenRenameSourceHandle(entry.Path)
+                        : WindowsNoFollowSecurity.OpenReadFileHandleExclusive(entry.Path);
                     if (ReadIdentity(fileHandle).LinkCount != 1)
                     {
                         fileHandle.Dispose();

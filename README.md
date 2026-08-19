@@ -89,8 +89,11 @@ Service，并在公共桌面创建指向固定安装路径的“SimplySignAuto�
    SHA-256、代码签名和发布者后原子安装扩展；管理控制台在下一次状态刷新后
    显示 PDF 入口。无需 PDF 时不要安装该扩展。
 
-当前版本只支持全新安装；目标 Program Files、ProgramData、产品注册、专用
-用户或 AutoLogon 已存在时会拒绝继续，不提供覆盖安装、修复安装或原地升级。
+同一主程序 Setup 同时负责全新安装和受控原地升级。检测到现有安装时，Setup
+只接受签名、catalog、install instance、owner marker、SID、账户/profile、ACL、
+Service、Agent task、AutoLogon、产品注册和可选 PDF 扩展全部精确匹配的本产品
+安装；未知文件、路径漂移或身份不一致会在替换前 fail closed。修复安装和降级
+仍不支持。
 
 ## 导入 SimplySign 激活信息
 
@@ -241,9 +244,19 @@ Agent 发布全局七态会话：`UNKNOWN`、`CHECKING`、`READY`、`LOGIN_REQUI
 
 API token 轮换也在同一“修改服务设置”对话框选择。控制台以事务式配置替换并重启/验证 Service，新 token 只在结果步骤显示一次，必须复制并明确确认后才能关闭；旧 token 在新配置生效后立即失效。先在客户端 secret store 建立新版本，完成服务端轮换后原子切换所有客户端，不要同时长期保存新旧 token。
 
-当前版本尚未提供原地升级或修复安装。需要替换版本时，先按下述标准卸载
-完成清理和重启，再核对新 Setup 的签名并执行全新安装；不要手工
-覆盖 Program Files 或受保护配置。
+升级前先关闭 Administrator 管理控制台，并核对新 Setup 的签名。签名用户已有
+活动交互会话时，直接运行新主程序 Setup：Service 先停止接收新任务并有界等待
+队列清空，再退出 SimplySign、停止 Agent task 与 Service；新介质在受保护 staging
+中完成签名、catalog、hash、成员闭包和兼容性校验后，才在同一卷原子切换。
+升级保留 API token、服务配置、任务数据库、spool、专用用户、AutoLogon、DPAPI
+激活凭证和兼容的独立 PDF 扩展。新 Service/Agent 及 heartbeat 验证成功后才删除
+旧版本备份；失败会恢复旧介质和旧运行时。
+
+签名用户交互会话缺失、已安装程序文件仍被占用或当前旧版本不支持安全 drain
+时，Setup 返回 `restart_required`，不会静默安排重启；活动任务超过等待上限返回
+`upgrade_drain_timeout`。无法证明旧版本已经完整恢复时返回
+`upgrade_state_uncertain`，此时不要手工覆盖 Program Files，应保留现场排查。
+首次安装仍需要一次重启，修复安装和降级仍不支持。
 
 标准卸载从 Windows“设置 → 应用 → 已安装的应用”选择 SimplySignAuto，
 也可以直接运行已安装主程序：

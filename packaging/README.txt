@@ -78,9 +78,15 @@ Standard install
    embedded signed helper without network access. Until then, PDF controls
    remain hidden and base readiness depends only on Authenticode.
 
-This version supports clean installation only. Existing product directories,
-registration, the managed account or product AutoLogon cause Setup to stop;
-there is no overwrite, repair or in-place upgrade path.
+An exact existing SimplySignAuto installation selects the bounded in-place
+upgrade path. Setup verifies the owned identity, ACLs, service, task, AutoLogon,
+registration, installed media and optional PDF extension before draining jobs.
+New media is verified in protected staging, switched atomically on the same
+volume, and rolled back if the new service or agent cannot be verified. User
+data, API token, activation and compatible PDF support are preserved. Missing
+signing-user sessions, occupied installed files and older builds without the
+drain contract return restart_required. Unknown or drifted resources still stop
+before replacement; repair installs and downgrades are unsupported.
 
 The default endpoint is HTTP port 7080 and is intended only for a controlled
 internal network, VPN or trusted reverse proxy. Setup does not open the firewall.

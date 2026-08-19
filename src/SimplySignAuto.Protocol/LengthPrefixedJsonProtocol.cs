@@ -45,7 +45,8 @@ public static class LengthPrefixedJsonProtocol
         "local_upload_size_mismatch", "local_upload_hash_mismatch", "local_upload_invalid_path",
         "local_upload_missing", "local_upload_cleanup_failed", "local_job_unavailable",
         "local_result_not_succeeded", "local_result_metadata_mismatch", "invalid_parameters",
-        "unsupported_type", "file_signature_mismatch", "file_too_large", "internal_error",
+        "unsupported_type", "file_signature_mismatch", "file_too_large", "upgrade_in_progress",
+        "internal_error",
     };
     private static readonly HashSet<string> AllowedErrorCodes = new(StringComparer.Ordinal)
     {
@@ -220,6 +221,10 @@ public static class LengthPrefixedJsonProtocol
                 "admin_control_accepted" => DeserializePayload<AdminControlAccepted>(messagePayload),
                 "agent_control_request" => DeserializePayload<AgentControlRequest>(messagePayload),
                 "agent_control_response" => DeserializePayload<AgentControlResponse>(messagePayload),
+                "upgrade_drain_request" => DeserializePayload<UpgradeDrainRequest>(messagePayload),
+                "upgrade_drain_response" => DeserializePayload<UpgradeDrainResponse>(messagePayload),
+                "upgrade_resume_request" => DeserializePayload<UpgradeResumeRequest>(messagePayload),
+                "upgrade_resume_response" => DeserializePayload<UpgradeResumeResponse>(messagePayload),
                 _ => throw Error("unknown_message_type", "The message type is not recognized."),
             };
         }
@@ -293,6 +298,10 @@ public static class LengthPrefixedJsonProtocol
         AdminControlAccepted => "admin_control_accepted",
         AgentControlRequest => "agent_control_request",
         AgentControlResponse => "agent_control_response",
+        UpgradeDrainRequest => "upgrade_drain_request",
+        UpgradeDrainResponse => "upgrade_drain_response",
+        UpgradeResumeRequest => "upgrade_resume_request",
+        UpgradeResumeResponse => "upgrade_resume_response",
         _ => throw Error("unsupported_message_contract", "The supplied message contract is not supported."),
     };
 
@@ -304,7 +313,8 @@ public static class LengthPrefixedJsonProtocol
         LocalJobAccepted or LocalJobRejected or LocalJobResultRequest or LocalJobResultMetadata or
         JobPageRequest or JobPageResponse or TerminalJobDeltaRequest or TerminalJobDeltaResponse or
         ServiceSettingsRequest or ServiceSettingsResponse or
-        AdminControlHello or AdminControlAccepted or AgentControlRequest or AgentControlResponse;
+        AdminControlHello or AdminControlAccepted or AgentControlRequest or AgentControlResponse or
+        UpgradeDrainRequest or UpgradeDrainResponse or UpgradeResumeRequest or UpgradeResumeResponse;
 
     private static bool IsSupportedContract(Type contract) => contract == typeof(AgentMessage) ||
         contract == typeof(AgentHello) ||
@@ -333,7 +343,11 @@ public static class LengthPrefixedJsonProtocol
         contract == typeof(AdminControlHello) ||
         contract == typeof(AdminControlAccepted) ||
         contract == typeof(AgentControlRequest) ||
-        contract == typeof(AgentControlResponse);
+        contract == typeof(AgentControlResponse) ||
+        contract == typeof(UpgradeDrainRequest) ||
+        contract == typeof(UpgradeDrainResponse) ||
+        contract == typeof(UpgradeResumeRequest) ||
+        contract == typeof(UpgradeResumeResponse);
 
     private static void ValidateMessage(AgentMessage message)
     {
@@ -473,6 +487,17 @@ public static class LengthPrefixedJsonProtocol
                     ? IsSafeOtpUri(request.OtpUri)
                     : request.OtpUri is null),
             AgentControlResponse response => IsValidControlResponse(response),
+            UpgradeDrainRequest request =>
+                request.RequestId != Guid.Empty && request.TimeoutSeconds is >= 1 and <= 300,
+            UpgradeDrainResponse response =>
+                response.RequestId != Guid.Empty &&
+                (response.Drained && response.ErrorCode is null ||
+                    !response.Drained && response.ErrorCode == "upgrade_drain_timeout"),
+            UpgradeResumeRequest request => request.RequestId != Guid.Empty,
+            UpgradeResumeResponse response =>
+                response.RequestId != Guid.Empty &&
+                (response.Resumed && response.ErrorCode is null ||
+                    !response.Resumed && response.ErrorCode == "management_unavailable"),
             _ => false,
         };
 

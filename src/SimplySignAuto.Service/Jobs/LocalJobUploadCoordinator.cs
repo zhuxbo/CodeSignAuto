@@ -93,6 +93,7 @@ public sealed class LocalJobUploadCoordinator :
     private readonly ILocalUploadContentValidator _contentValidator;
     private readonly ILocalJobAcceptanceObserver? _acceptanceObserver;
     private readonly JobRetentionPolicy _retention;
+    private readonly IUpgradeAdmissionGate _upgradeGate;
 
     public LocalJobUploadCoordinator(
         IJobStore jobs,
@@ -103,7 +104,8 @@ public sealed class LocalJobUploadCoordinator :
         ILocalLeaseProtector? protector = null,
         ILocalUploadContentValidator? contentValidator = null,
         ILocalJobAcceptanceObserver? acceptanceObserver = null,
-        int retentionHours = 24)
+        int retentionHours = 24,
+        IUpgradeAdmissionGate? upgradeGate = null)
     {
         _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
         _leases = jobs as ILocalUploadLeaseStore
@@ -118,6 +120,7 @@ public sealed class LocalJobUploadCoordinator :
         _contentValidator = contentValidator ?? new LocalUploadContentValidator();
         _acceptanceObserver = acceptanceObserver;
         _retention = new JobRetentionPolicy(retentionHours);
+        _upgradeGate = upgradeGate ?? new UpgradeAdmissionGate();
     }
 
     public Task<AgentMessage> HandleAsync(
@@ -163,6 +166,14 @@ public sealed class LocalJobUploadCoordinator :
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+        await using var admission = await _upgradeGate
+            .TryEnterAsync(cancellationToken)
+            .ConfigureAwait(false);
+        if (admission is null)
+        {
+            return Reject(request.RequestId, "upgrade_in_progress");
+        }
+
         if (!IsIdentityValid(identity, requireSigningUser))
         {
             return Reject(request.RequestId, "local_upload_identity_mismatch");
@@ -291,6 +302,14 @@ public sealed class LocalJobUploadCoordinator :
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(completed);
+        await using var admission = await _upgradeGate
+            .TryEnterExistingAsync(cancellationToken)
+            .ConfigureAwait(false);
+        if (admission is null)
+        {
+            return Reject(completed.RequestId, "upgrade_in_progress");
+        }
+
         try
         {
             var lease = await _leases.GetLocalLeaseAsync(completed.RequestId, cancellationToken).ConfigureAwait(false);

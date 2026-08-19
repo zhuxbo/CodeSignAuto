@@ -603,6 +603,41 @@ public sealed class LocalJobUploadCoordinatorTests
         Assert.Equal([lease.JobId], fixture.Dispatcher.Enqueued);
     }
 
+    [Fact]
+    public async Task Existing_local_upload_can_complete_while_upgrade_drain_blocks_new_creates()
+    {
+        var gate = new UpgradeAdmissionGate();
+        using var fixture = new LocalFixture(upgradeGate: gate);
+        var input = "MZ-drain-barrier"u8.ToArray();
+        var request = CreateRequest(input.Length);
+        var lease = Assert.IsType<LocalJobUploadLease>(
+            await fixture.Coordinator.CreateAsync(request, Identity(), CancellationToken.None));
+        var partPath = Path.Combine(
+            fixture.Spool.Root,
+            lease.RelativePartPath.Replace('/', Path.DirectorySeparatorChar));
+        await File.WriteAllBytesAsync(partPath, input);
+
+        using var cancellation = new CancellationTokenSource();
+        var drain = new UpgradeDrainCoordinator(gate, fixture.Store, fixture.Time)
+            .DrainAsync(TimeSpan.FromSeconds(2), cancellation.Token);
+        await WaitUntilAsync(() => gate.IsDraining);
+
+        Assert.IsType<LocalJobAccepted>(await fixture.Coordinator.CompleteAsync(
+            new LocalJobUploadCompleted(
+                request.RequestId,
+                lease.JobId,
+                lease.LeaseId,
+                input.Length,
+                Convert.ToHexString(SHA256.HashData(input)).ToLowerInvariant()),
+            Identity(),
+            CancellationToken.None));
+        Assert.False(drain.IsCompleted);
+
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => drain);
+        Assert.False(gate.IsDraining);
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(90)]
@@ -861,13 +896,28 @@ public sealed class LocalJobUploadCoordinatorTests
 
     private static AgentConnectionIdentity Identity() => new(321, 7, Sid);
 
+    private static async Task WaitUntilAsync(Func<bool> condition)
+    {
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(1);
+        while (!condition())
+        {
+            if (DateTimeOffset.UtcNow >= deadline)
+            {
+                throw new TimeoutException();
+            }
+
+            await Task.Delay(5);
+        }
+    }
+
     private sealed class LocalFixture : IDisposable
     {
         private readonly string _root = Path.Combine(Path.GetTempPath(), "SimplySignAuto-local-" + Guid.NewGuid().ToString("N"));
 
         public LocalFixture(
             ILocalJobAcceptanceObserver? acceptanceObserver = null,
-            int retentionHours = 24)
+            int retentionHours = 24,
+            IUpgradeAdmissionGate? upgradeGate = null)
         {
             Directory.CreateDirectory(_root);
             DatabasePath = Path.Combine(_root, "jobs.db");
@@ -883,7 +933,8 @@ public sealed class LocalJobUploadCoordinatorTests
                 Sid,
                 new XorLeaseProtector(),
                 acceptanceObserver: acceptanceObserver,
-                retentionHours: retentionHours);
+                retentionHours: retentionHours,
+                upgradeGate: upgradeGate);
         }
 
         public string DatabasePath { get; }

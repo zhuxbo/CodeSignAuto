@@ -65,3 +65,19 @@ public sealed record AgentControlResponse(
     DateTimeOffset? ExpiresAtUtc,
     string? ErrorCode,
     Guid? CorrelationId) : AgentMessage;
+
+public sealed record UpgradeDrainRequest(
+    Guid RequestId,
+    int TimeoutSeconds) : AgentMessage;
+
+public sealed record UpgradeDrainResponse(
+    Guid RequestId,
+    bool Drained,
+    string? ErrorCode) : AgentMessage;
+
+public sealed record UpgradeResumeRequest(Guid RequestId) : AgentMessage;
+
+public sealed record UpgradeResumeResponse(
+    Guid RequestId,
+    bool Resumed,
+    string? ErrorCode) : AgentMessage;

@@ -137,6 +137,30 @@ public sealed class LengthPrefixedJsonProtocolTests
     }
 
     [Fact]
+    public async Task Round_trips_bounded_upgrade_drain_and_resume_messages()
+    {
+        AgentMessage[] messages =
+        [
+            new UpgradeDrainRequest(Guid.NewGuid(), 120),
+            new UpgradeDrainResponse(Guid.NewGuid(), true, null),
+            new UpgradeDrainResponse(Guid.NewGuid(), false, "upgrade_drain_timeout"),
+            new UpgradeResumeRequest(Guid.NewGuid()),
+            new UpgradeResumeResponse(Guid.NewGuid(), true, null),
+        ];
+
+        foreach (var expected in messages)
+        {
+            await using var stream = new MemoryStream();
+            await LengthPrefixedJsonProtocol.WriteAsync(stream, expected, CancellationToken.None);
+            stream.Position = 0;
+
+            Assert.Equal(
+                expected,
+                await LengthPrefixedJsonProtocol.ReadAsync<AgentMessage>(stream, CancellationToken.None));
+        }
+    }
+
+    [Fact]
     public async Task Round_trips_not_ready_heartbeat_before_simplysign_process_exists()
     {
         var observedAt = new DateTimeOffset(2026, 8, 13, 0, 0, 0, TimeSpan.Zero);

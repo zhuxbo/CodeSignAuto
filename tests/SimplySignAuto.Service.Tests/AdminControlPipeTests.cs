@@ -198,16 +198,53 @@ public sealed class AdminControlPipeTests
         Assert.True(second.FirstWrite.Task.IsCompleted);
     }
 
+    [Fact]
+    public async Task Upgrade_drain_is_bounded_correlated_and_dispatched_only_after_admin_identity()
+    {
+        var identity = new AdminControlIdentity(
+            321,
+            7,
+            AdministratorSid,
+            IsAdministrator: true,
+            IsLocal: true);
+        var drain = new RecordingUpgradeDrain();
+        var request = new UpgradeDrainRequest(Guid.NewGuid(), 120);
+        var server = new AdminControlPipeServer(
+            new UnusedManagement(),
+            new UnusedAgentControl(),
+            new DisconnectedAgentHealthStatusSource(),
+            new UnusedLocalJobs(),
+            new FixedIdentityVerifier(identity),
+            upgradeDrain: drain);
+        await using var connection = new DuplexCaptureStream(await EncodeAsync(Hello(), request));
+
+        await server.ProcessConnectionAsync(connection, CancellationToken.None);
+
+        await using var written = new MemoryStream(connection.WrittenBytes);
+        _ = Assert.IsType<AdminControlAccepted>(
+            await LengthPrefixedJsonProtocol.ReadAsync<AgentMessage>(written, CancellationToken.None));
+        var response = Assert.IsType<UpgradeDrainResponse>(
+            await LengthPrefixedJsonProtocol.ReadAsync<AgentMessage>(written, CancellationToken.None));
+        Assert.Equal(request.RequestId, response.RequestId);
+        Assert.True(response.Drained);
+        Assert.Null(response.ErrorCode);
+        Assert.Equal(TimeSpan.FromSeconds(120), drain.Timeout);
+    }
+
     private static AdminControlHello Hello() => new(
         AdminControlContract.ProtocolVersion,
         321,
         7,
         AdministratorSid);
 
-    private static async Task<byte[]> EncodeAsync(AgentMessage message)
+    private static async Task<byte[]> EncodeAsync(params AgentMessage[] messages)
     {
         await using var encoded = new MemoryStream();
-        await LengthPrefixedJsonProtocol.WriteAsync(encoded, message, CancellationToken.None);
+        foreach (var message in messages)
+        {
+            await LengthPrefixedJsonProtocol.WriteAsync(encoded, message, CancellationToken.None);
+        }
+
         return encoded.ToArray();
     }
 
@@ -256,6 +293,22 @@ public sealed class AdminControlPipeTests
             AgentMessage request,
             AgentConnectionIdentity identity,
             CancellationToken cancellationToken) => throw new InvalidOperationException("unused");
+    }
+
+    private sealed class RecordingUpgradeDrain : IUpgradeDrainCoordinator
+    {
+        public TimeSpan? Timeout { get; private set; }
+
+        public Task<bool> DrainAsync(TimeSpan timeout, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Timeout = timeout;
+            return Task.FromResult(true);
+        }
+
+        public void Resume()
+        {
+        }
     }
 
     private sealed class BlockingAfterHelloStream(byte[] hello) : Stream
@@ -313,6 +366,29 @@ public sealed class AdminControlPipeTests
             ReadCalls++;
             return base.ReadAsync(buffer, cancellationToken);
         }
+    }
+
+    private sealed class DuplexCaptureStream(byte[] input) : Stream
+    {
+        private readonly MemoryStream _input = new(input, writable: false);
+        private readonly MemoryStream _output = new();
+
+        public byte[] WrittenBytes => _output.ToArray();
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => true;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
+            _input.ReadAsync(buffer, cancellationToken);
+        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default) =>
+            _output.WriteAsync(buffer, cancellationToken);
+        public override void Flush() { }
+        public override Task FlushAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public override int Read(byte[] buffer, int offset, int count) => _input.Read(buffer, offset, count);
+        public override void Write(byte[] buffer, int offset, int count) => _output.Write(buffer, offset, count);
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
     }
 
     private sealed class WindowsFactAttribute : FactAttribute

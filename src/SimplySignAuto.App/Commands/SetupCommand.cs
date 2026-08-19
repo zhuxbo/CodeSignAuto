@@ -619,13 +619,23 @@ public static class SetupCommand
             return 1;
         }
 
-        var platform = new WindowsAutoLogonPlatform();
-        var provisionOrchestrator = new ProvisionAgentUserOrchestrator(
-            platform,
-            new CryptographicAgentUserPasswordGenerator(),
-            new RandomProvisionOwnerGenerator());
         try
         {
+            var upgrade = await WindowsUpgradeTransaction.TryCreateAsync(cancellationToken)
+                .ConfigureAwait(false);
+            if (upgrade is not null)
+            {
+                await new UpgradeOrchestrator()
+                    .ExecuteAsync(upgrade, output, cancellationToken)
+                    .ConfigureAwait(false);
+                return 0;
+            }
+
+            var platform = new WindowsAutoLogonPlatform();
+            var provisionOrchestrator = new ProvisionAgentUserOrchestrator(
+                platform,
+                new CryptographicAgentUserPasswordGenerator(),
+                new RandomProvisionOwnerGenerator());
             await new SetupOrchestrator(
                     new WindowsInstallMediaStager(),
                     new WindowsSetupPreflight(platform),

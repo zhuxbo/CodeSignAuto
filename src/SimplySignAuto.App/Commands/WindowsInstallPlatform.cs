@@ -1446,6 +1446,96 @@ internal static class WindowsProductUninstallRegistry
         }
     }
 
+    public static ProductUninstallRegistration ReadExact(
+        string executablePath,
+        string ownerMarker,
+        string errorCode)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(errorCode);
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(KeyPath, writable: false)
+                ?? throw new InstallException(errorCode);
+            if (key.GetValueKind("DisplayVersion") != RegistryValueKind.String ||
+                key.GetValue(
+                    "DisplayVersion",
+                    null,
+                    RegistryValueOptions.DoNotExpandEnvironmentNames) is not string version ||
+                string.IsNullOrWhiteSpace(version))
+            {
+                throw new InstallException(errorCode);
+            }
+
+            var registration = ProductUninstallRegistration.Create(
+                executablePath,
+                version,
+                ownerMarker);
+            VerifyKey(key, registration, errorCode);
+            return registration;
+        }
+        catch (InstallException)
+        {
+            throw;
+        }
+        catch (Exception error) when (error is UnauthorizedAccessException or SystemException)
+        {
+            throw new InstallException(errorCode);
+        }
+    }
+
+    public static void ReplaceExact(
+        ProductUninstallRegistration expected,
+        ProductUninstallRegistration replacement,
+        string errorCode)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(errorCode);
+        ValidateRegistration(expected);
+        ValidateRegistration(replacement);
+        if (!string.Equals(expected.ExecutablePath, replacement.ExecutablePath, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(expected.OwnerMarker, replacement.OwnerMarker, StringComparison.Ordinal) ||
+            !ExpectedValues(expected)
+                .Where(static pair => !string.Equals(pair.Key, "DisplayVersion", StringComparison.Ordinal))
+                .SequenceEqual(
+                    ExpectedValues(replacement)
+                        .Where(static pair => !string.Equals(pair.Key, "DisplayVersion", StringComparison.Ordinal))))
+        {
+            throw new InstallException("install_arguments_invalid");
+        }
+
+        var mutated = false;
+        try
+        {
+            Verify(expected, errorCode);
+            using (var key = Registry.LocalMachine.OpenSubKey(KeyPath, writable: true)
+                ?? throw new InstallException(errorCode))
+            {
+                key.SetValue("DisplayVersion", replacement.DisplayVersion, RegistryValueKind.String);
+                mutated = true;
+            }
+
+            Verify(replacement, errorCode);
+        }
+        catch
+        {
+            if (mutated)
+            {
+                try
+                {
+                    using var key = Registry.LocalMachine.OpenSubKey(KeyPath, writable: true)
+                        ?? throw new InstallException("upgrade_state_uncertain");
+                    key.SetValue("DisplayVersion", expected.DisplayVersion, RegistryValueKind.String);
+                    Verify(expected, "upgrade_state_uncertain");
+                }
+                catch
+                {
+                    throw new InstallException("upgrade_state_uncertain");
+                }
+            }
+
+            throw new InstallException(errorCode);
+        }
+    }
+
     public static void Rollback(ProductUninstallRegistration registration) =>
         DeleteExact(registration, "install_state_uncertain");
 

@@ -225,6 +225,12 @@ public static class ServiceHost
         builder.Services.AddSingleton<IJobStore>(_ => new SqliteJobStore(options.DatabasePath));
         builder.Services.TryAddSingleton<IJobCompletionNotifier, JobCompletionNotifier>();
         builder.Services.TryAddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton<UpgradeAdmissionGate>();
+        builder.Services.AddSingleton<IUpgradeAdmissionGate>(services =>
+            services.GetRequiredService<UpgradeAdmissionGate>());
+        builder.Services.AddSingleton<UpgradeDrainCoordinator>();
+        builder.Services.AddSingleton<IUpgradeDrainCoordinator>(services =>
+            services.GetRequiredService<UpgradeDrainCoordinator>());
         builder.Services.AddSingleton(new JobRetentionPolicy(options.RetentionHours));
         if (options.SigningUserSid is null)
         {
@@ -279,7 +285,8 @@ public static class ServiceHost
             services.GetRequiredService<IJobDispatcher>(),
             services.GetRequiredService<TimeProvider>(),
             options.SigningUserSid,
-            retentionHours: options.RetentionHours));
+            retentionHours: options.RetentionHours,
+            upgradeGate: services.GetRequiredService<IUpgradeAdmissionGate>()));
         builder.Services.AddSingleton<ILocalJobRequestHandler>(services =>
             services.GetRequiredService<LocalJobUploadCoordinator>());
         builder.Services.AddSingleton<IAdministratorLocalJobRequestHandler>(services =>

@@ -239,6 +239,37 @@ public sealed class AdminControlClient :
             ?? throw new ManagementUnavailableException(response.CorrelationId ?? Guid.NewGuid());
     }
 
+    internal async Task<bool> DrainForUpgradeAsync(
+        int timeoutSeconds,
+        CancellationToken cancellationToken)
+    {
+        if (timeoutSeconds is < 1 or > 300)
+        {
+            throw new ArgumentOutOfRangeException(nameof(timeoutSeconds));
+        }
+
+        var request = new UpgradeDrainRequest(NewRequestId(), timeoutSeconds);
+        var response = await SendAsync<UpgradeDrainResponse>(
+                request,
+                TimeSpan.FromSeconds(timeoutSeconds + 10),
+                localJobTransport: false,
+                retryTransportOnce: false,
+                cancellationToken)
+            .ConfigureAwait(false);
+        return response.Drained && response.ErrorCode is null;
+    }
+
+    internal async Task ResumeAfterUpgradeFailureAsync(CancellationToken cancellationToken)
+    {
+        var request = new UpgradeResumeRequest(NewRequestId());
+        var response = await SendAsync<UpgradeResumeResponse>(request, cancellationToken)
+            .ConfigureAwait(false);
+        if (!response.Resumed || response.ErrorCode is not null)
+        {
+            throw new ManagementUnavailableException(Guid.NewGuid());
+        }
+    }
+
     public async Task<LocalJobCreateOutcome> CreateLocalJobAsync(
         LocalJobCreateRequest request,
         CancellationToken cancellationToken)
@@ -459,6 +490,10 @@ public sealed class AdminControlClient :
         LocalJobRejected value => value.RequestId,
         LocalJobResultRequest value => value.RequestId,
         LocalJobResultMetadata value => value.RequestId,
+        UpgradeDrainRequest value => value.RequestId,
+        UpgradeDrainResponse value => value.RequestId,
+        UpgradeResumeRequest value => value.RequestId,
+        UpgradeResumeResponse value => value.RequestId,
         _ => Guid.Empty,
     };
 

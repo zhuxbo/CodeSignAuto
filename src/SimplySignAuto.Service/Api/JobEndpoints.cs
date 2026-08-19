@@ -62,13 +62,17 @@ public static class JobEndpoints
         routes.MapPost("/jobs", (HttpContext context, IJobStore jobs, ISpoolStore spool, IJobDispatcher dispatcher,
                 IUploadedContentValidator contentValidator,
                 JobRetentionPolicy retention, TimeProvider timeProvider,
-                IAgentHealthStatusSource agentHealth, IAgentOnDemandLogin onDemandLogin) =>
-            CreateAsync(context, jobs, spool, dispatcher, contentValidator, retention, timeProvider, agentHealth, onDemandLogin));
+                IAgentHealthStatusSource agentHealth, IAgentOnDemandLogin onDemandLogin,
+                IUpgradeAdmissionGate upgradeGate) =>
+            CreateAsync(context, jobs, spool, dispatcher, contentValidator, retention, timeProvider,
+                agentHealth, onDemandLogin, upgradeGate));
         routes.MapPost("/sign", (HttpContext context, IJobStore jobs, ISpoolStore spool, IJobDispatcher dispatcher,
                 IJobCompletionNotifier notifier, JobRetentionPolicy retention,
                 IUploadedContentValidator contentValidator, TimeProvider timeProvider,
-                IAgentHealthStatusSource agentHealth, IAgentOnDemandLogin onDemandLogin, int waitSeconds = 120) =>
-            SignAsync(context, jobs, spool, dispatcher, notifier, contentValidator, retention, timeProvider, agentHealth, onDemandLogin, waitSeconds));
+                IAgentHealthStatusSource agentHealth, IAgentOnDemandLogin onDemandLogin,
+                IUpgradeAdmissionGate upgradeGate, int waitSeconds = 120) =>
+            SignAsync(context, jobs, spool, dispatcher, notifier, contentValidator, retention, timeProvider,
+                agentHealth, onDemandLogin, upgradeGate, waitSeconds));
         routes.MapGet("/jobs/{jobId:guid}", GetAsync);
         routes.MapGet("/jobs/{jobId:guid}/result", DownloadAsync);
         return routes;
@@ -83,10 +87,12 @@ public static class JobEndpoints
         JobRetentionPolicy retention,
         TimeProvider timeProvider,
         IAgentHealthStatusSource agentHealth,
-        IAgentOnDemandLogin onDemandLogin)
+        IAgentOnDemandLogin onDemandLogin,
+        IUpgradeAdmissionGate upgradeGate)
     {
         var outcome = await TryCreateAsync(
-            context, jobs, spool, dispatcher, contentValidator, retention, timeProvider, agentHealth, onDemandLogin);
+            context, jobs, spool, dispatcher, contentValidator, retention, timeProvider,
+            agentHealth, onDemandLogin, upgradeGate);
         return outcome.Error ?? Results.Accepted(
             $"/v1/jobs/{outcome.Job!.Id:D}",
             CreateJobResponse.From(outcome.Job));
@@ -103,6 +109,7 @@ public static class JobEndpoints
         TimeProvider timeProvider,
         IAgentHealthStatusSource agentHealth,
         IAgentOnDemandLogin onDemandLogin,
+        IUpgradeAdmissionGate upgradeGate,
         int waitSeconds)
     {
         if (waitSeconds is < 1 or > 120)
@@ -111,7 +118,8 @@ public static class JobEndpoints
         }
 
         var outcome = await TryCreateAsync(
-            context, jobs, spool, dispatcher, contentValidator, retention, timeProvider, agentHealth, onDemandLogin);
+            context, jobs, spool, dispatcher, contentValidator, retention, timeProvider,
+            agentHealth, onDemandLogin, upgradeGate);
         if (outcome.Error is not null)
         {
             return outcome.Error;
@@ -269,8 +277,21 @@ public static class JobEndpoints
         JobRetentionPolicy retention,
         TimeProvider timeProvider,
         IAgentHealthStatusSource agentHealth,
-        IAgentOnDemandLogin onDemandLogin)
+        IAgentOnDemandLogin onDemandLogin,
+        IUpgradeAdmissionGate upgradeGate)
     {
+        await using var admission = await upgradeGate
+            .TryEnterAsync(context.RequestAborted)
+            .ConfigureAwait(false);
+        if (admission is null)
+        {
+            return new(null, Problem(
+                context,
+                "upgrade_in_progress",
+                StatusCodes.Status503ServiceUnavailable,
+                "The service is draining for an upgrade."));
+        }
+
         var jobId = Guid.NewGuid();
         var retainSpool = false;
         var spoolMutationStarted = false;

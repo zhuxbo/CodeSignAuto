@@ -140,6 +140,7 @@ public sealed class AdminControlPipeServer : IAdminControlRuntime
     private readonly IAgentControlTransport _agentControl;
     private readonly IAgentHealthStatusSource _agentHealth;
     private readonly IAdministratorLocalJobRequestHandler _localJobs;
+    private readonly IUpgradeDrainCoordinator _upgradeDrain;
     private readonly TimeSpan _identityTimeout;
     private readonly TimeSpan _helloTimeout;
     private readonly TimeSpan _requestReadTimeout;
@@ -154,12 +155,14 @@ public sealed class AdminControlPipeServer : IAdminControlRuntime
         Func<CancellationToken, Task<Stream>>? acceptConnection = null,
         TimeSpan? identityTimeout = null,
         TimeSpan? helloTimeout = null,
-        TimeSpan? requestReadTimeout = null)
+        TimeSpan? requestReadTimeout = null,
+        IUpgradeDrainCoordinator? upgradeDrain = null)
     {
         _management = management ?? throw new ArgumentNullException(nameof(management));
         _agentControl = agentControl ?? throw new ArgumentNullException(nameof(agentControl));
         _agentHealth = agentHealth ?? throw new ArgumentNullException(nameof(agentHealth));
         _localJobs = localJobs ?? throw new ArgumentNullException(nameof(localJobs));
+        _upgradeDrain = upgradeDrain ?? new UnavailableUpgradeDrainCoordinator();
         _identityVerifier = identityVerifier ?? new WindowsAdminControlIdentityVerifier();
         _acceptConnection = acceptConnection ?? AcceptNamedPipeAsync;
         _identityTimeout = ValidateTimeout(identityTimeout ?? IdentityTimeout, nameof(identityTimeout));
@@ -314,6 +317,9 @@ public sealed class AdminControlPipeServer : IAdminControlRuntime
                     _management.GetServiceSettings(),
                     null,
                     null),
+                UpgradeDrainRequest drain => await DrainUpgradeAsync(drain, cancellationToken)
+                    .ConfigureAwait(false),
+                UpgradeResumeRequest resume => ResumeUpgrade(resume),
                 LocalJobCreateRequest or LocalJobUploadCompleted or LocalJobResultRequest =>
                     await _localJobs.HandleAdministratorAsync(
                         request,
@@ -403,6 +409,10 @@ public sealed class AdminControlPipeServer : IAdminControlRuntime
                 delta.RequestId, [], null, null, "management_unavailable", correlationId),
             ServiceSettingsRequest settings => new ServiceSettingsResponse(
                 settings.RequestId, null, "management_unavailable", correlationId),
+            UpgradeDrainRequest drain => new UpgradeDrainResponse(
+                drain.RequestId, false, "upgrade_drain_timeout"),
+            UpgradeResumeRequest resume => new UpgradeResumeResponse(
+                resume.RequestId, false, "management_unavailable"),
             LocalJobCreateRequest create => new LocalJobRejected(
                 create.RequestId, "local_job_unavailable", correlationId),
             LocalJobUploadCompleted complete => new LocalJobRejected(
@@ -455,11 +465,41 @@ public sealed class AdminControlPipeServer : IAdminControlRuntime
 
     private static TimeSpan GetDispatchTimeout(AgentMessage request) => request switch
     {
+        UpgradeDrainRequest drain => TimeSpan.FromSeconds(drain.TimeoutSeconds + 5),
         LocalJobCreateRequest => LocalCreateDispatchTimeout,
         LocalJobUploadCompleted => LocalCompleteDispatchTimeout,
         LocalJobResultRequest => LocalResultDispatchTimeout,
         _ => ManagementDispatchTimeout,
     };
+
+    private async Task<UpgradeDrainResponse> DrainUpgradeAsync(
+        UpgradeDrainRequest request,
+        CancellationToken cancellationToken)
+    {
+        var drained = await _upgradeDrain
+            .DrainAsync(TimeSpan.FromSeconds(request.TimeoutSeconds), cancellationToken)
+            .ConfigureAwait(false);
+        return new UpgradeDrainResponse(
+            request.RequestId,
+            drained,
+            drained ? null : "upgrade_drain_timeout");
+    }
+
+    private UpgradeResumeResponse ResumeUpgrade(UpgradeResumeRequest request)
+    {
+        _upgradeDrain.Resume();
+        return new UpgradeResumeResponse(request.RequestId, true, null);
+    }
+
+    private sealed class UnavailableUpgradeDrainCoordinator : IUpgradeDrainCoordinator
+    {
+        public Task<bool> DrainAsync(TimeSpan timeout, CancellationToken cancellationToken) =>
+            Task.FromResult(false);
+
+        public void Resume()
+        {
+        }
+    }
 
     private static TimeSpan ValidateTimeout(TimeSpan value, string parameterName) =>
         value > TimeSpan.Zero && value != Timeout.InfiniteTimeSpan
