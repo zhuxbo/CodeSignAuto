@@ -287,11 +287,6 @@ internal sealed class WindowsSetupProcessRunner(
                 "phase=preflight code=ready" => 45,
                 "phase=detection code=ready" or
                     "phase=detection code=install_required" => 50,
-                "phase=download code=ready" => 60,
-                "phase=metadata code=ready" => 65,
-                "phase=signature code=ready" => 70,
-                "phase=install code=ready" or
-                    "phase=install code=restart_required" => 80,
                 "phase=probe code=ready" => 90,
                 "phase=complete code=ready" => 92,
                 "phase=pdf_extension_media code=ready" => 55,
@@ -314,10 +309,6 @@ internal sealed class WindowsSetupProcessRunner(
             45 => "系统前置检查已完成",
             50 => "运行时状态已检查",
             55 => "PDF 扩展介质已验证",
-            60 => "运行时安装包已下载",
-            65 => "运行时元数据已验证",
-            70 => "运行时安装包签名已验证",
-            80 => "运行时安装完成",
             90 => "应用启动条件已验证",
             92 => "产品初始化完成",
             _ => throw new SetupBootstrapperException("setup_progress_invalid"),
