@@ -138,14 +138,7 @@ internal sealed class WindowsInstallRollbackOwnershipVerifier(
                 return;
             case StartAndVerifyWindowsService service:
                 await VerifyServiceAsync(
-                    new CreateWindowsService(
-                        service.Name,
-                        "LocalSystem",
-                        configuration.ExecutablePath,
-                        ["service"],
-                        AutomaticDelayedStart: true,
-                        [5, 15, 60],
-                        exactMarker),
+                    CreateExpectedService(service, configuration, exactMarker),
                     cancellationToken).ConfigureAwait(false);
                 return;
             case CreateInteractiveLogonTask task:
@@ -178,6 +171,19 @@ internal sealed class WindowsInstallRollbackOwnershipVerifier(
                 throw new InstallException("install_state_uncertain");
         }
     }
+
+    internal static CreateWindowsService CreateExpectedService(
+        StartAndVerifyWindowsService service,
+        ServiceConfiguration configuration,
+        string exactMarker) =>
+        new(
+            service.Name,
+            "LocalSystem",
+            configuration.ExecutablePath,
+            ["service"],
+            AutomaticDelayedStart: false,
+            [5, 15, 60],
+            exactMarker);
 
     private async Task VerifyServiceAsync(
         CreateWindowsService action,

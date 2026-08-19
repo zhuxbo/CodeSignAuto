@@ -1719,6 +1719,23 @@ public sealed class InstallCommandTests
     }
 
     [Fact]
+    public void Windows_service_ownership_verification_uses_the_installed_non_delayed_start_policy()
+    {
+        using var fixture = new InstallFixture();
+        var configuration = fixture.ServiceConfiguration();
+        var marker = InstallOwnershipMarker.Create(configuration.InstallInstanceId);
+
+        var expected = WindowsInstallRollbackOwnershipVerifier.CreateExpectedService(
+            new StartAndVerifyWindowsService("SimplySignAuto.Service", marker),
+            configuration,
+            marker);
+
+        Assert.False(expected.AutomaticDelayedStart);
+        Assert.Equal(configuration.ExecutablePath, expected.ExecutablePath);
+        Assert.Equal(marker, expected.OwnerMarker);
+    }
+
+    [Fact]
     public async Task Windows_desktop_shortcut_is_verified_and_exact_owned_rollback_removes_it()
     {
         if (!OperatingSystem.IsWindows())
