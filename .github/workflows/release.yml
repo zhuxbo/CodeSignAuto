@@ -44,6 +44,44 @@ jobs:
           python-version: "3.12"
           enable-cache: false
 
+      - name: Provision pinned PDF test font
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $fontUri = 'https://raw.githubusercontent.com/notofonts/noto-cjk/Sans2.004/Sans/Variable/TTF/Subset/NotoSansSC-VF.ttf'
+          $expectedLength = 17773132
+          $expectedSha256 = 'd68bafcb48a2707749396aa12bbbd833cb70401f3a9a689fd2902c7e0d295964'
+          $downloadPath = Join-Path $env:RUNNER_TEMP 'NotoSansSC-VF.ttf'
+          $fontPath = Join-Path $env:WINDIR 'Fonts\NotoSansSC-VF.ttf'
+          $curl = Join-Path $env:SystemRoot 'System32\curl.exe'
+
+          & $curl @(
+            '--fail', '--silent', '--show-error', '--location',
+            '--proto', '=https', '--proto-redir', '=https',
+            '--connect-timeout', '15', '--max-time', '120',
+            '--output', $downloadPath, $fontUri)
+          if ($LASTEXITCODE -ne 0) {
+            throw 'ci_pdf_test_font_download_failed'
+          }
+          $download = Get-Item -LiteralPath $downloadPath -Force
+          $downloadSha256 = (Get-FileHash -LiteralPath $downloadPath -Algorithm SHA256).Hash.ToLowerInvariant()
+          if (($download.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or
+              $download.Length -ne $expectedLength -or
+              $downloadSha256 -cne $expectedSha256) {
+            throw 'ci_pdf_test_font_integrity_invalid'
+          }
+          if (Test-Path -LiteralPath $fontPath) {
+            throw 'ci_pdf_test_font_destination_conflict'
+          }
+          [IO.File]::Copy($downloadPath, $fontPath, $false)
+          $installed = Get-Item -LiteralPath $fontPath -Force
+          $installedSha256 = (Get-FileHash -LiteralPath $fontPath -Algorithm SHA256).Hash.ToLowerInvariant()
+          if (($installed.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or
+              $installed.Length -ne $expectedLength -or
+              $installedSha256 -cne $expectedSha256) {
+            throw 'ci_pdf_test_font_install_invalid'
+          }
+
       - name: Restore locked dependencies
         shell: pwsh
         run: dotnet restore SimplySignAuto.sln --locked-mode -p:NuGetAudit=true -p:NuGetAuditMode=all -m:1 -nodeReuse:false
