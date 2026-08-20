@@ -31,6 +31,49 @@ internal interface IUpgradeRegistrationStore
         string errorCode);
 }
 
+internal interface IUpgradeLegacyQuiescenceVerifier
+{
+    Task VerifyAsync(
+        ServiceConfiguration configuration,
+        CancellationToken cancellationToken);
+}
+
+internal sealed class UpgradeLegacyQuiescenceVerifier : IUpgradeLegacyQuiescenceVerifier
+{
+    public async Task VerifyAsync(
+        ServiceConfiguration configuration,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        try
+        {
+            using var jobs = new SqliteJobStore(Path.Combine(configuration.DataRoot, "jobs.db"));
+            await jobs.CheckHealthAsync(cancellationToken).ConfigureAwait(false);
+            var queue = await jobs.GetQueueSnapshotAsync(cancellationToken).ConfigureAwait(false);
+            var pendingUploads = await jobs.GetUnacceptedLocalLeasesAsync(
+                    DateTimeOffset.UtcNow,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (queue is not { Queued: 0, Active: 0 } || pendingUploads.Count != 0)
+            {
+                throw new SetupException("upgrade_drain_timeout");
+            }
+        }
+        catch (SetupException)
+        {
+            throw;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            throw new SetupException("restart_required");
+        }
+    }
+}
+
 internal sealed class UpgradeControlClient : IUpgradeControlClient
 {
     private readonly AdminControlClient _inner = new();
@@ -75,6 +118,7 @@ internal sealed class WindowsUpgradeTransaction : IUpgradeTransaction
     private readonly IWindowsInstallStartupRuntime _startup;
     private readonly IUpgradeControlClient _control;
     private readonly IUpgradeRegistrationStore _registrations;
+    private readonly IUpgradeLegacyQuiescenceVerifier _legacyQuiescence;
     private readonly bool _expectAuthenticode;
     private readonly bool _expectPdf;
     private readonly TimeSpan _runtimeTimeout;
@@ -87,6 +131,7 @@ internal sealed class WindowsUpgradeTransaction : IUpgradeTransaction
     private bool _activated;
     private bool _registrationUpdated;
     private bool _committed;
+    private bool _legacyQuiescenceRequired;
 
     internal WindowsUpgradeTransaction(
         ServiceConfiguration configuration,
@@ -96,6 +141,7 @@ internal sealed class WindowsUpgradeTransaction : IUpgradeTransaction
         IWindowsInstallStartupRuntime startup,
         IUpgradeControlClient control,
         IUpgradeRegistrationStore registrations,
+        IUpgradeLegacyQuiescenceVerifier legacyQuiescence,
         bool hasInteractiveSigningSession,
         bool expectAuthenticode,
         bool expectPdf,
@@ -109,6 +155,8 @@ internal sealed class WindowsUpgradeTransaction : IUpgradeTransaction
         _startup = startup ?? throw new ArgumentNullException(nameof(startup));
         _control = control ?? throw new ArgumentNullException(nameof(control));
         _registrations = registrations ?? throw new ArgumentNullException(nameof(registrations));
+        _legacyQuiescence = legacyQuiescence ??
+            throw new ArgumentNullException(nameof(legacyQuiescence));
         _expectAuthenticode = expectAuthenticode;
         _expectPdf = expectPdf;
         _runtimeTimeout = runtimeTimeout ?? RuntimeTimeout;
@@ -202,6 +250,7 @@ internal sealed class WindowsUpgradeTransaction : IUpgradeTransaction
                 new WindowsInstallStartupRuntime(),
                 control,
                 new UpgradeRegistrationStore(),
+                new UpgradeLegacyQuiescenceVerifier(),
                 hasInteractiveSession,
                 expectAuthenticode,
                 expectPdf,
@@ -258,7 +307,40 @@ internal sealed class WindowsUpgradeTransaction : IUpgradeTransaction
             }
             catch (ManagementUnavailableException)
             {
-                _ = await _control.GetServiceSettingsAsync(cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    var settings = await _control.GetServiceSettingsAsync(cancellationToken)
+                        .ConfigureAwait(false);
+                    var snapshot = await _control.RefreshAsync(cancellationToken)
+                        .ConfigureAwait(false);
+                    if (!string.Equals(
+                            settings.ProductVersion,
+                            _oldRegistration.DisplayVersion,
+                            StringComparison.Ordinal) ||
+                        !IsRuntimeSnapshotAcceptable(
+                            snapshot,
+                            _expectAuthenticode,
+                            _expectPdf))
+                    {
+                        throw new SetupException("restart_required");
+                    }
+
+                    _drainAttempted = false;
+                    if (snapshot.QueuedJobCount != 0 || snapshot.ActiveJobCount != 0)
+                    {
+                        return false;
+                    }
+
+                    _legacyQuiescenceRequired = true;
+                    return true;
+                }
+                catch (SetupException)
+                {
+                    throw;
+                }
+                catch (ManagementUnavailableException)
+                {
+                }
             }
 
             _drainAttempted = false;
@@ -308,10 +390,19 @@ internal sealed class WindowsUpgradeTransaction : IUpgradeTransaction
         }
     }
 
-    public Task VerifyReplaceableAsync(CancellationToken cancellationToken) =>
-        _media.VerifyUpgradeTargetReplaceableAsync(
-            _mediaPlan ?? throw new SetupException("upgrade_state_uncertain"),
-            cancellationToken);
+    public async Task VerifyReplaceableAsync(CancellationToken cancellationToken)
+    {
+        if (_legacyQuiescenceRequired)
+        {
+            await _legacyQuiescence.VerifyAsync(_configuration, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        await _media.VerifyUpgradeTargetReplaceableAsync(
+                _mediaPlan ?? throw new SetupException("upgrade_state_uncertain"),
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
 
     public async Task ActivateAsync(CancellationToken cancellationToken)
     {

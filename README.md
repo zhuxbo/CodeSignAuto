@@ -247,15 +247,19 @@ Agent 发布全局七态会话：`UNKNOWN`、`CHECKING`、`READY`、`LOGIN_REQUI
 API token 轮换也在同一“修改服务设置”对话框选择。控制台以事务式配置替换并重启/验证 Service，新 token 只在结果步骤显示一次，必须复制并明确确认后才能关闭；旧 token 在新配置生效后立即失效。先在客户端 secret store 建立新版本，完成服务端轮换后原子切换所有客户端，不要同时长期保存新旧 token。
 
 升级前先关闭 Administrator 管理控制台，并核对新 Setup 的签名。签名用户已有
-活动交互会话时，直接运行新主程序 Setup：Service 先停止接收新任务并有界等待
-队列清空，再退出 SimplySign、停止 Agent task 与 Service；新介质在受保护 staging
-中完成签名、catalog、hash、成员闭包和兼容性校验后，才在同一卷原子切换。
+活动交互会话时，直接运行新主程序 Setup：支持升级 drain 的 Service 先停止接收
+新任务并有界等待队列清空，再退出 SimplySign、停止 Agent task 与 Service。尚不
+支持 drain 的旧 Service 只在管理快照确认空闲时进入兼容路径；Service/Agent 停止、
+新任务入口关闭后还会直接复核任务数据库和未完成本地上传，发现竞态立即恢复旧
+运行时且不替换介质。新介质在受保护 staging 中完成签名、catalog、hash、成员闭包
+和兼容性校验后，才在同一卷原子切换。
 升级保留 API token、服务配置、任务数据库、spool、专用用户、AutoLogon、DPAPI
 激活凭证和兼容的独立 PDF 扩展。新 Service/Agent 及 heartbeat 验证成功后才删除
 旧版本备份；失败会恢复旧介质和旧运行时。
 
-签名用户交互会话缺失、已安装程序文件仍被占用或当前旧版本不支持安全 drain
-时，Setup 返回 `restart_required`，不会静默安排重启；活动任务超过等待上限返回
+签名用户交互会话缺失、已安装程序文件仍被占用，或旧版本既不支持 drain 又无法
+完成空闲快照与离线复核时，Setup 返回 `restart_required`，不会静默安排重启；
+活动任务超过等待上限，或旧版本停止后发现新进入的任务/上传时，返回
 `upgrade_drain_timeout`。无法证明旧版本已经完整恢复时返回
 `upgrade_state_uncertain`，此时不要手工覆盖 Program Files，应保留现场排查。
 首次安装仍需要一次重启，修复安装和降级仍不支持。

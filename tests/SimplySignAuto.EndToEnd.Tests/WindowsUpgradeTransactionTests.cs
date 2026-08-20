@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using SimplySignAuto.Agent.Ipc;
 using SimplySignAuto.App.Commands;
 using SimplySignAuto.Protocol;
 using SimplySignAuto.Service;
@@ -77,6 +78,89 @@ public sealed class WindowsUpgradeTransactionTests
     }
 
     [Fact]
+    public async Task Legacy_service_without_drain_messages_upgrades_only_after_post_stop_quiescence()
+    {
+        var fixture = new TransactionFixture();
+        fixture.Control.DrainFailure = new ManagementUnavailableException(Guid.NewGuid());
+        fixture.Control.ResumeFailure = new ManagementUnavailableException(Guid.NewGuid());
+        fixture.LegacyQuiescence.OnVerify = () =>
+        {
+            Assert.Contains("stop-service", fixture.Startup.Events);
+            Assert.False(fixture.Media.Activated);
+        };
+
+        await new UpgradeOrchestrator().ExecuteAsync(
+            fixture.CreateTransaction(),
+            TextWriter.Null,
+            CancellationToken.None);
+
+        Assert.Equal(1, fixture.LegacyQuiescence.Calls);
+        Assert.True(fixture.Media.Activated);
+        Assert.Equal(1, fixture.Control.Events.Count(item => item == "resume"));
+    }
+
+    [Fact]
+    public async Task Legacy_service_race_after_admission_closes_rolls_back_without_activation()
+    {
+        var fixture = new TransactionFixture();
+        fixture.Control.DrainFailure = new ManagementUnavailableException(Guid.NewGuid());
+        fixture.Control.ResumeFailure = new ManagementUnavailableException(Guid.NewGuid());
+        fixture.LegacyQuiescence.Failure = new SetupException("upgrade_drain_timeout");
+
+        var error = await Assert.ThrowsAsync<SetupException>(() =>
+            new UpgradeOrchestrator().ExecuteAsync(
+                fixture.CreateTransaction(),
+                TextWriter.Null,
+                CancellationToken.None));
+
+        Assert.Equal("upgrade_drain_timeout", error.Code);
+        Assert.Equal(1, fixture.LegacyQuiescence.Calls);
+        Assert.False(fixture.Media.Activated);
+        Assert.True(fixture.Media.RollbackCalled);
+        Assert.Contains("start-service", fixture.Startup.Events);
+        Assert.Contains("start-task", fixture.Startup.Events);
+        Assert.Equal(1, fixture.Control.Events.Count(item => item == "resume"));
+    }
+
+    [Fact]
+    public async Task Legacy_service_fallback_rejects_a_nonempty_snapshot_before_logout()
+    {
+        var fixture = new TransactionFixture();
+        fixture.Control.DrainFailure = new ManagementUnavailableException(Guid.NewGuid());
+        fixture.Control.ResumeFailure = new ManagementUnavailableException(Guid.NewGuid());
+        fixture.Control.QueuedJobCount = 1;
+
+        var error = await Assert.ThrowsAsync<SetupException>(() =>
+            new UpgradeOrchestrator().ExecuteAsync(
+                fixture.CreateTransaction(),
+                TextWriter.Null,
+                CancellationToken.None));
+
+        Assert.Equal("upgrade_drain_timeout", error.Code);
+        Assert.Equal(0, fixture.LegacyQuiescence.Calls);
+        Assert.DoesNotContain("stop-task", fixture.Startup.Events);
+        Assert.DoesNotContain("stop-service", fixture.Startup.Events);
+        Assert.False(fixture.Media.Activated);
+    }
+
+    [Fact]
+    public async Task Recoverable_drain_transport_failure_does_not_enter_legacy_fallback()
+    {
+        var fixture = new TransactionFixture();
+        fixture.Control.DrainFailure = new ManagementUnavailableException(Guid.NewGuid());
+
+        var error = await Assert.ThrowsAsync<SetupException>(() =>
+            new UpgradeOrchestrator().ExecuteAsync(
+                fixture.CreateTransaction(),
+                TextWriter.Null,
+                CancellationToken.None));
+
+        Assert.Equal("restart_required", error.Code);
+        Assert.Equal(0, fixture.LegacyQuiescence.Calls);
+        Assert.False(fixture.Media.Activated);
+    }
+
+    [Fact]
     public void Runtime_acceptance_preserves_exact_capabilities_and_rejects_failed_session()
     {
         Assert.True(WindowsUpgradeTransaction.IsRuntimeSnapshotAcceptable(
@@ -145,7 +229,8 @@ public sealed class WindowsUpgradeTransactionTests
 
     private static ManagementSnapshot Snapshot(
         CapabilitySnapshot authenticode,
-        CapabilitySnapshot pdf)
+        CapabilitySnapshot pdf,
+        int queuedJobCount = 0)
     {
         var now = DateTimeOffset.UtcNow;
         return new ManagementSnapshot(
@@ -161,7 +246,7 @@ public sealed class WindowsUpgradeTransactionTests
             null,
             authenticode,
             pdf,
-            0,
+            queuedJobCount,
             0,
             null,
             [],
@@ -228,6 +313,7 @@ public sealed class WindowsUpgradeTransactionTests
         public FakeStartupRuntime Startup { get; } = new();
         public FakeUpgradeControl Control { get; } = new();
         public FakeRegistrationStore Registrations { get; } = new();
+        public FakeLegacyQuiescenceVerifier LegacyQuiescence { get; } = new();
 
         public WindowsUpgradeTransaction CreateTransaction()
         {
@@ -241,6 +327,7 @@ public sealed class WindowsUpgradeTransactionTests
                 Startup,
                 Control,
                 Registrations,
+                LegacyQuiescence,
                 hasInteractiveSigningSession: true,
                 expectAuthenticode: true,
                 expectPdf: false,
@@ -325,6 +412,9 @@ public sealed class WindowsUpgradeTransactionTests
     {
         public List<string> Events { get; } = [];
         public Func<string> ProductVersionProvider { get; set; } = () => "1.0.0";
+        public Exception? DrainFailure { get; set; }
+        public Exception? ResumeFailure { get; set; }
+        public int QueuedJobCount { get; set; }
 
         public Task<ServiceSettingsSummary> GetServiceSettingsAsync(CancellationToken cancellationToken) =>
             Task.FromResult(new ServiceSettingsSummary(
@@ -338,7 +428,8 @@ public sealed class WindowsUpgradeTransactionTests
             Events.Add("refresh");
             return Task.FromResult(Snapshot(
                 Capability(SimplySignSessionState.LoginRequired),
-                CapabilitySnapshot.NotConfigured()));
+                CapabilitySnapshot.NotConfigured(),
+                QueuedJobCount));
         }
 
         public Task<ManagementSnapshot> LogoutAsync(CancellationToken cancellationToken) => RefreshAsync(cancellationToken);
@@ -346,17 +437,37 @@ public sealed class WindowsUpgradeTransactionTests
         public Task<bool> DrainForUpgradeAsync(int timeoutSeconds, CancellationToken cancellationToken)
         {
             Events.Add("drain");
-            return Task.FromResult(true);
+            return DrainFailure is null
+                ? Task.FromResult(true)
+                : Task.FromException<bool>(DrainFailure);
         }
 
         public Task ResumeAfterUpgradeFailureAsync(CancellationToken cancellationToken)
         {
             Events.Add("resume");
-            return Task.CompletedTask;
+            return ResumeFailure is null
+                ? Task.CompletedTask
+                : Task.FromException(ResumeFailure);
         }
 
         public void Dispose()
         {
+        }
+    }
+
+    private sealed class FakeLegacyQuiescenceVerifier : IUpgradeLegacyQuiescenceVerifier
+    {
+        public int Calls { get; private set; }
+        public Action? OnVerify { get; set; }
+        public Exception? Failure { get; set; }
+
+        public Task VerifyAsync(
+            ServiceConfiguration configuration,
+            CancellationToken cancellationToken)
+        {
+            Calls++;
+            OnVerify?.Invoke();
+            return Failure is null ? Task.CompletedTask : Task.FromException(Failure);
         }
     }
 
