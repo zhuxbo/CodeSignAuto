@@ -187,6 +187,86 @@ public sealed class WindowsUpgradeTransactionTests
     }
 
     [Fact]
+    public async Task Upgrade_directory_move_retries_transient_access_denied()
+    {
+        var attempts = 0;
+        var delays = 0;
+
+        await WindowsInstallMediaStager.MoveDirectoryWithRetryAsync(
+            () =>
+            {
+                attempts++;
+                if (attempts == 1)
+                {
+                    throw new IOException("injected access denied", unchecked((int)0x80070005));
+                }
+            },
+            () => true,
+            maxAttempts: 3,
+            _ =>
+            {
+                delays++;
+                return Task.CompletedTask;
+            },
+            CancellationToken.None);
+
+        Assert.Equal(2, attempts);
+        Assert.Equal(1, delays);
+    }
+
+    [Fact]
+    public async Task Upgrade_directory_move_rejects_state_drift_before_retry()
+    {
+        var delays = 0;
+
+        var error = await Assert.ThrowsAsync<SetupException>(() =>
+            WindowsInstallMediaStager.MoveDirectoryWithRetryAsync(
+                () => throw new IOException(
+                    "injected access denied",
+                    unchecked((int)0x80070005)),
+                () => false,
+                maxAttempts: 3,
+                _ =>
+                {
+                    delays++;
+                    return Task.CompletedTask;
+                },
+                CancellationToken.None));
+
+        Assert.Equal("upgrade_state_uncertain", error.Code);
+        Assert.Equal(0, delays);
+    }
+
+    [Fact]
+    public async Task Upgrade_directory_move_maps_persistent_access_denied_to_restart_required()
+    {
+        var attempts = 0;
+        var delays = 0;
+
+        var error = await Assert.ThrowsAsync<SetupException>(() =>
+            WindowsInstallMediaStager.MoveDirectoryWithRetryAsync(
+                () =>
+                {
+                    attempts++;
+                    throw new IOException(
+                        "injected access denied",
+                        unchecked((int)0x80070005));
+                },
+                () => true,
+                maxAttempts: 3,
+                _ =>
+                {
+                    delays++;
+                    return Task.CompletedTask;
+                },
+                CancellationToken.None));
+
+        Assert.Equal("restart_required", error.Code);
+        Assert.Equal(3, attempts);
+        Assert.Equal(2, delays);
+    }
+
+    [Fact]
     public void Rename_capable_handles_reject_real_file_and_directory_delete_sharing_conflicts()
     {
         if (!OperatingSystem.IsWindows())

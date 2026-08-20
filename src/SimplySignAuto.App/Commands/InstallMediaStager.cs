@@ -84,6 +84,8 @@ internal static class InstallMediaPreflight
 
 internal sealed class WindowsInstallMediaStager : IInstallMediaStager, IUpgradeMediaTransaction
 {
+    private const int UpgradeMoveMaximumAttempts = 51;
+    private static readonly TimeSpan UpgradeMoveRetryDelay = TimeSpan.FromMilliseconds(100);
     private static readonly SecurityIdentifier LocalSystem =
         new(WellKnownSidType.LocalSystemSid, null);
     private readonly string _sourceRoot;
@@ -533,14 +535,32 @@ internal sealed class WindowsInstallMediaStager : IInstallMediaStager, IUpgradeM
             await _oldTargetLease.VerifyUnchangedAsync(cancellationToken).ConfigureAwait(false);
             _oldTargetLease.Dispose();
             _oldTargetLease = null;
-            Directory.Move(plan.TargetRoot, plan.BackupRoot);
+            await MoveDirectoryWithRetryAsync(
+                    () => Directory.Move(plan.TargetRoot, plan.BackupRoot),
+                    () => SameIdentity(
+                            _existingTargetIdentity,
+                            ReadDirectoryIdentity(plan.TargetRoot)) &&
+                        !EntryExists(plan.BackupRoot),
+                    UpgradeMoveMaximumAttempts,
+                    token => Task.Delay(UpgradeMoveRetryDelay, token),
+                    cancellationToken)
+                .ConfigureAwait(false);
             _backupCreated = true;
             if (!SameIdentity(_existingTargetIdentity, ReadDirectoryIdentity(plan.BackupRoot)))
             {
                 throw new SetupException("upgrade_state_uncertain");
             }
 
-            Directory.Move(plan.StagingRoot, plan.TargetRoot);
+            await MoveDirectoryWithRetryAsync(
+                    () => Directory.Move(plan.StagingRoot, plan.TargetRoot),
+                    () => SameIdentity(
+                            _ownedDirectoryIdentity,
+                            ReadDirectoryIdentity(plan.StagingRoot)) &&
+                        !EntryExists(plan.TargetRoot),
+                    UpgradeMoveMaximumAttempts,
+                    token => Task.Delay(UpgradeMoveRetryDelay, token),
+                    cancellationToken)
+                .ConfigureAwait(false);
             _promoted = true;
             if (!SameIdentity(_ownedDirectoryIdentity, ReadDirectoryIdentity(plan.TargetRoot)))
             {
@@ -1181,6 +1201,58 @@ internal sealed class WindowsInstallMediaStager : IInstallMediaStager, IUpgradeM
             : error.HResult & 0xffff;
         return code is 32 or 33;
     }
+
+    internal static async Task MoveDirectoryWithRetryAsync(
+        Action move,
+        Func<bool> stateIsSafeToRetry,
+        int maxAttempts,
+        Func<CancellationToken, Task> delay,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(move);
+        ArgumentNullException.ThrowIfNull(stateIsSafeToRetry);
+        ArgumentNullException.ThrowIfNull(delay);
+        if (maxAttempts < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maxAttempts));
+        }
+
+        for (var attempt = 1; ; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                move();
+                return;
+            }
+            catch (Exception error) when (IsAccessDenied(error))
+            {
+                bool stateIsSafe;
+                try
+                {
+                    stateIsSafe = stateIsSafeToRetry();
+                }
+                catch
+                {
+                    throw new SetupException("upgrade_state_uncertain");
+                }
+
+                if (!stateIsSafe)
+                {
+                    throw new SetupException("upgrade_state_uncertain");
+                }
+                if (attempt >= maxAttempts)
+                {
+                    throw new SetupException("restart_required");
+                }
+
+                await delay(cancellationToken).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private static bool IsAccessDenied(Exception error) =>
+        (error.HResult & 0xffff) == 5;
 
     private sealed record MediaTreeEntry(string Path, string RelativePath, bool Directory);
 
