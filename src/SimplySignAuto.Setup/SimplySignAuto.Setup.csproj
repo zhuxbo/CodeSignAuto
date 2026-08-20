@@ -13,7 +13,7 @@
   <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'win-x64'">
     <SelfContained>false</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
-    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
     <EnableSingleFileAnalyzer>false</EnableSingleFileAnalyzer>
   </PropertyGroup>
   <ItemGroup Condition="'$(SetupPayloadPath)' != ''">

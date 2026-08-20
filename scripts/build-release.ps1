@@ -802,7 +802,7 @@ function Publish-SetupArtifact {
         '-m:1',
         '-nodeReuse:false',
         '-p:PublishSingleFile=true',
-        '-p:EnableCompressionInSingleFile=true',
+        '-p:EnableCompressionInSingleFile=false',
         '-p:EnableSingleFileAnalyzer=false',
         '-p:PublishReadyToRun=false',
         '-p:PublishTrimmed=false',

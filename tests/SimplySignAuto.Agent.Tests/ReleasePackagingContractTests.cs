@@ -57,6 +57,13 @@ public sealed class ReleasePackagingContractTests
             "</PropertyGroup>",
             publishPropertyGroupStart,
             StringComparison.Ordinal);
+        var setupPublishPropertyGroupStart = setupProject.IndexOf(
+            "<PropertyGroup Condition=\"'$(RuntimeIdentifier)' == 'win-x64'\">",
+            StringComparison.Ordinal);
+        var setupPublishPropertyGroupEnd = setupProject.IndexOf(
+            "</PropertyGroup>",
+            setupPublishPropertyGroupStart,
+            StringComparison.Ordinal);
 
         Assert.Contains("<SatelliteResourceLanguages>zh-Hans;en</SatelliteResourceLanguages>", properties, StringComparison.Ordinal);
         Assert.Contains("<SelfContained>false</SelfContained>", project, StringComparison.Ordinal);
@@ -69,11 +76,27 @@ public sealed class ReleasePackagingContractTests
         Assert.Contains("<PublishReadyToRun>false</PublishReadyToRun>", project, StringComparison.Ordinal);
         Assert.Contains("<PublishTrimmed>false</PublishTrimmed>", project, StringComparison.Ordinal);
         Assert.DoesNotContain("<SelfContained>true</SelfContained>", setupProject, StringComparison.Ordinal);
+        Assert.NotEqual(-1, setupPublishPropertyGroupStart);
+        Assert.NotEqual(-1, setupPublishPropertyGroupEnd);
+        var setupPublishProperties = setupProject[
+            setupPublishPropertyGroupStart..setupPublishPropertyGroupEnd];
+        Assert.Contains(
+            "<EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>",
+            setupPublishProperties,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "<EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>",
+            setupPublishProperties,
+            StringComparison.Ordinal);
         Assert.Equal(2, Count(script, "'--self-contained', 'false'"));
         Assert.DoesNotContain("'--self-contained', 'true'", script, StringComparison.Ordinal);
         Assert.Contains("'--self-contained', 'false'", script, StringComparison.Ordinal);
         Assert.Contains("'-p:PublishSingleFile=true'", script, StringComparison.Ordinal);
-        Assert.Contains("'-p:EnableCompressionInSingleFile=false'", script, StringComparison.Ordinal);
+        Assert.Equal(2, Count(script, "'-p:EnableCompressionInSingleFile=false'"));
+        Assert.DoesNotContain(
+            "'-p:EnableCompressionInSingleFile=true'",
+            script,
+            StringComparison.Ordinal);
         Assert.Contains("'-p:EnableSingleFileAnalyzer=false'", script, StringComparison.Ordinal);
         Assert.Contains("'-p:PublishReadyToRun=false'", script, StringComparison.Ordinal);
         Assert.Contains("'-p:PublishTrimmed=false'", script, StringComparison.Ordinal);
