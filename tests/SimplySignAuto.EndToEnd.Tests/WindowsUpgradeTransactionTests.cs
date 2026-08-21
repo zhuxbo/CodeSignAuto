@@ -10,6 +10,42 @@ namespace SimplySignAuto.EndToEnd.Tests;
 public sealed class WindowsUpgradeTransactionTests
 {
     [Fact]
+    public void Upgrade_discovery_does_not_treat_abnormal_service_configuration_entries_as_uninstalled()
+    {
+        var root = Directory.CreateTempSubdirectory("SimplySignAuto.Upgrade.Discovery.").FullName;
+        var configurationPath = Path.Combine(root, "service.json");
+        var receiptPath = Path.Combine(root, "install.json");
+        var missingTarget = Path.Combine(root, "missing-service.json");
+        try
+        {
+            Directory.CreateDirectory(configurationPath);
+            Assert.True(WindowsUpgradeTransaction.HasAnyInstallationEntry(
+                configurationPath,
+                receiptPath));
+
+            Directory.Delete(configurationPath);
+            File.CreateSymbolicLink(configurationPath, missingTarget);
+            Assert.True(WindowsUpgradeTransaction.HasAnyInstallationEntry(
+                configurationPath,
+                receiptPath));
+        }
+        finally
+        {
+            if (Directory.Exists(configurationPath) &&
+                !WindowsPathSafety.IsReparse(configurationPath))
+            {
+                Directory.Delete(configurationPath, recursive: true);
+            }
+            else if (WindowsPathSafety.EntryExists(configurationPath))
+            {
+                File.Delete(configurationPath);
+            }
+
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Deleted_one_time_token_file_is_not_required_for_upgrade()
     {
         var verified = false;
@@ -75,6 +111,40 @@ public sealed class WindowsUpgradeTransactionTests
         Assert.True(fixture.Media.RollbackCalled);
         Assert.Contains("start-service", fixture.Startup.Events);
         Assert.Contains("start-task", fixture.Startup.Events);
+        Assert.Equal(["create", "delete"], fixture.ReceiptStore.Events);
+        Assert.Null(fixture.ReceiptStore.Current);
+    }
+
+    [Fact]
+    public async Task Legacy_service_upgrade_writes_receipt_only_when_commit_succeeds()
+    {
+        var fixture = new TransactionFixture();
+
+        await new UpgradeOrchestrator().ExecuteAsync(
+            fixture.CreateTransaction(),
+            TextWriter.Null,
+            CancellationToken.None);
+
+        Assert.Equal(["create"], fixture.ReceiptStore.Events);
+        InstallationReceiptValidator.RequireServiceMatch(
+            Assert.IsType<InstallationReceipt>(fixture.ReceiptStore.Current),
+            fixture.Configuration);
+    }
+
+    [Fact]
+    public async Task Existing_service_receipt_is_inherited_without_rewrite()
+    {
+        var fixture = new TransactionFixture();
+        fixture.ExistingReceipt = InstallationReceipt.ForService(fixture.Configuration);
+        fixture.ReceiptStore.Current = fixture.ExistingReceipt;
+
+        await new UpgradeOrchestrator().ExecuteAsync(
+            fixture.CreateTransaction(),
+            TextWriter.Null,
+            CancellationToken.None);
+
+        Assert.Empty(fixture.ReceiptStore.Events);
+        Assert.Equal(fixture.ExistingReceipt, fixture.ReceiptStore.Current);
     }
 
     [Fact]
@@ -394,6 +464,9 @@ public sealed class WindowsUpgradeTransactionTests
         public FakeUpgradeControl Control { get; } = new();
         public FakeRegistrationStore Registrations { get; } = new();
         public FakeLegacyQuiescenceVerifier LegacyQuiescence { get; } = new();
+        public FakeInstallationReceiptStore ReceiptStore { get; } = new();
+        public InstallationReceipt? ExistingReceipt { get; set; }
+        public ServiceConfiguration Configuration => _configuration;
 
         public WindowsUpgradeTransaction CreateTransaction()
         {
@@ -401,6 +474,8 @@ public sealed class WindowsUpgradeTransactionTests
             Control.ProductVersionProvider = () => Media.Activated ? "2.0.0" : "1.0.0";
             return new WindowsUpgradeTransaction(
                 _configuration,
+                ExistingReceipt,
+                ReceiptStore,
                 ProductUninstallRegistration.Create(_configuration.ExecutablePath, "1.0.0", owner),
                 ProductUninstallRegistration.Create(_configuration.ExecutablePath, "2.0.0", owner),
                 Media,
@@ -412,6 +487,40 @@ public sealed class WindowsUpgradeTransactionTests
                 expectAuthenticode: true,
                 expectPdf: false,
                 runtimeTimeout: TimeSpan.FromMilliseconds(50));
+        }
+    }
+
+    private sealed class FakeInstallationReceiptStore : IInstallationReceiptStore
+    {
+        public InstallationReceipt? Current { get; set; }
+
+        public List<string> Events { get; } = [];
+
+        public Task<InstallationReceipt?> LoadOptionalAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(Current);
+
+        public Task CreateAsync(
+            InstallationReceipt receipt,
+            CancellationToken cancellationToken)
+        {
+            if (Current is not null)
+            {
+                throw new InstallException("installation_receipt_exists");
+            }
+
+            Events.Add("create");
+            Current = receipt;
+            return Task.CompletedTask;
+        }
+
+        public Task DeleteExactAsync(
+            InstallationReceipt receipt,
+            CancellationToken cancellationToken)
+        {
+            Assert.Equal(receipt, Current);
+            Events.Add("delete");
+            Current = null;
+            return Task.CompletedTask;
         }
     }
 

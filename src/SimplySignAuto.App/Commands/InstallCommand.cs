@@ -30,6 +30,7 @@ public sealed record InstallPaths(
     string ToolsRoot,
     string LogsRoot,
     string SpoolRoot,
+    string InstallationReceiptPath,
     string ServiceConfigurationPath,
     string JobsDatabasePath,
     string InstallTokenPath,
@@ -51,6 +52,7 @@ public enum InstallContent
     ServiceConfiguration,
     AgentConfiguration,
     InstallToken,
+    InstallationReceipt,
 }
 
 public abstract record InstallAction;
@@ -237,6 +239,7 @@ public sealed class InstallPlanner
             Canonical(Path.Combine(dataRoot, "tools")),
             Canonical(Path.Combine(dataRoot, "logs")),
             spoolRoot,
+            Canonical(Path.Combine(dataRoot, "install.json")),
             Canonical(Path.Combine(dataRoot, "service.json")),
             Canonical(Path.Combine(dataRoot, "jobs.db")),
             Canonical(Path.Combine(dataRoot, "install-token.txt")),
@@ -284,6 +287,7 @@ public sealed class InstallPlanner
             new CreateProtectedDirectory(paths.LogsRoot, InstallAclProfile.AdministratorsOnly),
             new CreateProtectedDirectory(paths.SpoolRoot, InstallAclProfile.SigningUserRead),
             new CreateProtectedDirectory(paths.AgentDirectory, InstallAclProfile.SigningUserData),
+            new WriteProtectedFile(paths.InstallationReceiptPath, InstallAclProfile.AdministratorsOnly, InstallContent.InstallationReceipt),
             new WriteProtectedFile(paths.ServiceConfigurationPath, InstallAclProfile.AdministratorsOnly, InstallContent.ServiceConfiguration),
             new WriteProtectedFile(paths.JobsDatabasePath, InstallAclProfile.AdministratorsOnly, InstallContent.Empty),
             new WriteProtectedFile(paths.AgentConfigurationPath, InstallAclProfile.SigningUserRead, InstallContent.AgentConfiguration),
@@ -515,7 +519,8 @@ public sealed class RandomApiTokenGenerator : IApiTokenGenerator
 public sealed record InstallExecutionMaterial(
     byte[] ServiceConfiguration,
     byte[] AgentConfiguration,
-    byte[] InstallToken)
+    byte[] InstallToken,
+    byte[] InstallationReceipt)
 {
     public byte[] GetFile(InstallContent content) => content switch
     {
@@ -523,6 +528,7 @@ public sealed record InstallExecutionMaterial(
         InstallContent.ServiceConfiguration => ServiceConfiguration,
         InstallContent.AgentConfiguration => AgentConfiguration,
         InstallContent.InstallToken => InstallToken,
+        InstallContent.InstallationReceipt => InstallationReceipt,
         _ => throw new ArgumentOutOfRangeException(nameof(content)),
     };
 }
@@ -574,10 +580,12 @@ public sealed class InstallOrchestrator(
             .Replace('+', '-')
             .Replace('/', '_');
         var serviceConfiguration = BuildServiceConfiguration(plan, token);
+        var installationReceipt = InstallationReceipt.ForService(serviceConfiguration);
         var material = new InstallExecutionMaterial(
             JsonSerializer.SerializeToUtf8Bytes(serviceConfiguration, SerializerOptions),
             JsonSerializer.SerializeToUtf8Bytes(plan.AgentConfiguration, SerializerOptions),
-            Encoding.UTF8.GetBytes(token + Environment.NewLine));
+            Encoding.UTF8.GetBytes(token + Environment.NewLine),
+            InstallationReceiptCodec.Serialize(installationReceipt));
         var applied = new List<AppliedInstallAction>();
         try
         {

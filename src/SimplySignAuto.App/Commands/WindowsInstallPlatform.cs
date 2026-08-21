@@ -771,12 +771,17 @@ public sealed class WindowsInstallActionExecutor : IInstallActionExecutor
             WindowsInstallAcl.VerifyDirectory(action.Paths.LogsRoot, InstallAclProfile.AdministratorsOnly, signingUser);
             WindowsInstallAcl.VerifyDirectory(action.Paths.SpoolRoot, InstallAclProfile.SigningUserRead, signingUser);
             WindowsInstallAcl.VerifyDirectory(action.Paths.AgentDirectory, InstallAclProfile.SigningUserData, signingUser);
+            WindowsInstallAcl.VerifyFile(action.Paths.InstallationReceiptPath, InstallAclProfile.AdministratorsOnly, signingUser);
             WindowsInstallAcl.VerifyFile(action.Paths.ServiceConfigurationPath, InstallAclProfile.AdministratorsOnly, signingUser);
             WindowsInstallAcl.VerifyFile(action.Paths.JobsDatabasePath, InstallAclProfile.AdministratorsOnly, signingUser);
             WindowsInstallAcl.VerifyFile(action.Paths.AgentConfigurationPath, InstallAclProfile.SigningUserRead, signingUser);
             WindowsInstallAcl.VerifyFile(action.Paths.InstallTokenPath, InstallAclProfile.AdministratorsOnly, signingUser);
-            _ = await new ServiceConfigurationLoader(action.Paths.ServiceConfigurationPath)
+            var configuration = await new ServiceConfigurationLoader(action.Paths.ServiceConfigurationPath)
                 .LoadAsync(cancellationToken).ConfigureAwait(false);
+            var receipt = await new WindowsInstallationReceiptStore(action.Paths.InstallationReceiptPath)
+                .LoadOptionalAsync(cancellationToken).ConfigureAwait(false)
+                ?? throw new InstallException("installation_receipt_invalid");
+            InstallationReceiptValidator.RequireServiceMatch(receipt, configuration);
             _ = await new AgentConfigurationLoader(action.Paths.AgentConfigurationPath)
                 .LoadAsync(cancellationToken).ConfigureAwait(false);
             if (action.FirewallExpected)

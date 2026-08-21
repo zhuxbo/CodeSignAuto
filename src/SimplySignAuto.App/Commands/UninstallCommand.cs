@@ -67,10 +67,14 @@ public sealed record DeleteOwnedLocalUser(
 public sealed record RemoveOwnedProductUninstall(
     ProductUninstallRegistration Registration) : UninstallAction;
 
+public sealed record RemoveOwnedInstallationReceipt(
+    InstallationReceipt Receipt) : UninstallAction;
+
 public sealed record UninstallPlan(
     ServiceConfiguration Configuration,
     UninstallSigningIdentity Identity,
-    IReadOnlyList<UninstallAction> Actions);
+    IReadOnlyList<UninstallAction> Actions,
+    InstallationReceipt? Receipt = null);
 
 public interface IUninstallEnvironment
 {
@@ -79,6 +83,9 @@ public interface IUninstallEnvironment
     string CommonDesktopDirectory { get; }
 
     Task<ServiceConfiguration> LoadConfigurationAsync(CancellationToken cancellationToken);
+
+    Task<InstallationReceipt?> LoadInstallationReceiptAsync(
+        CancellationToken cancellationToken) => Task.FromResult<InstallationReceipt?>(null);
 
     void ValidateControlledPaths(ServiceConfiguration configuration);
 
@@ -108,14 +115,27 @@ public sealed class UninstallPlanner(IUninstallEnvironment environment)
             throw new InstallException("uninstall_arguments_invalid");
         }
 
+        var receipt = await environment.LoadInstallationReceiptAsync(cancellationToken)
+            .ConfigureAwait(false);
+        if (receipt is not null &&
+            InstallationReceiptValidator.Validate(receipt).Mode != InstallationMode.Service)
+        {
+            throw new InstallException("owned_resource_mismatch");
+        }
+
         var configuration = ServiceConfigurationLoader.Validate(
             await environment.LoadConfigurationAsync(cancellationToken).ConfigureAwait(false));
+        if (receipt is not null)
+        {
+            InstallationReceiptValidator.RequireServiceMatch(receipt, configuration);
+        }
+
         environment.ValidateControlledPaths(configuration);
         var exactOwnerMarker = InstallOwnershipMarker.Create(configuration.InstallInstanceId);
         var identity = environment.InspectSigningIdentity(configuration, exactOwnerMarker);
         if (identity is null)
         {
-            return LegacyPlan(configuration, exactOwnerMarker, options.PurgeData);
+            return LegacyPlan(configuration, exactOwnerMarker, options.PurgeData, receipt);
         }
 
         ValidateIdentity(configuration, identity, exactOwnerMarker);
@@ -160,14 +180,19 @@ public sealed class UninstallPlanner(IUninstallEnvironment environment)
             IncludeAgentDirectory: identity.Ownership == UninstallSigningUserOwnership.ExistingUser));
         actions.Add(CreateDesktopShortcutAction(configuration, exactOwnerMarker));
         actions.Add(CreateProductUninstallAction(configuration, exactOwnerMarker));
+        if (receipt is not null && !actions.Any(action => action is PurgeControlledData))
+        {
+            actions.Add(new RemoveOwnedInstallationReceipt(receipt));
+        }
 
-        return new UninstallPlan(configuration, identity, actions);
+        return new UninstallPlan(configuration, identity, actions, receipt);
     }
 
     private static UninstallPlan LegacyPlan(
         ServiceConfiguration configuration,
         string ownerMarker,
-        bool includePurge)
+        bool includePurge,
+        InstallationReceipt? receipt)
     {
         var profilePath = Path.GetDirectoryName(configuration.AgentConfigurationPath)
             ?? throw new InstallException("uninstall_configuration_invalid");
@@ -198,7 +223,12 @@ public sealed class UninstallPlanner(IUninstallEnvironment environment)
             actions.Add(new PurgeControlledData(configuration.DataRoot, profilePath, IncludeAgentDirectory: true));
         }
 
-        return new UninstallPlan(configuration, identity, actions);
+        if (receipt is not null && !actions.Any(action => action is PurgeControlledData))
+        {
+            actions.Add(new RemoveOwnedInstallationReceipt(receipt));
+        }
+
+        return new UninstallPlan(configuration, identity, actions, receipt);
     }
 
     private static RemoveOwnedProductUninstall CreateProductUninstallAction(
@@ -371,6 +401,10 @@ public sealed class WindowsUninstallEnvironment : IUninstallEnvironment
         return configuration;
     }
 
+    public Task<InstallationReceipt?> LoadInstallationReceiptAsync(
+        CancellationToken cancellationToken) =>
+        new WindowsInstallationReceiptStore().LoadOptionalAsync(cancellationToken);
+
     public void ValidateControlledPaths(ServiceConfiguration configuration)
     {
         if (!OperatingSystem.IsWindows())
@@ -513,6 +547,7 @@ public sealed class WindowsUninstallActionExecutor : IUninstallActionExecutor
     private readonly IPurgeIsolationFileSystem _purgeFileSystem;
     private readonly IOptionalToolUninstallPreflight _optionalToolPreflight;
     private readonly IInstalledMediaUninstallPreflight _installedMediaPreflight;
+    private readonly IInstallationReceiptStore _receiptStore;
     private PurgeIsolationPlan? _preparedPurgePlan;
     private PurgeControlledData? _preparedPurgeAction;
     private string? _managedProfileDirectoryForPurge;
@@ -522,7 +557,8 @@ public sealed class WindowsUninstallActionExecutor : IUninstallActionExecutor
             new WindowsUninstallNative(),
             new WindowsPurgeIsolationFileSystem(),
             new WindowsOptionalToolUninstallPreflight(),
-            new WindowsInstalledMediaUninstallPreflight())
+            new WindowsInstalledMediaUninstallPreflight(),
+            new WindowsInstallationReceiptStore())
     {
     }
 
@@ -530,7 +566,8 @@ public sealed class WindowsUninstallActionExecutor : IUninstallActionExecutor
         IWindowsUninstallNative native,
         IPurgeIsolationFileSystem purgeFileSystem,
         IOptionalToolUninstallPreflight optionalToolPreflight,
-        IInstalledMediaUninstallPreflight installedMediaPreflight)
+        IInstalledMediaUninstallPreflight installedMediaPreflight,
+        IInstallationReceiptStore? receiptStore = null)
     {
         _native = native ?? throw new ArgumentNullException(nameof(native));
         _purgeFileSystem = purgeFileSystem ?? throw new ArgumentNullException(nameof(purgeFileSystem));
@@ -538,6 +575,7 @@ public sealed class WindowsUninstallActionExecutor : IUninstallActionExecutor
             throw new ArgumentNullException(nameof(optionalToolPreflight));
         _installedMediaPreflight = installedMediaPreflight ??
             throw new ArgumentNullException(nameof(installedMediaPreflight));
+        _receiptStore = receiptStore ?? new WindowsInstallationReceiptStore();
     }
 
     public async Task PreflightAsync(
@@ -604,6 +642,14 @@ public sealed class WindowsUninstallActionExecutor : IUninstallActionExecutor
                     _native.VerifyDesktopShortcutOwnership(shortcut);
                     break;
                 case RemoveOwnedPdfExtension:
+                    break;
+                case RemoveOwnedInstallationReceipt receipt:
+                    if (await _receiptStore.LoadOptionalAsync(cancellationToken).ConfigureAwait(false) !=
+                        receipt.Receipt)
+                    {
+                        throw new InstallException("owned_resource_mismatch");
+                    }
+
                     break;
                 default:
                     throw new InstallException("uninstall_action_invalid");
@@ -682,6 +728,10 @@ public sealed class WindowsUninstallActionExecutor : IUninstallActionExecutor
             case RemoveOwnedPdfExtension:
                 await _native.RemovePdfExtensionAsync(cancellationToken).ConfigureAwait(false);
                 break;
+            case RemoveOwnedInstallationReceipt receipt:
+                await _receiptStore.DeleteExactAsync(receipt.Receipt, cancellationToken)
+                    .ConfigureAwait(false);
+                break;
             default:
                 throw new InstallException("uninstall_action_invalid");
         }
@@ -716,6 +766,7 @@ public static class UninstallCommand
         {
             if (!options!.PurgeData &&
                 !File.Exists(WindowsUninstallEnvironment.ConfigurationPath) &&
+                !WindowsPathSafety.EntryExists(WindowsInstallationReceiptStore.ReceiptPath) &&
                 await new WindowsInterruptedPurgeResume()
                     .TryResumeAsync(cancellationToken)
                     .ConfigureAwait(false))

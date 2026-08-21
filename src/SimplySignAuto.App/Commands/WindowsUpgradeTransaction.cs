@@ -112,6 +112,9 @@ internal sealed class WindowsUpgradeTransaction : IUpgradeTransaction
     private static readonly TimeSpan RuntimeTimeout = TimeSpan.FromSeconds(30);
 
     private readonly ServiceConfiguration _configuration;
+    private readonly InstallationReceipt _expectedReceipt;
+    private readonly IInstallationReceiptStore _receiptStore;
+    private readonly bool _receiptPresent;
     private readonly ProductUninstallRegistration _oldRegistration;
     private readonly ProductUninstallRegistration _newRegistration;
     private readonly IUpgradeMediaTransaction _media;
@@ -130,11 +133,14 @@ internal sealed class WindowsUpgradeTransaction : IUpgradeTransaction
     private bool _serviceStopAttempted;
     private bool _activated;
     private bool _registrationUpdated;
+    private bool _receiptCreated;
     private bool _committed;
     private bool _legacyQuiescenceRequired;
 
     internal WindowsUpgradeTransaction(
         ServiceConfiguration configuration,
+        InstallationReceipt? receipt,
+        IInstallationReceiptStore receiptStore,
         ProductUninstallRegistration oldRegistration,
         ProductUninstallRegistration newRegistration,
         IUpgradeMediaTransaction media,
@@ -149,6 +155,14 @@ internal sealed class WindowsUpgradeTransaction : IUpgradeTransaction
         Func<bool>? interactiveSessionAvailable = null)
     {
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+        _expectedReceipt = InstallationReceipt.ForService(configuration);
+        _receiptStore = receiptStore ?? throw new ArgumentNullException(nameof(receiptStore));
+        if (receipt is not null)
+        {
+            InstallationReceiptValidator.RequireServiceMatch(receipt, configuration);
+        }
+
+        _receiptPresent = receipt is not null;
         _oldRegistration = oldRegistration ?? throw new ArgumentNullException(nameof(oldRegistration));
         _newRegistration = newRegistration ?? throw new ArgumentNullException(nameof(newRegistration));
         _media = media ?? throw new ArgumentNullException(nameof(media));
@@ -175,7 +189,9 @@ internal sealed class WindowsUpgradeTransaction : IUpgradeTransaction
     internal static async Task<WindowsUpgradeTransaction?> TryCreateAsync(
         CancellationToken cancellationToken)
     {
-        if (!File.Exists(WindowsUninstallEnvironment.ConfigurationPath))
+        var configurationPath = WindowsUninstallEnvironment.ConfigurationPath;
+        var receiptPath = WindowsInstallationReceiptStore.ReceiptPath;
+        if (!HasAnyInstallationEntry(configurationPath, receiptPath))
         {
             return null;
         }
@@ -185,7 +201,15 @@ internal sealed class WindowsUpgradeTransaction : IUpgradeTransaction
             throw new SetupException("windows_required");
         }
 
-        var environment = new WindowsUpgradeEnvironment();
+        var receiptStore = new WindowsInstallationReceiptStore();
+        var receipt = await receiptStore.LoadOptionalAsync(cancellationToken).ConfigureAwait(false);
+        if (!WindowsPathSafety.EntryExists(configurationPath) ||
+            receipt is { Mode: not InstallationMode.Service })
+        {
+            throw new SetupException("owned_resource_mismatch");
+        }
+
+        var environment = new WindowsUpgradeEnvironment(receipt);
         var plan = await new UninstallPlanner(environment)
             .PlanAsync(new UninstallOptions(false, null), cancellationToken)
             .ConfigureAwait(false);
@@ -238,6 +262,8 @@ internal sealed class WindowsUpgradeTransaction : IUpgradeTransaction
             var hasInteractiveSession = sessions.HasActiveSession(configuration.SigningUserSid);
             return new WindowsUpgradeTransaction(
                 configuration,
+                receipt,
+                receiptStore,
                 oldRegistration,
                 newRegistration,
                 new WindowsInstallMediaStager(
@@ -268,6 +294,12 @@ internal sealed class WindowsUpgradeTransaction : IUpgradeTransaction
             throw;
         }
     }
+
+    internal static bool HasAnyInstallationEntry(
+        string configurationPath,
+        string receiptPath) =>
+        WindowsPathSafety.EntryExists(configurationPath) ||
+        WindowsPathSafety.EntryExists(receiptPath);
 
     public async Task StageAsync(CancellationToken cancellationToken)
     {
@@ -457,6 +489,13 @@ internal sealed class WindowsUpgradeTransaction : IUpgradeTransaction
             _newRegistration,
             "product_registration_failed");
         _registrationUpdated = true;
+        if (!_receiptPresent)
+        {
+            await _receiptStore.CreateAsync(_expectedReceipt, cancellationToken)
+                .ConfigureAwait(false);
+            _receiptCreated = true;
+        }
+
         await _media.CommitUpgradeAsync(
                 _mediaPlan ?? throw new SetupException("upgrade_state_uncertain"),
                 cancellationToken)
@@ -494,6 +533,22 @@ internal sealed class WindowsUpgradeTransaction : IUpgradeTransaction
                     _oldRegistration,
                     "upgrade_state_uncertain");
                 _registrationUpdated = false;
+            }
+            catch
+            {
+                uncertain = true;
+            }
+        }
+
+        if (_receiptCreated)
+        {
+            try
+            {
+                await _receiptStore.DeleteExactAsync(
+                        _expectedReceipt,
+                        CancellationToken.None)
+                    .ConfigureAwait(false);
+                _receiptCreated = false;
             }
             catch
             {
@@ -729,7 +784,8 @@ internal sealed class WindowsUpgradeTransaction : IUpgradeTransaction
                 case RemoveOwnedDesktopShortcut shortcut:
                     native.VerifyDesktopShortcutOwnership(shortcut);
                     break;
-                case RemoveOwnedProductUninstall or RemoveOwnedPdfExtension:
+                case RemoveOwnedProductUninstall or RemoveOwnedPdfExtension or
+                    RemoveOwnedInstallationReceipt:
                     break;
                 default:
                     throw new SetupException("owned_resource_mismatch");
@@ -754,12 +810,18 @@ internal sealed class WindowsUpgradeTransaction : IUpgradeTransaction
 internal sealed class WindowsUpgradeEnvironment : IUninstallEnvironment
 {
     private readonly WindowsUninstallEnvironment _inner = new();
+    private readonly InstallationReceipt? _receipt;
+
+    internal WindowsUpgradeEnvironment(InstallationReceipt? receipt) => _receipt = receipt;
 
     public bool IsWindows => _inner.IsWindows;
     public string CommonDesktopDirectory => _inner.CommonDesktopDirectory;
 
     public Task<ServiceConfiguration> LoadConfigurationAsync(CancellationToken cancellationToken) =>
         _inner.LoadConfigurationAsync(cancellationToken);
+
+    public Task<InstallationReceipt?> LoadInstallationReceiptAsync(
+        CancellationToken cancellationToken) => Task.FromResult(_receipt);
 
     public void ValidateControlledPaths(ServiceConfiguration configuration)
     {

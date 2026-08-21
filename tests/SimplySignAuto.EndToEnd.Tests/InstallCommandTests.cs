@@ -849,6 +849,89 @@ public sealed class InstallCommandTests
     }
 
     [Fact]
+    public void Installation_receipt_codec_round_trips_and_rejects_non_exact_shapes()
+    {
+        var receipt = new InstallationReceipt(
+            InstallationReceipt.CurrentSchemaVersion,
+            InstallationMode.Service,
+            "0123456789abcdef0123456789abcdef",
+            InstallFixture.SigningSid,
+            Path.GetFullPath(Path.Combine(Path.GetTempPath(), "installed", "SimplySignAuto.exe")),
+            UserDataRoot: null);
+
+        var json = Encoding.UTF8.GetString(InstallationReceiptCodec.Serialize(receipt));
+
+        Assert.Equal(receipt, InstallationReceiptCodec.Deserialize(json));
+        Assert.DoesNotContain("token", json, StringComparison.OrdinalIgnoreCase);
+        foreach (var invalid in new[]
+        {
+            "{}",
+            json.Replace("{", "{\"schemaVersion\":1,", StringComparison.Ordinal),
+            json.Replace("\"service\"", "\"Service\"", StringComparison.Ordinal),
+            json.TrimEnd().TrimEnd('}') + ",\"extra\":true}",
+            json.TrimEnd().TrimEnd('}') + ",\"userDataRoot\":\"/tmp/manual\"}",
+        })
+        {
+            var error = Assert.Throws<InstallException>(() =>
+                InstallationReceiptCodec.Deserialize(invalid));
+            Assert.Equal("installation_receipt_invalid", error.Code);
+        }
+    }
+
+    [WindowsAdministratorFact]
+    public async Task Windows_receipt_store_round_trips_admin_only_file_and_refuses_drifted_delete()
+    {
+        using var identity = WindowsIdentity.GetCurrent();
+        var currentSid = Assert.IsType<SecurityIdentifier>(identity.User);
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "SimplySignAuto.Receipt.Tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var path = Path.Combine(root, "install.json");
+        var receipt = new InstallationReceipt(
+            InstallationReceipt.CurrentSchemaVersion,
+            InstallationMode.Service,
+            "0123456789abcdef0123456789abcdef",
+            currentSid.Value,
+            Path.GetFullPath(Path.Combine(root, "bin", "SimplySignAuto.exe")),
+            UserDataRoot: null);
+        try
+        {
+            WindowsInstallAcl.ApplyDirectory(
+                root,
+                InstallAclProfile.AdministratorsOnly,
+                currentSid);
+            var store = new WindowsInstallationReceiptStore(path);
+
+            await store.CreateAsync(receipt, CancellationToken.None);
+
+            WindowsInstallAcl.VerifyFile(
+                path,
+                InstallAclProfile.AdministratorsOnly,
+                currentSid);
+            Assert.Equal(receipt, await store.LoadOptionalAsync(CancellationToken.None));
+            var mismatch = await Assert.ThrowsAsync<InstallException>(() =>
+                store.DeleteExactAsync(
+                    receipt with { InstallInstanceId = "fedcba9876543210fedcba9876543210" },
+                    CancellationToken.None));
+            Assert.Equal("owned_resource_mismatch", mismatch.Code);
+            Assert.True(File.Exists(path));
+
+            await store.DeleteExactAsync(receipt, CancellationToken.None);
+
+            Assert.False(File.Exists(path));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void Unelevated_uninstall_relaunches_only_the_fixed_current_executable_and_forwards_exit_code()
     {
         var launcher = new RecordingUninstallElevationLauncher(23);
@@ -913,11 +996,17 @@ public sealed class InstallCommandTests
         Assert.Equal(plan.Paths.ExecutablePath, shortcut.TargetPath);
         Assert.Equal(exactOwner, shortcut.OwnerMarker);
         var actionArray = plan.Actions.ToArray();
+        var receipt = Assert.Single(plan.Actions.OfType<WriteProtectedFile>(), action =>
+            action.Content == InstallContent.InstallationReceipt);
+        Assert.Equal(plan.Paths.InstallationReceiptPath, receipt.Path);
+        Assert.Equal(InstallAclProfile.AdministratorsOnly, receipt.Acl);
         var productRegistrationIndex = Array.FindIndex(actionArray, action => action is RegisterProductUninstall);
+        var receiptIndex = Array.IndexOf(actionArray, receipt);
         var verifyIndex = Array.FindIndex(actionArray, action => action is VerifyInstallSecurity);
         var serviceStartIndex = Array.FindIndex(actionArray, action => action is StartAndVerifyWindowsService);
         var agentStartIndex = Array.FindIndex(actionArray, action => action is StartInteractiveAgentTask);
         Assert.True(productRegistrationIndex >= 0 && productRegistrationIndex < verifyIndex);
+        Assert.True(receiptIndex >= 0 && receiptIndex < verifyIndex);
         Assert.True(verifyIndex < serviceStartIndex);
         Assert.True(serviceStartIndex < agentStartIndex);
         Assert.DoesNotContain("otpauth", JsonSerializer.Serialize(plan), StringComparison.OrdinalIgnoreCase);
@@ -1160,6 +1249,24 @@ public sealed class InstallCommandTests
             rolledBack => Assert.Equal(
                 plan.InstallInstanceId,
                 Assert.IsType<ServiceConfiguration>(rolledBack.OwnershipConfiguration).InstallInstanceId));
+    }
+
+    [Fact]
+    public async Task Service_receipt_write_failure_rolls_back_prior_install_actions_before_service_creation()
+    {
+        using var fixture = new InstallFixture();
+        var plan = await fixture.CreatePlanner().PlanAsync(fixture.Options, CancellationToken.None);
+        var executor = new RecordingInstallActionExecutor { FailReceiptWrite = true };
+
+        var failure = await Assert.ThrowsAsync<InstallException>(() =>
+            new InstallOrchestrator(executor, new FixedTokenGenerator(new byte[32]))
+                .ExecuteAsync(plan, TextWriter.Null, CancellationToken.None));
+
+        Assert.Equal("installation_receipt_write_failed", failure.Code);
+        Assert.DoesNotContain(executor.Applied, action => action is CreateWindowsService);
+        Assert.Equal(
+            executor.Applied.Take(executor.Applied.Count - 1).Reverse().Select(action => action.GetType()),
+            executor.RolledBack.Select(action => action.GetType()));
     }
 
     [Fact]
@@ -1551,6 +1658,10 @@ public sealed class InstallCommandTests
         var service = JsonSerializer.Deserialize<ServiceConfiguration>(
             executor.Files[plan.Paths.ServiceConfigurationPath],
             JsonSerializerOptions.Web)!;
+        var receipt = InstallationReceiptCodec.Deserialize(
+            Encoding.UTF8.GetString(executor.Files[plan.Paths.InstallationReceiptPath]));
+        InstallationReceiptValidator.RequireServiceMatch(receipt, service);
+        Assert.Equal(InstallationMode.Service, receipt.Mode);
         Assert.Equal(
             Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(result.ApiToken))).ToLowerInvariant(),
             service.TokenHash);
@@ -2114,7 +2225,11 @@ public sealed class InstallCommandTests
             new WindowsInstallResourceLookup(),
             new WindowsInstallStartupRuntime(),
             new AllowingRollbackOwnershipVerifier());
-        var material = new InstallExecutionMaterial("{}"u8.ToArray(), "{}"u8.ToArray(), "token\n"u8.ToArray());
+        var material = new InstallExecutionMaterial(
+            "{}"u8.ToArray(),
+            "{}"u8.ToArray(),
+            "token\n"u8.ToArray(),
+            "{}"u8.ToArray());
         var actions = new InstallAction[]
         {
             new CreateProtectedDirectory(root, InstallAclProfile.AdministratorsOnly),
@@ -2214,7 +2329,7 @@ public sealed class InstallCommandTests
     private static int Count(string value, string needle) =>
         (value.Length - value.Replace(needle, string.Empty, StringComparison.Ordinal).Length) / needle.Length;
 
-    private static InstallExecutionMaterial EmptyMaterial() => new([], [], []);
+    private static InstallExecutionMaterial EmptyMaterial() => new([], [], [], []);
 
     private sealed class FixedTokenGenerator(byte[] bytes) : IApiTokenGenerator
     {
@@ -2630,6 +2745,7 @@ public sealed class InstallCommandTests
         public bool FailAgentStart { get; init; }
         public bool FailRollbackOwnership { get; init; }
         public bool FailFirstRollbackWithIoException { get; init; }
+        public bool FailReceiptWrite { get; init; }
 
         public Task<AppliedInstallAction> ApplyAsync(
             InstallAction action,
@@ -2639,6 +2755,11 @@ public sealed class InstallCommandTests
             Applied.Add(action);
             if (action is WriteProtectedFile file)
             {
+                if (FailReceiptWrite && file.Content == InstallContent.InstallationReceipt)
+                {
+                    throw new InstallException("installation_receipt_write_failed");
+                }
+
                 Files[file.Path] = material.GetFile(file.Content);
             }
 

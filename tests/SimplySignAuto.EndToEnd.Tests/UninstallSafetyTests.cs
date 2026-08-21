@@ -242,6 +242,31 @@ public sealed class UninstallSafetyTests
     }
 
     [Fact]
+    public async Task Legacy_receipt_removal_requires_exact_preflight_readback_then_deletes_once()
+    {
+        var basePlan = Plan(includePurge: false);
+        var receipt = InstallationReceipt.ForService(basePlan.Configuration);
+        var receiptStore = new RecordingInstallationReceiptStore(receipt);
+        var plan = basePlan with
+        {
+            Actions = [.. basePlan.Actions, new RemoveOwnedInstallationReceipt(receipt)],
+            Receipt = receipt,
+        };
+        var executor = new WindowsUninstallActionExecutor(
+            new RecordingWindowsUninstallNative(null, null),
+            new RecordingPurgeIsolationFileSystem(),
+            AllowOptionalToolUninstallPreflight.Instance,
+            AllowInstalledMediaUninstallPreflight.Instance,
+            receiptStore);
+
+        await new UninstallOrchestrator(executor)
+            .ExecuteAsync(plan, TextWriter.Null, CancellationToken.None);
+
+        Assert.Equal(["load", "delete"], receiptStore.Events);
+        Assert.Null(receiptStore.Current);
+    }
+
+    [Fact]
     public async Task Default_uninstall_fully_cleans_the_exact_product_managed_user()
     {
         var configuration = Configuration();
@@ -276,6 +301,80 @@ public sealed class UninstallSafetyTests
         Assert.Equal(
             InstallOwnershipMarker.Create(configuration.InstallInstanceId),
             productRegistration.OwnerMarker);
+    }
+
+    [Fact]
+    public async Task Service_receipt_is_cross_checked_and_covered_by_the_owned_data_isolation()
+    {
+        var configuration = Configuration();
+        var identity = ManagedIdentity(configuration);
+        var receipt = InstallationReceipt.ForService(configuration);
+        var planner = new UninstallPlanner(
+            new RecordingUninstallEnvironment(configuration, identity, receipt));
+
+        var plan = await planner.PlanAsync(
+            new UninstallOptions(PurgeData: false, Confirmation: null),
+            CancellationToken.None);
+
+        Assert.Equal(receipt, plan.Receipt);
+        Assert.Contains(plan.Actions, action =>
+            action is PurgeControlledData purge && purge.DataRoot == configuration.DataRoot);
+        Assert.DoesNotContain(plan.Actions, action => action is RemoveOwnedInstallationReceipt);
+    }
+
+    [Fact]
+    public async Task Upgraded_legacy_service_without_data_isolation_removes_the_exact_receipt()
+    {
+        var configuration = Configuration();
+        var receipt = InstallationReceipt.ForService(configuration);
+
+        var plan = await new UninstallPlanner(
+                new RecordingUninstallEnvironment(configuration, identity: null, receipt: receipt))
+            .PlanAsync(
+                new UninstallOptions(PurgeData: false, Confirmation: null),
+                CancellationToken.None);
+
+        Assert.Equal(
+            receipt,
+            Assert.IsType<RemoveOwnedInstallationReceipt>(plan.Actions[^1]).Receipt);
+    }
+
+    [Fact]
+    public async Task Receipt_and_service_configuration_identity_conflicts_fail_closed()
+    {
+        var configuration = Configuration();
+        var exact = InstallationReceipt.ForService(configuration);
+        var identity = ManagedIdentity(configuration);
+        foreach (var conflicting in new[]
+        {
+            exact with
+            {
+                Mode = InstallationMode.Manual,
+                UserDataRoot = Path.GetFullPath(Path.Combine(
+                    Path.GetTempPath(),
+                    "SimplySignAuto.Tests",
+                    "manual")),
+            },
+            exact with { InstallInstanceId = "fedcba9876543210fedcba9876543210" },
+            exact with { SigningUserSid = "S-1-5-21-1000-2000-3000-5000" },
+            exact with
+            {
+                ExecutablePath = Path.GetFullPath(Path.Combine(
+                    Path.GetDirectoryName(configuration.ExecutablePath)!,
+                    "other",
+                    "SimplySignAuto.exe")),
+            },
+        })
+        {
+            var failure = await Assert.ThrowsAsync<InstallException>(() =>
+                new UninstallPlanner(
+                        new RecordingUninstallEnvironment(configuration, identity, conflicting))
+                    .PlanAsync(
+                        new UninstallOptions(PurgeData: false, Confirmation: null),
+                        CancellationToken.None));
+
+            Assert.Equal("owned_resource_mismatch", failure.Code);
+        }
     }
 
     [Fact]
@@ -2689,7 +2788,8 @@ public sealed class UninstallSafetyTests
 
     private sealed class RecordingUninstallEnvironment(
         SimplySignAuto.Service.ServiceConfiguration configuration,
-        UninstallSigningIdentity identity) : IUninstallEnvironment
+        UninstallSigningIdentity? identity,
+        InstallationReceipt? receipt = null) : IUninstallEnvironment
     {
         public bool IsWindows => true;
 
@@ -2701,14 +2801,45 @@ public sealed class UninstallSafetyTests
         public Task<SimplySignAuto.Service.ServiceConfiguration> LoadConfigurationAsync(
             CancellationToken cancellationToken) => Task.FromResult(configuration);
 
+        public Task<InstallationReceipt?> LoadInstallationReceiptAsync(
+            CancellationToken cancellationToken) => Task.FromResult(receipt);
+
         public void ValidateControlledPaths(
             SimplySignAuto.Service.ServiceConfiguration configured)
         {
         }
 
-        public UninstallSigningIdentity InspectSigningIdentity(
+        public UninstallSigningIdentity? InspectSigningIdentity(
             SimplySignAuto.Service.ServiceConfiguration configured,
             string ownerMarker) => identity;
+    }
+
+    private sealed class RecordingInstallationReceiptStore(InstallationReceipt current)
+        : IInstallationReceiptStore
+    {
+        public InstallationReceipt? Current { get; private set; } = current;
+
+        public List<string> Events { get; } = [];
+
+        public Task<InstallationReceipt?> LoadOptionalAsync(CancellationToken cancellationToken)
+        {
+            Events.Add("load");
+            return Task.FromResult(Current);
+        }
+
+        public Task CreateAsync(
+            InstallationReceipt receipt,
+            CancellationToken cancellationToken) => throw new InvalidOperationException();
+
+        public Task DeleteExactAsync(
+            InstallationReceipt receipt,
+            CancellationToken cancellationToken)
+        {
+            Events.Add("delete");
+            Assert.Equal(receipt, Current);
+            Current = null;
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class RootSwapPurgeIsolationFileSystem(
