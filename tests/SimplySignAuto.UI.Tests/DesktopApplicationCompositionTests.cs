@@ -42,6 +42,34 @@ public sealed class DesktopApplicationCompositionTests
     }
 
     [Fact]
+    public void Installed_receipt_selects_the_fixed_desktop_entry_without_ui_override()
+    {
+        var root = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "SimplySignAuto", "manual"));
+        var manual = new InstallationReceipt(
+            InstallationReceipt.CurrentSchemaVersion,
+            InstallationMode.Manual,
+            "0123456789abcdef0123456789abcdef",
+            "S-1-5-21-1000-2000-3000-4000",
+            Path.GetFullPath(Path.Combine(Path.GetTempPath(), "SimplySignAuto.exe")),
+            root);
+        var service = manual with { Mode = InstallationMode.Service, UserDataRoot = null };
+
+        Assert.Equal(InstallationMode.Service, Program.ResolveDesktopMode(null));
+        Assert.Equal(InstallationMode.Service, Program.ResolveDesktopMode(service));
+        Assert.Equal(InstallationMode.Manual, Program.ResolveDesktopMode(manual));
+        Assert.Same(manual, Program.ValidateManualDesktopReceipt(
+            manual,
+            manual.ExecutablePath,
+            root));
+        Assert.Equal(
+            "owned_resource_mismatch",
+            Assert.Throws<InstallException>(() => Program.ValidateManualDesktopReceipt(
+                manual,
+                Path.GetFullPath(Path.Combine(Path.GetTempPath(), "other", "SimplySignAuto.exe")),
+                root)).Code);
+    }
+
+    [Fact]
     public void Explicit_entry_routing_preserves_cli_and_desktop_modes()
     {
         (string[] Arguments, ApplicationEntryKind ExpectedKind, bool ExpectedShowInitially)[] routes =
@@ -531,6 +559,40 @@ public sealed class DesktopApplicationCompositionTests
         Assert.NotNull(runtime.ViewModel!.QuickSign);
         Assert.Same(runtime.ViewModel.QuickSign, runtime.ViewModel.Pages[1].Content);
         Assert.Same(localJobs, runner.LocalJobs);
+
+        runtime.RequestShutdown();
+        Assert.Equal(0, await execution);
+    }
+
+    [Fact]
+    public async Task Manual_desktop_application_reuses_the_local_bridge_with_the_five_page_shell()
+    {
+        var events = new List<string>();
+        var runtime = new RecordingDesktopRuntime();
+        var localJobs = new RecordingLocalJobClient();
+        using var management = new AgentManagementBridge();
+        var runner = new LocalManagementBlockingAgentRunner(events, management, localJobs);
+        var configuration = CompleteLocalConfiguration();
+        var application = new DesktopApplication(
+            new FixedConfigurationLoader(configuration),
+            new FixedSigningIdentity(configuration.SigningUserSid),
+            new ImmediateSingleInstanceActivator(new BlockingActivationServer(events)),
+            runner,
+            new FixedDesktopRuntimeFactory(runtime),
+            new UnknownActiveJobStateSource(),
+            new FixedAgentLifetimeFactory(new FakeOwnedAgentLifetime()),
+            mode: InstallationMode.Manual);
+
+        var execution = application.ExecuteAsync(false, TextWriter.Null, default);
+        await Task.WhenAll(runtime.Started.Task, runner.Started.Task);
+
+        Assert.Equal(
+            ["概览", "手工签名", "签名任务", "激活凭证", "应用设置"],
+            runtime.ViewModel!.Pages.Select(page => page.Title).ToArray());
+        Assert.NotNull(runtime.ViewModel.QuickSign);
+        Assert.NotNull(runtime.ViewModel.Jobs);
+        Assert.NotNull(runtime.ViewModel.Activation);
+        Assert.Null(runtime.ViewModel.ServiceSettings);
 
         runtime.RequestShutdown();
         Assert.Equal(0, await execution);

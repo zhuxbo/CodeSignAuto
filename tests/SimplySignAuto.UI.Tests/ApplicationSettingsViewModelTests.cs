@@ -1,6 +1,7 @@
 using System.Globalization;
 using SimplySignAuto.App.UI.Localization;
 using SimplySignAuto.App.UI.ViewModels;
+using SimplySignAuto.App.Manual;
 
 namespace SimplySignAuto.UI.Tests;
 
@@ -60,6 +61,52 @@ public sealed class ApplicationSettingsViewModelTests : IDisposable
         {
             CultureInfo.CurrentUICulture = originalUiCulture;
         }
+    }
+
+    [Fact]
+    public async Task Manual_settings_show_and_persist_retention_separately_from_ui_language()
+    {
+        var uiStore = new UiPreferenceStore(Path.Combine(_directory, "ui.json"));
+        var manualStore = new ManualSettingsStore(Path.Combine(_directory, "manual", "settings.json"));
+        await manualStore.LoadAsync(CancellationToken.None);
+        var viewModel = new ApplicationSettingsViewModel(
+            uiStore,
+            displayCulture: null,
+            manualSettings: manualStore)
+        {
+            RetentionHoursText = "0",
+        };
+
+        await viewModel.SaveAsync(CancellationToken.None);
+
+        Assert.True(viewModel.IsManualMode);
+        Assert.Equal(0, manualStore.CurrentRetentionHours);
+        Assert.Equal(0, (await new ManualSettingsStore(manualStore.Path)
+            .LoadAsync(CancellationToken.None)).RetentionHours);
+        Assert.Equal("结果将永久保留；此设置只影响之后创建的任务。", viewModel.RetentionStatusText);
+    }
+
+    [Fact]
+    public async Task Invalid_manual_retention_does_not_mutate_either_settings_file()
+    {
+        var uiPath = Path.Combine(_directory, "invalid", "ui.json");
+        var manualStore = new ManualSettingsStore(Path.Combine(_directory, "invalid", "manual", "settings.json"));
+        await manualStore.LoadAsync(CancellationToken.None);
+        var viewModel = new ApplicationSettingsViewModel(
+            new UiPreferenceStore(uiPath),
+            displayCulture: null,
+            manualSettings: manualStore)
+        {
+            SelectedCultureName = UiCulture.EnglishName,
+            RetentionHoursText = "169",
+        };
+
+        await viewModel.SaveAsync(CancellationToken.None);
+
+        Assert.Equal(168, manualStore.CurrentRetentionHours);
+        Assert.False(File.Exists(uiPath));
+        Assert.Equal("请输入 0 至 168 的整数。", viewModel.RetentionStatusText);
+        Assert.False(viewModel.RestartRequired);
     }
 
     public void Dispose()

@@ -5,13 +5,19 @@
   <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
   <data name="ApplicationSettingsTitle" xml:space="preserve"><value>Application settings</value></data>
-  <data name="ApplicationSettingsDescription" xml:space="preserve"><value>Set the interface language for this administrator account.</value></data>
+  <data name="ApplicationSettingsDescription" xml:space="preserve"><value>Set the interface language and the application options available in this mode.</value></data>
   <data name="InterfaceLanguageLabel" xml:space="preserve"><value>Interface language</value></data>
   <data name="LanguageChinese" xml:space="preserve"><value>Simplified Chinese</value></data>
   <data name="LanguageEnglish" xml:space="preserve"><value>English</value></data>
   <data name="SaveButton" xml:space="preserve"><value>Save</value></data>
   <data name="ApplicationSettingsStatusArea" xml:space="preserve"><value>Application settings status</value></data>
   <data name="RestartRequired" xml:space="preserve"><value>Language saved. Restart SimplySignAuto to apply it.</value></data>
+  <data name="ManualRetentionHours" xml:space="preserve"><value>Job and result retention hours</value></data>
+  <data name="ManualRetentionDescription" xml:space="preserve"><value>Enter 0 to 168; 0 keeps results forever. Changes apply only to jobs created afterward.</value></data>
+  <data name="ManualRetentionInvalid" xml:space="preserve"><value>Enter an integer from 0 to 168.</value></data>
+  <data name="ManualRetentionSavedForever" xml:space="preserve"><value>Results will be kept forever; this applies only to jobs created afterward.</value></data>
+  <data name="ManualRetentionSavedHours" xml:space="preserve"><value>Results will be kept for {0} hours; this applies only to jobs created afterward.</value></data>
+  <data name="ManualExitActiveJob" xml:space="preserve"><value>A signing job is running. Wait for it to finish before exiting.</value></data>
   <data name="WindowTitle" xml:space="preserve"><value>SimplySign Auto</value></data>
   <data name="ActionCancel" xml:space="preserve"><value>Cancel</value></data>
   <data name="ActionClear" xml:space="preserve"><value>Clear</value></data>
@@ -39,6 +45,7 @@
   <data name="OverallStatusAutomation" xml:space="preserve"><value>Service status: {0}</value></data>
   <data name="NavigationOverview" xml:space="preserve"><value>Overview</value></data>
   <data name="NavigationQuickSign" xml:space="preserve"><value>Quick sign</value></data>
+  <data name="NavigationManualSign" xml:space="preserve"><value>Manual signing</value></data>
   <data name="NavigationJobs" xml:space="preserve"><value>Signing jobs</value></data>
   <data name="NavigationActivation" xml:space="preserve"><value>Activation</value></data>
   <data name="NavigationServiceSettings" xml:space="preserve"><value>Service settings</value></data>
@@ -182,6 +189,9 @@
   <data name="JobsPdfFilter" xml:space="preserve"><value>PDF documents|*.pdf</value></data>
   <data name="JobsSoftwareFilter" xml:space="preserve"><value>Signed software|*.exe;*.dll;*.msi;*.sys;*.cat|All files|*.*</value></data>
   <data name="JobsSaveDialogTitle" xml:space="preserve"><value>Save a copy of the signed result</value></data>
+  <data name="JobsErrorDestinationIdentityUnavailable" xml:space="preserve"><value>For safety, the application cannot overwrite an existing file after restart. Save with a new file name.</value></data>
+  <data name="JobsErrorDestinationExists" xml:space="preserve"><value>The destination already exists. Choose a new file name, or confirm overwrite in the current signing session.</value></data>
+  <data name="JobsErrorSaveFailed" xml:space="preserve"><value>Could not save the signed result (code: {0}).</value></data>
   <data name="ActivationAutomation" xml:space="preserve"><value>Activation</value></data>
   <data name="ActivationTitle" xml:space="preserve"><value>Activation</value></data>
   <data name="ActivationDescription" xml:space="preserve"><value>Save Certum otpauth activation data and view redacted SimplySign certificate status.</value></data>

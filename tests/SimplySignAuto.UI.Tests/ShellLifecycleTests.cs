@@ -22,6 +22,22 @@ public sealed class ShellLifecycleTests
     }
 
     [Fact]
+    public void Manual_shell_uses_the_fixed_five_page_set_without_service_settings()
+    {
+        var viewModel = new ShellViewModel(
+            new FixedActiveJobState(ActiveJobState.None),
+            new RecordingWindow(),
+            new RecordingAgentLifetime(),
+            dispatcher: null,
+            mode: SimplySignAuto.App.Commands.InstallationMode.Manual);
+
+        Assert.Equal(
+            ["概览", "手工签名", "签名任务", "激活凭证", "应用设置"],
+            viewModel.Pages.Select(page => page.Title).ToArray());
+        Assert.DoesNotContain(viewModel.Pages, page => page.Title == "服务设置");
+    }
+
+    [Fact]
     public void Ordinary_close_hides_the_window_and_keeps_the_agent_running()
     {
         var window = new RecordingWindow();
@@ -71,6 +87,47 @@ public sealed class ShellLifecycleTests
 
         Assert.All(results, result => Assert.Equal(ExitRequestResult.Exiting, result));
         Assert.Equal(0, lifetime.StopCalls);
+        Assert.Equal(1, window.CloseForExitCalls);
+    }
+
+    [Fact]
+    public async Task Manual_exit_refuses_an_active_job_without_stopping_or_closing()
+    {
+        var window = new RecordingWindow();
+        var lifetime = new RecordingAgentLifetime();
+        var viewModel = new ShellViewModel(
+            new FixedActiveJobState(ActiveJobState.Active),
+            window,
+            lifetime,
+            dispatcher: null,
+            mode: SimplySignAuto.App.Commands.InstallationMode.Manual);
+
+        var result = await viewModel.RequestExitAsync(CancellationToken.None);
+
+        Assert.Equal(ExitRequestResult.Refused, result);
+        Assert.Equal("签名任务正在进行，完成后才能退出程序。", window.LastNotice);
+        Assert.Equal(0, lifetime.StopCalls);
+        Assert.Equal(0, window.CloseForExitCalls);
+    }
+
+    [Fact]
+    public async Task Manual_exit_stops_the_owned_runtime_before_closing_once()
+    {
+        var window = new RecordingWindow();
+        var lifetime = new RecordingAgentLifetime();
+        var viewModel = new ShellViewModel(
+            new FixedActiveJobState(ActiveJobState.None),
+            window,
+            lifetime,
+            dispatcher: null,
+            mode: SimplySignAuto.App.Commands.InstallationMode.Manual);
+
+        var results = await Task.WhenAll(
+            viewModel.RequestExitAsync(CancellationToken.None),
+            viewModel.RequestExitAsync(CancellationToken.None));
+
+        Assert.All(results, result => Assert.Equal(ExitRequestResult.Exiting, result));
+        Assert.Equal(1, lifetime.StopCalls);
         Assert.Equal(1, window.CloseForExitCalls);
     }
 

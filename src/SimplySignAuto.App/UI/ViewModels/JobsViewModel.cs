@@ -118,8 +118,23 @@ public sealed class JobsViewModel : INotifyPropertyChanged, IDisposable
     public string? ErrorCode
     {
         get => _errorCode;
-        private set => SetField(ref _errorCode, value);
+        private set
+        {
+            if (SetField(ref _errorCode, value))
+            {
+                OnPropertyChanged(nameof(ErrorText));
+            }
+        }
     }
+
+    public string? ErrorText => ErrorCode switch
+    {
+        null => null,
+        "local_destination_identity_unavailable" =>
+            UiCulture.Text("JobsErrorDestinationIdentityUnavailable"),
+        "local_destination_exists" => UiCulture.Text("JobsErrorDestinationExists"),
+        _ => UiCulture.Format("JobsErrorSaveFailed", ErrorCode),
+    };
 
     public bool CanLoadMore => !_hasLoadedPage || _nextCursor is not null;
 

@@ -7,6 +7,7 @@ using System.Security.Principal;
 using SimplySignAuto.Agent;
 using SimplySignAuto.Agent.SimplySign;
 using SimplySignAuto.App.Commands;
+using SimplySignAuto.App.Manual;
 using SimplySignAuto.App.UI;
 using SimplySignAuto.App.UI.Localization;
 using SimplySignAuto.App.UI.Testing;
@@ -56,8 +57,10 @@ internal static class Program
                 }
 
                 using var diagnostics = DesktopDiagnosticLog.Open();
-                return await new AdminDesktopApplication(diagnostics)
-                    .ExecuteAsync(route.ShowInitially, diagnostics, cancellationToken);
+                return await RunInstalledDesktopAsync(
+                    route.ShowInitially,
+                    diagnostics,
+                    cancellationToken).ConfigureAwait(false);
             }
             case ApplicationEntryKind.UiTest:
                 return await UiTestProgramGate.DispatchAsync(
@@ -209,6 +212,92 @@ internal static class Program
     internal static bool ShouldDetachConsole(ApplicationEntryRoute route) =>
         route.Kind == ApplicationEntryKind.Desktop ||
         route is { Kind: ApplicationEntryKind.AgentConsole, Arguments: ["--background"] };
+
+    internal static InstallationMode ResolveDesktopMode(InstallationReceipt? receipt) =>
+        receipt is null
+            ? InstallationMode.Service
+            : InstallationReceiptValidator.Validate(receipt).Mode;
+
+    internal static InstallationReceipt ValidateManualDesktopReceipt(
+        InstallationReceipt receipt,
+        string executablePath,
+        string expectedDataRoot)
+    {
+        receipt = InstallationReceiptValidator.Validate(receipt);
+        ArgumentException.ThrowIfNullOrWhiteSpace(executablePath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(expectedDataRoot);
+        if (receipt.Mode != InstallationMode.Manual ||
+            !string.Equals(
+                receipt.ExecutablePath,
+                Path.GetFullPath(executablePath),
+                PathComparison()) ||
+            !string.Equals(
+                receipt.UserDataRoot,
+                Path.GetFullPath(expectedDataRoot),
+                PathComparison()))
+        {
+            throw new InstallException("owned_resource_mismatch");
+        }
+
+        return receipt;
+    }
+
+    private static async Task<int> RunInstalledDesktopAsync(
+        bool showInitially,
+        TextWriter diagnostics,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var receipt = await new WindowsInstallationReceiptStore()
+                .LoadOptionalAsync(cancellationToken)
+                .ConfigureAwait(false);
+            if (ResolveDesktopMode(receipt) == InstallationMode.Service)
+            {
+                return await new AdminDesktopApplication(diagnostics)
+                    .ExecuteAsync(showInitially, diagnostics, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            var expectedPaths = ManualRuntimePaths.Default;
+            var manualReceipt = ValidateManualDesktopReceipt(
+                InstallationReceiptValidator.Validate(receipt),
+                Environment.ProcessPath ?? throw new InstallException("owned_resource_mismatch"),
+                expectedPaths.DataRoot);
+            var paths = ManualRuntimePaths.ForDataRoot(manualReceipt.UserDataRoot!);
+            var settings = new ManualSettingsStore(Path.Combine(paths.DataRoot, "settings.json"));
+            await settings.LoadAsync(cancellationToken).ConfigureAwait(false);
+            var runner = new ManualAgentRunner(paths, settings, diagnostics);
+            return await new DesktopApplication(
+                    new ManualAgentConfigurationLoader(manualReceipt, paths),
+                    new WindowsDesktopSigningUserIdentity(),
+                    new SingleInstanceActivator(),
+                    runner,
+                    new WpfDesktopRuntimeFactory(),
+                    new UnknownActiveJobStateSource(),
+                    new WindowsAgentLifetimeFactory(),
+                    InstallationMode.Manual,
+                    settings)
+                .ExecuteAsync(showInitially, diagnostics, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (InstallException receiptError)
+        {
+            await diagnostics.WriteLineAsync(receiptError.Code).ConfigureAwait(false);
+            return 1;
+        }
+        catch (InvalidDataException settingsError) when (
+            settingsError.Message == "manual_settings_invalid")
+        {
+            await diagnostics.WriteLineAsync("manual_settings_invalid").ConfigureAwait(false);
+            return 1;
+        }
+    }
+
+    private static StringComparison PathComparison() =>
+        OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
 
     private static void DetachDesktopConsole() => DetachConsole();
 

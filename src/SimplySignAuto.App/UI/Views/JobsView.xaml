@@ -36,9 +36,10 @@
         <TextBlock Text="{localization:UiString JobsLoading}"
                    Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}"
                    AutomationProperties.Name="{localization:UiString JobsLoading}" />
-        <TextBlock Text="{Binding ErrorCode}"
+        <TextBlock Text="{Binding ErrorText}"
                    Foreground="{DynamicResource TextSecondaryBrush}"
-                   AutomationProperties.Name="{Binding ErrorCode}" />
+                   TextWrapping="Wrap"
+                   AutomationProperties.Name="{Binding ErrorText}" />
         <ItemsControl ItemsSource="{Binding Items}" Margin="0,4,0,0">
           <ItemsControl.ItemTemplate>
             <DataTemplate>

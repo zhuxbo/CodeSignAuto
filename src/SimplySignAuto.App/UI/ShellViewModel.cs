@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using SimplySignAuto.Agent.Ipc;
 using SimplySignAuto.Agent.LocalJobs;
 using SimplySignAuto.App.Commands;
+using SimplySignAuto.App.Manual;
 using SimplySignAuto.App.UI.Localization;
 using SimplySignAuto.App.UI.Status;
 using SimplySignAuto.App.UI.ViewModels;
@@ -214,7 +215,26 @@ public static class DesktopShellComposition
         IWindowController window,
         IDesktopAgentLifetime agentLifetime,
         IUiDispatcher dispatcher,
-        AgentConfiguration? configuration = null)
+        AgentConfiguration? configuration = null) =>
+        Create(
+            agentRunner,
+            fallbackActiveJobs,
+            window,
+            agentLifetime,
+            dispatcher,
+            configuration,
+            InstallationMode.Service,
+            manualSettings: null);
+
+    internal static ShellViewModel Create(
+        IAgentRunner agentRunner,
+        IActiveJobStateSource fallbackActiveJobs,
+        IWindowController window,
+        IDesktopAgentLifetime agentLifetime,
+        IUiDispatcher dispatcher,
+        AgentConfiguration? configuration,
+        InstallationMode mode,
+        ManualSettingsStore? manualSettings)
     {
         ArgumentNullException.ThrowIfNull(agentRunner);
         ArgumentNullException.ThrowIfNull(dispatcher);
@@ -228,7 +248,14 @@ public static class DesktopShellComposition
                     new WindowReloginConfirmation(window, dispatcher),
                     window,
                     agentLifetime,
-                    dispatcher)
+                    dispatcher,
+                    terminalJobs: null,
+                    clipboard: null,
+                    serviceConfigurationEditor: null,
+                    serviceSettingsDialogs: null,
+                    uiPreferenceStore: null,
+                    mode: mode,
+                    manualSettings: manualSettings)
                 : new ShellViewModel(
                     managementSource.Management,
                     new WindowReloginConfirmation(window, dispatcher),
@@ -247,6 +274,9 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
     private readonly object _exitSync = new();
     private readonly IWindowController _window;
     private readonly IUiDispatcher _dispatcher;
+    private readonly IActiveJobStateSource _activeJobs;
+    private readonly IDesktopAgentLifetime _agentLifetime;
+    private readonly InstallationMode _mode;
     private readonly CancellationTokenSource _lifetime = new();
     private readonly IReadOnlyList<NavigationPage> _pages;
     private NavigationPage _currentPage;
@@ -258,13 +288,24 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
         IWindowController window,
         IDesktopAgentLifetime agentLifetime,
         IUiDispatcher? dispatcher = null)
+        : this(activeJobs, window, agentLifetime, dispatcher, InstallationMode.Service)
     {
-        ArgumentNullException.ThrowIfNull(activeJobs);
+    }
+
+    internal ShellViewModel(
+        IActiveJobStateSource activeJobs,
+        IWindowController window,
+        IDesktopAgentLifetime agentLifetime,
+        IUiDispatcher? dispatcher,
+        InstallationMode mode)
+    {
+        _activeJobs = activeJobs ?? throw new ArgumentNullException(nameof(activeJobs));
         _window = window ?? throw new ArgumentNullException(nameof(window));
-        ArgumentNullException.ThrowIfNull(agentLifetime);
+        _agentLifetime = agentLifetime ?? throw new ArgumentNullException(nameof(agentLifetime));
         _dispatcher = dispatcher ?? InlineAppUiDispatcher.Instance;
+        _mode = mode;
         ApplicationSettings = new ApplicationSettingsViewModel(new UiPreferenceStore());
-        _pages = CreatePages(null, null, null, null, null, ApplicationSettings);
+        _pages = CreatePages(null, null, null, null, null, ApplicationSettings, _mode);
         _currentPage = _pages[0];
     }
 
@@ -287,9 +328,11 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
         ITerminalJobFeed? terminalJobs)
     {
         ArgumentNullException.ThrowIfNull(management);
+        _activeJobs = new ManagementActiveJobStateSource(management);
         _window = window ?? throw new ArgumentNullException(nameof(window));
-        ArgumentNullException.ThrowIfNull(agentLifetime);
+        _agentLifetime = agentLifetime ?? throw new ArgumentNullException(nameof(agentLifetime));
         _dispatcher = dispatcher ?? InlineAppUiDispatcher.Instance;
+        _mode = InstallationMode.Service;
         Overview = new OverviewViewModel(management, confirmation, OpenJobs, _dispatcher);
         if (management is IAgentAdministrationClient administration)
         {
@@ -297,7 +340,7 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
         }
         Overview.PropertyChanged += HandleOverviewPropertyChanged;
         ApplicationSettings = new ApplicationSettingsViewModel(new UiPreferenceStore());
-        _pages = CreatePages(Overview, null, null, null, null, ApplicationSettings);
+        _pages = CreatePages(Overview, null, null, null, null, ApplicationSettings, _mode);
         _currentPage = _pages[0];
     }
 
@@ -333,7 +376,9 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
         IClipboardService? clipboard = null,
         IServiceConfigurationEditor? serviceConfigurationEditor = null,
         IServiceSettingsDialogService? serviceSettingsDialogs = null,
-        UiPreferenceStore? uiPreferenceStore = null)
+        UiPreferenceStore? uiPreferenceStore = null,
+        InstallationMode mode = InstallationMode.Service,
+        ManualSettingsStore? manualSettings = null)
         : this(
             management,
             localJobs,
@@ -345,7 +390,9 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
             clipboard,
             serviceConfigurationEditor,
             serviceSettingsDialogs,
-            uiPreferenceStore)
+            uiPreferenceStore,
+            mode,
+            manualSettings)
     {
         ArgumentNullException.ThrowIfNull(configuration);
     }
@@ -379,13 +426,17 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
         IClipboardService? clipboard = null,
         IServiceConfigurationEditor? serviceConfigurationEditor = null,
         IServiceSettingsDialogService? serviceSettingsDialogs = null,
-        UiPreferenceStore? uiPreferenceStore = null)
+        UiPreferenceStore? uiPreferenceStore = null,
+        InstallationMode mode = InstallationMode.Service,
+        ManualSettingsStore? manualSettings = null)
     {
         ArgumentNullException.ThrowIfNull(management);
         ArgumentNullException.ThrowIfNull(localJobs);
+        _activeJobs = new ManagementActiveJobStateSource(management);
         _window = window ?? throw new ArgumentNullException(nameof(window));
-        ArgumentNullException.ThrowIfNull(agentLifetime);
+        _agentLifetime = agentLifetime ?? throw new ArgumentNullException(nameof(agentLifetime));
         _dispatcher = dispatcher ?? InlineAppUiDispatcher.Instance;
+        _mode = mode;
         Overview = new OverviewViewModel(management, confirmation, OpenJobs, _dispatcher);
         if (management is IAgentAdministrationClient administration)
         {
@@ -400,12 +451,15 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
                 new WindowOtpClearConfirmation(window, _dispatcher),
                 _dispatcher,
                 administration as ILocalTotpCodeProvider);
-            ServiceSettings = new ServiceSettingsViewModel(
-                administration,
-                serviceConfigurationEditor ?? UnavailableServiceConfigurationEditor.Instance,
-                serviceSettingsDialogs ?? UnavailableServiceSettingsDialogService.Instance,
-                desktopClipboard,
-                _dispatcher);
+            if (_mode == InstallationMode.Service)
+            {
+                ServiceSettings = new ServiceSettingsViewModel(
+                    administration,
+                    serviceConfigurationEditor ?? UnavailableServiceConfigurationEditor.Instance,
+                    serviceSettingsDialogs ?? UnavailableServiceSettingsDialogService.Instance,
+                    desktopClipboard,
+                    _dispatcher);
+            }
         }
         QuickSign = new QuickSignViewModel(
             localJobs,
@@ -416,14 +470,17 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
 
         Overview.PropertyChanged += HandleOverviewPropertyChanged;
         ApplicationSettings = new ApplicationSettingsViewModel(
-            uiPreferenceStore ?? new UiPreferenceStore());
+            uiPreferenceStore ?? new UiPreferenceStore(),
+            displayCulture: null,
+            manualSettings: _mode == InstallationMode.Manual ? manualSettings : null);
         _pages = CreatePages(
             Overview,
             QuickSign,
             Jobs,
             Activation,
             ServiceSettings,
-            ApplicationSettings);
+            ApplicationSettings,
+            _mode);
         _currentPage = _pages[0];
     }
 
@@ -503,6 +560,12 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
     public Task<ExitRequestResult> RequestExitAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (_mode == InstallationMode.Manual &&
+            (QuickSign?.HasActiveJob == true || _activeJobs.Current != ActiveJobState.None))
+        {
+            return RefuseManualExitAsync();
+        }
+
         lock (_exitSync)
         {
             return _exitTask ??= ExitOnceAsync();
@@ -511,8 +574,21 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
 
     private async Task<ExitRequestResult> ExitOnceAsync()
     {
+        if (_mode == InstallationMode.Manual)
+        {
+            await _agentLifetime.StopAsync(CancellationToken.None).ConfigureAwait(false);
+        }
+
         await InvokeUiAsync(_window.CloseForExit).ConfigureAwait(false);
         return ExitRequestResult.Exiting;
+    }
+
+    private async Task<ExitRequestResult> RefuseManualExitAsync()
+    {
+        await InvokeUiAsync(
+            () => _window.ShowNotice(UiCulture.Text("ManualExitActiveJob")))
+            .ConfigureAwait(false);
+        return ExitRequestResult.Refused;
     }
 
     public void Dispose()
@@ -543,15 +619,34 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
         JobsViewModel? jobs,
         ActivationViewModel? activation,
         ServiceSettingsViewModel? serviceSettings,
-        ApplicationSettingsViewModel applicationSettings) =>
-    [
-        new(UiCulture.Text("NavigationOverview"), "●", UiCulture.Text("NavigationOverviewPlaceholder"), overview),
-        new(UiCulture.Text("NavigationQuickSign"), "✎", UiCulture.Text("NavigationQuickSignPlaceholder"), quickSign),
-        new(UiCulture.Text("NavigationJobs"), "≡", UiCulture.Text("NavigationJobsPlaceholder"), jobs),
-        new(UiCulture.Text("NavigationActivation"), "◆", UiCulture.Text("NavigationActivationPlaceholder"), activation),
-        new(UiCulture.Text("NavigationServiceSettings"), "⚙", UiCulture.Text("NavigationServiceSettingsPlaceholder"), serviceSettings),
-        new(applicationSettings.PageTitle, "⚙", string.Empty, applicationSettings),
-    ];
+        ApplicationSettingsViewModel applicationSettings,
+        InstallationMode mode)
+    {
+        var pages = new List<NavigationPage>
+        {
+            new(UiCulture.Text("NavigationOverview"), "●", UiCulture.Text("NavigationOverviewPlaceholder"), overview),
+            new(
+                UiCulture.Text(mode == InstallationMode.Manual
+                    ? "NavigationManualSign"
+                    : "NavigationQuickSign"),
+                "✎",
+                UiCulture.Text("NavigationQuickSignPlaceholder"),
+                quickSign),
+            new(UiCulture.Text("NavigationJobs"), "≡", UiCulture.Text("NavigationJobsPlaceholder"), jobs),
+            new(UiCulture.Text("NavigationActivation"), "◆", UiCulture.Text("NavigationActivationPlaceholder"), activation),
+        };
+        if (mode == InstallationMode.Service)
+        {
+            pages.Add(new NavigationPage(
+                UiCulture.Text("NavigationServiceSettings"),
+                "⚙",
+                UiCulture.Text("NavigationServiceSettingsPlaceholder"),
+                serviceSettings));
+        }
+
+        pages.Add(new NavigationPage(applicationSettings.PageTitle, "⚙", string.Empty, applicationSettings));
+        return pages.AsReadOnly();
+    }
 
     private void OpenJobs() => _ = InvokeUiAsync(() => CurrentPage = Pages[2]);
 

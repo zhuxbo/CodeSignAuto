@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
@@ -28,6 +29,7 @@ public sealed class QuickSignViewModel : INotifyPropertyChanged, IDisposable
     private readonly IUiDispatcher _dispatcher;
     private readonly ITerminalJobFeed? _terminalJobs;
     private readonly CancellationTokenSource _lifetime = new();
+    private readonly ConcurrentDictionary<Guid, byte> _activeLocalJobs = new();
     private string? _selectedPath;
     private FileKind? _selectedKind;
     private string _selectedFileName = string.Empty;
@@ -174,6 +176,12 @@ public sealed class QuickSignViewModel : INotifyPropertyChanged, IDisposable
         private set => SetField(ref _acceptedJobId, value);
     }
 
+    internal bool HasActiveJob =>
+        Volatile.Read(ref _submitting) != 0 ||
+        !_activeLocalJobs.IsEmpty ||
+        State is QuickSignState.Validating or QuickSignState.Copying or QuickSignState.Finalizing ||
+        AcceptedJobId is { } jobId && !IsAcceptedJobTerminal(jobId);
+
     public string? ErrorCode
     {
         get => _errorCode;
@@ -185,6 +193,10 @@ public sealed class QuickSignViewModel : INotifyPropertyChanged, IDisposable
         (_acceptedTerminalState == "succeeded" ||
          _management.LatestSnapshot?.RecentJobs.Any(job =>
              job.JobId == jobId && job.TerminalState == "succeeded") == true);
+
+    private bool IsAcceptedJobTerminal(Guid jobId) =>
+        _acceptedTerminalState is "succeeded" or "failed" or "expired" ||
+        _management.LatestSnapshot?.RecentJobs.Any(job => job.JobId == jobId) == true;
 
     public string ReadinessText => ReadinessFailure() ?? UiCulture.Text("QuickSignReadyToSubmit");
 
@@ -350,6 +362,7 @@ public sealed class QuickSignViewModel : INotifyPropertyChanged, IDisposable
             var jobId = await _localJobs
                 .CreateAndUploadAsync(path, parameters, progress, operation.Token)
                 .ConfigureAwait(false);
+            TrackActiveLocalJob(jobId);
             var applied = await ApplyIfCurrentAsync(version, () =>
             {
                 _selectedPath = null;
@@ -588,6 +601,7 @@ public sealed class QuickSignViewModel : INotifyPropertyChanged, IDisposable
         var snapshot = _management.LatestSnapshot;
         _ = InvokeUiAsync(() =>
         {
+            RemoveTerminalLocalJobs(snapshot?.RecentJobs.Select(static job => job.JobId));
             RefreshAvailableCertificates();
             if (AcceptedJobId is { } acceptedJobId &&
                 snapshot?.RecentJobs.FirstOrDefault(
@@ -612,6 +626,9 @@ public sealed class QuickSignViewModel : INotifyPropertyChanged, IDisposable
         var items = _terminalJobs?.Items;
         _ = InvokeUiAsync(() =>
         {
+            RemoveTerminalLocalJobs(items?
+                .Where(static item => item.Item.State is "succeeded" or "failed" or "expired")
+                .Select(static item => item.Item.JobId));
             if (AcceptedJobId is { } acceptedJobId)
             {
                 ApplyAcceptedTerminalItem(FindLatestTerminalItem(acceptedJobId, items));
@@ -646,6 +663,29 @@ public sealed class QuickSignViewModel : INotifyPropertyChanged, IDisposable
             .Where(item => item.Item.JobId == jobId)
             .OrderByDescending(static item => item.Sequence)
             .FirstOrDefault();
+
+    private void TrackActiveLocalJob(Guid jobId)
+    {
+        _activeLocalJobs.TryAdd(jobId, 0);
+        RemoveTerminalLocalJobs(
+            _management.LatestSnapshot?.RecentJobs.Select(static job => job.JobId));
+        RemoveTerminalLocalJobs(_terminalJobs?.Items
+            .Where(static item => item.Item.State is "succeeded" or "failed" or "expired")
+            .Select(static item => item.Item.JobId));
+    }
+
+    private void RemoveTerminalLocalJobs(IEnumerable<Guid>? jobIds)
+    {
+        if (jobIds is null)
+        {
+            return;
+        }
+
+        foreach (var jobId in jobIds)
+        {
+            _activeLocalJobs.TryRemove(jobId, out _);
+        }
+    }
 
     private async Task<bool> ApplyIfCurrentAsync(long version, Action action)
     {

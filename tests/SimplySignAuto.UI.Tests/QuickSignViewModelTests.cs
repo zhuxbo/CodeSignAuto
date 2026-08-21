@@ -318,6 +318,7 @@ public sealed class QuickSignViewModelTests
         await viewModel.SelectFileAsync(fixture.Write("source.exe", "MZ-complete"u8.ToArray()));
         Assert.Equal(local.JobId, await viewModel.SubmitAsync(default));
         Assert.Equal("已提交，正在签名任务页中跟踪", viewModel.StatusText);
+        Assert.True(viewModel.HasActiveJob);
         var changedProperties = new List<string?>();
         viewModel.PropertyChanged += (_, args) => changedProperties.Add(args.PropertyName);
 
@@ -332,6 +333,7 @@ public sealed class QuickSignViewModelTests
         ]));
 
         Assert.Equal("签名已完成，请在签名任务中保存", viewModel.StatusText);
+        Assert.False(viewModel.HasActiveJob);
         Assert.Contains(nameof(QuickSignViewModel.StatusText), changedProperties);
         Assert.Equal(local.JobId, viewModel.AcceptedJobId);
         Assert.Empty(local.ReleasedAcceptedSources);

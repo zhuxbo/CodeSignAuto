@@ -128,6 +128,22 @@ public sealed class JobsViewModelTests
         Assert.Null(vm.ErrorCode);
     }
 
+    [Fact]
+    public async Task Restarted_manual_history_rejects_overwrite_with_friendly_guidance()
+    {
+        var succeeded = Item(GuidFrom(1), "succeeded", source: "local");
+        var local = new LocalJobsFake { FailureCode = "local_destination_identity_unavailable" };
+        var vm = new JobsViewModel(
+            new AdministrationFake(new JobPageResponse(Guid.NewGuid(), [succeeded], null, null, null)),
+            local);
+        await vm.RefreshAsync(default);
+
+        await vm.SaveResultAsAsync(succeeded.JobId, "/tmp/existing.pdf", overwrite: true, default);
+
+        Assert.Equal("local_destination_identity_unavailable", vm.ErrorCode);
+        Assert.Equal("出于安全原因，程序重启后不能覆盖已有文件。请使用新文件名保存。", vm.ErrorText);
+    }
+
     private static JobPageItem Item(Guid id, string state, string source = "local")
     {
         var created = DateTimeOffset.Parse("2026-08-09T10:00:00Z").AddTicks(-id.ToByteArray()[0]);

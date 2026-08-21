@@ -5,13 +5,19 @@
   <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
   <data name="ApplicationSettingsTitle" xml:space="preserve"><value>应用设置</value></data>
-  <data name="ApplicationSettingsDescription" xml:space="preserve"><value>设置此管理员用户的界面语言。</value></data>
+  <data name="ApplicationSettingsDescription" xml:space="preserve"><value>设置此管理员用户的界面语言及当前模式可用的应用选项。</value></data>
   <data name="InterfaceLanguageLabel" xml:space="preserve"><value>界面语言</value></data>
   <data name="LanguageChinese" xml:space="preserve"><value>简体中文</value></data>
   <data name="LanguageEnglish" xml:space="preserve"><value>English</value></data>
   <data name="SaveButton" xml:space="preserve"><value>保存</value></data>
   <data name="ApplicationSettingsStatusArea" xml:space="preserve"><value>应用设置状态区</value></data>
   <data name="RestartRequired" xml:space="preserve"><value>语言设置已保存。重启 SimplySignAuto 后生效。</value></data>
+  <data name="ManualRetentionHours" xml:space="preserve"><value>任务与结果保留小时</value></data>
+  <data name="ManualRetentionDescription" xml:space="preserve"><value>请输入 0 至 168；0 表示永久保留。修改只影响之后创建的任务。</value></data>
+  <data name="ManualRetentionInvalid" xml:space="preserve"><value>请输入 0 至 168 的整数。</value></data>
+  <data name="ManualRetentionSavedForever" xml:space="preserve"><value>结果将永久保留；此设置只影响之后创建的任务。</value></data>
+  <data name="ManualRetentionSavedHours" xml:space="preserve"><value>结果将保留 {0} 小时；此设置只影响之后创建的任务。</value></data>
+  <data name="ManualExitActiveJob" xml:space="preserve"><value>签名任务正在进行，完成后才能退出程序。</value></data>
   <data name="WindowTitle" xml:space="preserve"><value>SimplySign Auto</value></data>
   <data name="ActionCancel" xml:space="preserve"><value>取消</value></data>
   <data name="ActionClear" xml:space="preserve"><value>清除</value></data>
@@ -39,6 +45,7 @@
   <data name="OverallStatusAutomation" xml:space="preserve"><value>服务状态：{0}</value></data>
   <data name="NavigationOverview" xml:space="preserve"><value>概览</value></data>
   <data name="NavigationQuickSign" xml:space="preserve"><value>快速签名</value></data>
+  <data name="NavigationManualSign" xml:space="preserve"><value>手工签名</value></data>
   <data name="NavigationJobs" xml:space="preserve"><value>签名任务</value></data>
   <data name="NavigationActivation" xml:space="preserve"><value>激活凭证</value></data>
   <data name="NavigationServiceSettings" xml:space="preserve"><value>服务设置</value></data>
@@ -182,6 +189,9 @@
   <data name="JobsPdfFilter" xml:space="preserve"><value>PDF 文档|*.pdf</value></data>
   <data name="JobsSoftwareFilter" xml:space="preserve"><value>签名软件|*.exe;*.dll;*.msi;*.sys;*.cat|所有文件|*.*</value></data>
   <data name="JobsSaveDialogTitle" xml:space="preserve"><value>保存签名结果副本</value></data>
+  <data name="JobsErrorDestinationIdentityUnavailable" xml:space="preserve"><value>出于安全原因，程序重启后不能覆盖已有文件。请使用新文件名保存。</value></data>
+  <data name="JobsErrorDestinationExists" xml:space="preserve"><value>目标文件已存在。请选择新文件名，或在当前签名会话中确认覆盖。</value></data>
+  <data name="JobsErrorSaveFailed" xml:space="preserve"><value>保存签名结果失败（错误码：{0}）。</value></data>
   <data name="ActivationAutomation" xml:space="preserve"><value>激活凭证</value></data>
   <data name="ActivationTitle" xml:space="preserve"><value>激活凭证</value></data>
   <data name="ActivationDescription" xml:space="preserve"><value>保存 Certum otpauth 激活内容，并查看脱敏的 SimplySign 证书状态。</value></data>

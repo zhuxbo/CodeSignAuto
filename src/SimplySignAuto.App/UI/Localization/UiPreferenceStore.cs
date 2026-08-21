@@ -182,7 +182,7 @@ public sealed class UiPreferenceStore
     private static InvalidDataException InvalidPreference(Exception? inner = null) =>
         new("ui_preference_invalid", inner);
 
-    private static class WindowsCurrentUserFile
+    internal static class WindowsCurrentUserFile
     {
         private const uint GenericWrite = 0x40000000;
         private const uint CreationDispositionCreateNew = 1;

@@ -94,6 +94,7 @@ public sealed class LocalJobUploadCoordinator :
     private readonly ILocalJobAcceptanceObserver? _acceptanceObserver;
     private readonly JobRetentionPolicy _retention;
     private readonly IUpgradeAdmissionGate _upgradeGate;
+    private readonly Func<int>? _retentionHoursProvider;
 
     public LocalJobUploadCoordinator(
         IJobStore jobs,
@@ -105,7 +106,8 @@ public sealed class LocalJobUploadCoordinator :
         ILocalUploadContentValidator? contentValidator = null,
         ILocalJobAcceptanceObserver? acceptanceObserver = null,
         int retentionHours = 24,
-        IUpgradeAdmissionGate? upgradeGate = null)
+        IUpgradeAdmissionGate? upgradeGate = null,
+        Func<int>? retentionHoursProvider = null)
     {
         _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
         _leases = jobs as ILocalUploadLeaseStore
@@ -121,6 +123,11 @@ public sealed class LocalJobUploadCoordinator :
         _acceptanceObserver = acceptanceObserver;
         _retention = new JobRetentionPolicy(retentionHours);
         _upgradeGate = upgradeGate ?? new UpgradeAdmissionGate();
+        _retentionHoursProvider = retentionHoursProvider;
+        if (_retentionHoursProvider is not null)
+        {
+            _ = new JobRetentionPolicy(_retentionHoursProvider());
+        }
     }
 
     public Task<AgentMessage> HandleAsync(
@@ -411,7 +418,7 @@ public sealed class LocalJobUploadCoordinator :
                 InputSize = verified.Size,
                 InputSha256 = verified.Sha256,
                 CreatedAt = now,
-                ExpiresAt = _retention.GetExpiresAt(now),
+                ExpiresAt = GetExpiresAt(now),
                 Source = "local",
             };
             var accepted = await _leases.AcceptLocalLeaseAsync(
@@ -616,6 +623,11 @@ public sealed class LocalJobUploadCoordinator :
             Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant(),
             parameters);
     }
+
+    private DateTimeOffset? GetExpiresAt(DateTimeOffset createdAt) =>
+        _retentionHoursProvider is null
+            ? _retention.GetExpiresAt(createdAt)
+            : new JobRetentionPolicy(_retentionHoursProvider()).GetExpiresAt(createdAt);
 
     private bool IsIdentityValid(
         AgentConnectionIdentity identity,

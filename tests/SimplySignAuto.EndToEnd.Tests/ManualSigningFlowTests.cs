@@ -58,6 +58,24 @@ public sealed class ManualSigningFlowTests
 
         fixture.Stop();
         await run.WaitAsync(TimeSpan.FromSeconds(5));
+
+        using var restartLifetime = new CancellationTokenSource();
+        var restarted = fixture.CreateRunner();
+        var restartedRun = restarted.RunAsync(fixture.Configuration, restartLifetime.Token);
+        await fixture.WaitUntilReadyAsync(restarted);
+        var history = await Assert.IsAssignableFrom<IAgentAdministrationClient>(restarted.Management)
+            .GetJobPageAsync(null, CancellationToken.None);
+        Assert.All(jobIds, jobId => Assert.Contains(
+            history.Items,
+            item => item.JobId == jobId && item.State == "succeeded" && item.HasResult));
+        var restartedDestination = Path.Combine(fixture.OutputRoot, "first.after-restart.signed.exe");
+        await restarted.LocalJobs.SaveSignedCopyAsync(
+            jobIds[0], restartedDestination, overwrite: false, CancellationToken.None);
+        Assert.True((await File.ReadAllBytesAsync(restartedDestination)).AsSpan()
+            .EndsWith(CopyingSigner.SignedTrailer));
+        Assert.Equal(2, fixture.Signer.CallCount);
+        restartLifetime.Cancel();
+        await restartedRun.WaitAsync(TimeSpan.FromSeconds(5));
     }
 
     [Fact]
@@ -135,8 +153,20 @@ public sealed class ManualSigningFlowTests
             OtpStore = new TestOtpStore(Paths.OtpPath);
             Signer = new CopyingSigner(Paths.SpoolPath, blockSigner);
             SpoolAcl = new TestSpoolAclPolicy(blockResultPublication);
+            Runner = CreateRunner();
+            Configuration = new AgentConfiguration(
+                UserSid,
+                Path.Combine(_root, "ignored-service-spool"),
+                Path.Combine(_root, "SimplySignDesktop.exe"),
+                Path.Combine(_root, "SimplySignPKCS.dll"),
+                new AgentAuthenticodeConfiguration(Path.Combine(_root, "signtool.exe")),
+                Pdf: null);
+        }
+
+        public ManualAgentRunner CreateRunner()
+        {
             var manager = new ReadySessionManager();
-            Runner = new ManualAgentRunner(
+            return new ManualAgentRunner(
                 Paths,
                 OtpStore,
                 new FixedBackendFactory(new AgentSigningBackends(
@@ -148,13 +178,6 @@ public sealed class ManualSigningFlowTests
                 _ => SpoolAcl,
                 PassThroughLeaseProtector.Instance,
                 TimeProvider.System);
-            Configuration = new AgentConfiguration(
-                UserSid,
-                Path.Combine(_root, "ignored-service-spool"),
-                Path.Combine(_root, "SimplySignDesktop.exe"),
-                Path.Combine(_root, "SimplySignPKCS.dll"),
-                new AgentAuthenticodeConfiguration(Path.Combine(_root, "signtool.exe")),
-                Pdf: null);
         }
 
         public ManualRuntimePaths Paths { get; }
@@ -177,14 +200,16 @@ public sealed class ManualSigningFlowTests
             return path;
         }
 
-        public async Task WaitUntilReadyAsync()
+        public Task WaitUntilReadyAsync() => WaitUntilReadyAsync(Runner);
+
+        public async Task WaitUntilReadyAsync(ManualAgentRunner runner)
         {
             var deadline = DateTime.UtcNow.AddSeconds(5);
             while (DateTime.UtcNow < deadline)
             {
                 try
                 {
-                    var snapshot = await Runner.Management.RefreshAsync(CancellationToken.None);
+                    var snapshot = await runner.Management.RefreshAsync(CancellationToken.None);
                     if (snapshot.AgentConnected)
                     {
                         return;

@@ -4,6 +4,7 @@ using SimplySignAuto.Agent.Ipc;
 using SimplySignAuto.Agent.Sessions;
 using SimplySignAuto.Agent.Diagnostics;
 using SimplySignAuto.App.Commands;
+using SimplySignAuto.App.Manual;
 using SimplySignAuto.App.Control;
 using SimplySignAuto.App.UI.ViewModels;
 using SimplySignAuto.App.UI.Views;
@@ -340,6 +341,8 @@ public sealed class DesktopApplication
     private readonly IDesktopRuntimeFactory _runtimeFactory;
     private readonly IActiveJobStateSource _activeJobs;
     private readonly IAgentLifetimeFactory _agentLifetimeFactory;
+    private readonly InstallationMode _mode;
+    private readonly ManualSettingsStore? _manualSettings;
 
     public DesktopApplication()
         : this(Console.Error)
@@ -366,6 +369,51 @@ public sealed class DesktopApplication
         IDesktopRuntimeFactory runtimeFactory,
         IActiveJobStateSource activeJobs,
         IAgentLifetimeFactory? agentLifetimeFactory = null)
+        : this(
+            configurationLoader,
+            signingIdentity,
+            singleInstance,
+            agentRunner,
+            runtimeFactory,
+            activeJobs,
+            agentLifetimeFactory,
+            InstallationMode.Service,
+            manualSettings: null)
+    {
+    }
+
+    internal DesktopApplication(
+        IAgentConfigurationLoader configurationLoader,
+        IDesktopSigningUserIdentity signingIdentity,
+        ISingleInstanceActivator singleInstance,
+        IAgentRunner agentRunner,
+        IDesktopRuntimeFactory runtimeFactory,
+        IActiveJobStateSource activeJobs,
+        IAgentLifetimeFactory? agentLifetimeFactory,
+        InstallationMode mode)
+        : this(
+            configurationLoader,
+            signingIdentity,
+            singleInstance,
+            agentRunner,
+            runtimeFactory,
+            activeJobs,
+            agentLifetimeFactory,
+            mode,
+            mode == InstallationMode.Manual ? new ManualSettingsStore() : null)
+    {
+    }
+
+    internal DesktopApplication(
+        IAgentConfigurationLoader configurationLoader,
+        IDesktopSigningUserIdentity signingIdentity,
+        ISingleInstanceActivator singleInstance,
+        IAgentRunner agentRunner,
+        IDesktopRuntimeFactory runtimeFactory,
+        IActiveJobStateSource activeJobs,
+        IAgentLifetimeFactory? agentLifetimeFactory,
+        InstallationMode mode,
+        ManualSettingsStore? manualSettings)
     {
         _configurationLoader = configurationLoader ?? throw new ArgumentNullException(nameof(configurationLoader));
         _signingIdentity = signingIdentity ?? throw new ArgumentNullException(nameof(signingIdentity));
@@ -374,6 +422,12 @@ public sealed class DesktopApplication
         _runtimeFactory = runtimeFactory ?? throw new ArgumentNullException(nameof(runtimeFactory));
         _activeJobs = activeJobs ?? throw new ArgumentNullException(nameof(activeJobs));
         _agentLifetimeFactory = agentLifetimeFactory ?? new WindowsAgentLifetimeFactory();
+        _mode = mode;
+        _manualSettings = manualSettings;
+        if (_mode == InstallationMode.Manual && _manualSettings is null)
+        {
+            _manualSettings = new ManualSettingsStore();
+        }
     }
 
     public async Task<int> ExecuteAsync(
@@ -496,7 +550,9 @@ public sealed class DesktopApplication
                 runtime.Window,
                 placeholderLifetime,
                 runtime.Dispatcher,
-                configuration);
+                configuration,
+                _mode,
+                _manualSettings);
             await runtime.InitializeAsync(viewModel, cancellationToken).ConfigureAwait(false);
 
             var activationHandler = new ActivationCommandHandler(runtime.Dispatcher, runtime.Window);

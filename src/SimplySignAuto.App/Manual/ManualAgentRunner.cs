@@ -38,6 +38,56 @@ internal sealed record ManualRuntimePaths(
     }
 }
 
+internal sealed class ManualAgentConfigurationLoader : IAgentConfigurationLoader
+{
+    private readonly InstallationReceipt _receipt;
+    private readonly ManualRuntimePaths _paths;
+    private readonly Func<SetupPreflightResult> _inspectPrerequisites;
+
+    public ManualAgentConfigurationLoader(
+        InstallationReceipt receipt,
+        ManualRuntimePaths paths,
+        Func<SetupPreflightResult>? inspectPrerequisites = null)
+    {
+        _receipt = InstallationReceiptValidator.Validate(receipt);
+        _paths = paths ?? throw new ArgumentNullException(nameof(paths));
+        _inspectPrerequisites = inspectPrerequisites ??
+            WindowsSetupPreflight.InspectSigningPrerequisites;
+        if (_receipt.Mode != InstallationMode.Manual ||
+            !string.Equals(_receipt.UserDataRoot, _paths.DataRoot, PathComparison()))
+        {
+            throw new AgentConfigurationException("installation_receipt_invalid");
+        }
+    }
+
+    public Task<AgentConfiguration> LoadAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            var prerequisites = _inspectPrerequisites();
+            return Task.FromResult(AgentConfigurationLoader.Validate(new AgentConfiguration(
+                _receipt.SigningUserSid,
+                _paths.SpoolPath,
+                prerequisites.SimplySignDesktopPath,
+                prerequisites.Pkcs11ModulePath,
+                prerequisites.SignToolPath is null
+                    ? null
+                    : new AgentAuthenticodeConfiguration(prerequisites.SignToolPath),
+                new AgentPdfConfiguration())));
+        }
+        catch (SetupException error)
+        {
+            throw new AgentConfigurationException(error.Code, error);
+        }
+    }
+
+    private static StringComparison PathComparison() =>
+        OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+}
+
 internal sealed class ManualAgentRunner :
     IAgentRunner,
     IDesktopAgentRunner,
@@ -56,11 +106,21 @@ internal sealed class ManualAgentRunner :
     private readonly IAgentDiagnosticSink _diagnostics;
     private readonly AgentManagementBridge _management;
     private readonly int _retentionHours;
+    private readonly ManualSettingsStore? _settingsStore;
     private int _started;
 
     public ManualAgentRunner(TextWriter? diagnosticWriter = null)
+        : this(ManualRuntimePaths.Default, new ManualSettingsStore(), diagnosticWriter)
     {
-        _paths = ManualRuntimePaths.Default;
+    }
+
+    internal ManualAgentRunner(
+        ManualRuntimePaths paths,
+        ManualSettingsStore settingsStore,
+        TextWriter? diagnosticWriter = null)
+    {
+        _paths = paths ?? throw new ArgumentNullException(nameof(paths));
+        _settingsStore = settingsStore ?? throw new ArgumentNullException(nameof(settingsStore));
         _otpStore = new DpapiOtpStore(_paths.OtpPath);
         _diagnostics = new TextWriterAgentDiagnosticSink(diagnosticWriter ?? Console.Error).Safe();
         _backends = new DefaultAgentSigningBackendFactory(_diagnostics);
@@ -96,6 +156,7 @@ internal sealed class ManualAgentRunner :
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         _ = new JobRetentionPolicy(retentionHours);
         _retentionHours = retentionHours;
+        _settingsStore = null;
         _diagnostics = diagnostics.Safe();
         _management = new AgentManagementBridge(
             otpStore: _otpStore,
@@ -135,6 +196,11 @@ internal sealed class ManualAgentRunner :
         try
         {
             configuration = AgentConfigurationLoader.Validate(configuration);
+            if (_settingsStore is not null)
+            {
+                await _settingsStore.LoadAsync(cancellationToken).ConfigureAwait(false);
+            }
+
             EnsureRuntimePaths();
             var session = _sessionResolver(configuration.SigningUserSid);
             if (!string.Equals(
@@ -187,7 +253,10 @@ internal sealed class ManualAgentRunner :
                 _timeProvider,
                 session.UserSid,
                 _leaseProtector,
-                retentionHours: _retentionHours);
+                retentionHours: _retentionHours,
+                retentionHoursProvider: _settingsStore is null
+                    ? null
+                    : () => _settingsStore.CurrentRetentionHours);
             var managementProvider = new ServiceManagementSnapshotProvider(jobs, _timeProvider);
             transport.Configure(localCoordinator, managementProvider);
             using var cleanup = new JobCleanupService(

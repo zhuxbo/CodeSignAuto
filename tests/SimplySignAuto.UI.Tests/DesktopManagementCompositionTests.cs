@@ -4,6 +4,7 @@ using SimplySignAuto.Agent.LocalJobs;
 using SimplySignAuto.App.Commands;
 using SimplySignAuto.App.UI;
 using SimplySignAuto.App.UI.Status;
+using SimplySignAuto.Core.Jobs;
 using SimplySignAuto.Core.Otp;
 using SimplySignAuto.Protocol;
 
@@ -168,6 +169,36 @@ public sealed class DesktopManagementCompositionTests
     }
 
     [Fact]
+    public async Task Manual_exit_refuses_an_accepted_local_job_after_selecting_another_file_with_stale_snapshot()
+    {
+        using var fixture = new ConfigurationFixture();
+        var management = new MutableManagementClient(Snapshot(active: 0));
+        var localJobs = new ImmediateLocalJobClient();
+        var window = new RecordingWindow();
+        var lifetime = new RecordingLifetime();
+        using var shell = DesktopShellComposition.Create(
+            new LocalSourceRunner(management, localJobs),
+            new FixedActiveJobStateSource(ActiveJobState.None),
+            window,
+            lifetime,
+            InlineTestDispatcher.Instance,
+            fixture.Configuration,
+            InstallationMode.Manual,
+            manualSettings: null);
+        await shell.QuickSign!.SelectFileAsync(fixture.WriteSource());
+        Assert.Equal(localJobs.JobId, await shell.QuickSign.SubmitAsync(default));
+        await shell.QuickSign.SelectFileAsync(fixture.WriteSource("replacement.exe"));
+        Assert.Null(shell.QuickSign.AcceptedJobId);
+
+        var result = await shell.RequestExitAsync(default);
+
+        Assert.Equal(ExitRequestResult.Refused, result);
+        Assert.Equal(0, management.RefreshCalls);
+        Assert.Equal(0, lifetime.StopCalls);
+        Assert.Equal("签名任务正在进行，完成后才能退出程序。", window.LastNotice);
+    }
+
+    [Fact]
     public async Task Worker_snapshot_marshals_shell_and_tray_status_and_disposal_prevents_dead_dispatcher_access()
     {
         var dispatcher = new GuardedDispatcher();
@@ -268,6 +299,21 @@ public sealed class DesktopManagementCompositionTests
             Task.CompletedTask;
     }
 
+    private sealed class LocalSourceRunner(
+        IAgentManagementClient management,
+        ILocalJobClient localJobs) :
+        IAgentRunner,
+        IDesktopManagementSource,
+        IDesktopLocalJobSource
+    {
+        public IAgentManagementClient Management { get; } = management;
+
+        public ILocalJobClient LocalJobs { get; } = localJobs;
+
+        public Task RunAsync(AgentConfiguration configuration, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+    }
+
     private sealed class ConfigurationFixture : IDisposable
     {
         private readonly string _root = Path.Combine(Path.GetTempPath(), "SimplySignAuto.Tests", Guid.NewGuid().ToString("N"));
@@ -284,6 +330,14 @@ public sealed class DesktopManagementCompositionTests
         }
 
         public AgentConfiguration Configuration { get; }
+
+        public string WriteSource(string fileName = "source.exe")
+        {
+            Directory.CreateDirectory(_root);
+            var path = Path.Combine(_root, fileName);
+            File.WriteAllBytes(path, "MZ-manual-exit"u8.ToArray());
+            return path;
+        }
 
         public void Dispose()
         {
@@ -416,10 +470,36 @@ public sealed class DesktopManagementCompositionTests
 
     private sealed class RecordingWindow : IWindowController
     {
+        public string? LastNotice { get; private set; }
+
         public void ShowRestoreActivate() { }
         public void Hide() { }
         public void CloseForExit() { }
-        public void ShowNotice(string message) { }
+        public void ShowNotice(string message) => LastNotice = message;
+    }
+
+    private sealed class ImmediateLocalJobClient : ILocalJobClient
+    {
+        public Guid JobId { get; } = Guid.Parse("dddddddd-dddd-dddd-dddd-dddddddddddd");
+
+        public Task<Guid> CreateAndUploadAsync(
+            string path,
+            SigningParameters parameters,
+            IProgress<LocalCopyProgress>? progress,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(JobId);
+        }
+
+        public Task SaveSignedCopyAsync(
+            Guid jobId,
+            string destinationPath,
+            bool overwrite,
+            CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public void ReleaseAcceptedSource(Guid jobId) { }
     }
 
     private sealed class RecordingTrayPlatform(GuardedDispatcher? dispatcher = null) : ITrayIconPlatform

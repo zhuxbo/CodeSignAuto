@@ -278,6 +278,37 @@ public sealed class LocalJobUploadCoordinatorTests
     }
 
     [Fact]
+    public async Task Live_retention_provider_changes_only_subsequently_accepted_jobs()
+    {
+        using var fixture = new LocalFixture(retentionHours: 168);
+        var retentionHours = 168;
+        var coordinator = new LocalJobUploadCoordinator(
+            fixture.Store,
+            fixture.Spool,
+            fixture.Dispatcher,
+            fixture.Time,
+            Sid,
+            new XorLeaseProtector(),
+            retentionHours: retentionHours,
+            retentionHoursProvider: () => retentionHours);
+        var retained = await AcceptLocalJobAsync(
+            fixture,
+            coordinator,
+            Guid.Parse("33333333-3333-3333-3333-333333333333"),
+            "retained-live");
+
+        retentionHours = 0;
+        var permanent = await AcceptLocalJobAsync(
+            fixture,
+            coordinator,
+            Guid.Parse("44444444-4444-4444-4444-444444444444"),
+            "permanent-live");
+
+        Assert.Equal(Now.AddHours(168), (await fixture.Store.GetAsync(retained.Id))!.ExpiresAt);
+        Assert.Null((await fixture.Store.GetAsync(permanent.Id))!.ExpiresAt);
+    }
+
+    [Fact]
     public async Task Sqlite_v7_persists_a_permanent_local_job_as_sql_null()
     {
         var root = Path.Combine(

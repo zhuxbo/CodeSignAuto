@@ -39,4 +39,35 @@ public sealed class ManualAgentRunnerTests
             typeof(IAgentPipeRuntime),
             typeof(InProcessSigningTransport).GetInterfaces());
     }
+
+    [Fact]
+    public async Task Manual_configuration_uses_only_the_validated_receipt_identity_and_shared_prerequisites()
+    {
+        var root = Path.GetFullPath(Path.Combine(Path.GetTempPath(), $"manual-config-{Guid.NewGuid():N}"));
+        var paths = ManualRuntimePaths.ForDataRoot(root);
+        var receipt = new InstallationReceipt(
+            InstallationReceipt.CurrentSchemaVersion,
+            InstallationMode.Manual,
+            "0123456789abcdef0123456789abcdef",
+            "S-1-5-21-1000-2000-3000-4000",
+            Path.GetFullPath(Path.Combine(Path.GetTempPath(), "SimplySignAuto.exe")),
+            root);
+        var prerequisites = new SetupPreflightResult(
+            Path.GetFullPath(Path.Combine(root, "SimplySignDesktop.exe")),
+            Path.GetFullPath(Path.Combine(root, "SimplySignPKCS.dll")),
+            Path.GetFullPath(Path.Combine(root, "signtool.exe")));
+
+        var configuration = await new ManualAgentConfigurationLoader(
+                receipt,
+                paths,
+                () => prerequisites)
+            .LoadAsync(default);
+
+        Assert.Equal(receipt.SigningUserSid, configuration.SigningUserSid);
+        Assert.Equal(paths.SpoolPath, configuration.SpoolPath);
+        Assert.Equal(prerequisites.SimplySignDesktopPath, configuration.SimplySignDesktopPath);
+        Assert.Equal(prerequisites.Pkcs11ModulePath, configuration.Pkcs11ModulePath);
+        Assert.Equal(prerequisites.SignToolPath, configuration.Authenticode!.SignToolPath);
+        Assert.NotNull(configuration.Pdf);
+    }
 }

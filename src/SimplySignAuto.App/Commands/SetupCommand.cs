@@ -283,6 +283,11 @@ internal sealed class WindowsSetupPreflight(IWindowsAutoLogonPlatform autoLogonP
 
         VerifyInstallResources(userName);
 
+        return InspectSigningPrerequisites();
+    }
+
+    internal static SetupPreflightResult InspectSigningPrerequisites()
+    {
         if (!IsPlainFile(SimplySignDesktopPath))
         {
             throw new SetupException("simplysign_desktop_missing");
