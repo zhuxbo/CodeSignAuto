@@ -80,6 +80,9 @@ public interface IJobStore
     Task<int> RecoverActiveLeasesAsync(CancellationToken cancellationToken = default) =>
         Task.FromException<int>(new NotSupportedException());
 
+    Task<int> RecoverManualInterruptedAsync(CancellationToken cancellationToken = default) =>
+        Task.FromException<int>(new NotSupportedException());
+
     Task<Job?> GetNextPendingCompletionAsync(CancellationToken cancellationToken = default) =>
         Task.FromException<Job?>(new NotSupportedException());
 
@@ -1095,6 +1098,41 @@ public sealed class SqliteJobStore : IJobStore, ILocalUploadLeaseStore, IDisposa
             affected += await command.ExecuteNonQueryAsync(cancellationToken);
         }
 
+        await transaction.CommitAsync(cancellationToken);
+        return affected;
+    }
+
+    public async Task<int> RecoverManualInterruptedAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureInitializedAsync(cancellationToken);
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var transaction = connection.BeginTransaction(deferred: false);
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            UPDATE jobs
+            SET state = $failed,
+                dispatch_id = NULL,
+                lease_connection_id = NULL,
+                result_size = NULL,
+                result_sha256 = NULL,
+                error_code = 'manual_job_interrupted',
+                error_message = 'Manual signing was interrupted before completion.',
+                completed_at = $now
+            WHERE state IN ($queued, $waitingForAgent, $signing, $verifying)
+              AND NOT (
+                  state = $verifying AND
+                  result_size IS NOT NULL AND
+                  result_sha256 IS NOT NULL);
+            """;
+        command.Parameters.AddWithValue("$failed", (int)JobState.Failed);
+        command.Parameters.AddWithValue("$queued", (int)JobState.Queued);
+        command.Parameters.AddWithValue("$waitingForAgent", (int)JobState.WaitingForAgent);
+        command.Parameters.AddWithValue("$signing", (int)JobState.Signing);
+        command.Parameters.AddWithValue("$verifying", (int)JobState.Verifying);
+        command.Parameters.AddWithValue("$now", ToStorageTime(DateTimeOffset.UtcNow));
+        var affected = await command.ExecuteNonQueryAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return affected;
     }

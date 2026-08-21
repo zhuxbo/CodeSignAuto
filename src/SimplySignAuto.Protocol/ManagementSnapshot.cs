@@ -119,7 +119,8 @@ public static class ManagementJobCodes
         "private_key_missing", "pkcs11_session_lost", "signtool_missing", "invalid_signable_file",
         "already_signed", "authenticode_sign_failed", "authenticode_verify_failed", "pdf_helper_missing",
         "pdf_helper_tampered", "pdf_invalid", "pdf_sign_failed", "pdf_verify_failed", "tsa_failed",
-        "spool_write_failed", "input_corrupt", "result_corrupt", "recovery_exhausted", "job_expired",
+        "spool_write_failed", "input_corrupt", "result_corrupt", "recovery_exhausted",
+        "manual_job_interrupted", "job_expired",
         "certificate_catalog_unavailable", "certificate_not_found",
         "certificate_serial_ambiguous", "certificate_not_usable", "internal_error",
     };

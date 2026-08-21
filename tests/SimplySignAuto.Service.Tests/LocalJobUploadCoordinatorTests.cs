@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging.Abstractions;
 using SimplySignAuto.Core.Jobs;
@@ -255,6 +256,25 @@ public sealed class LocalJobUploadCoordinatorTests
                 Directory.Delete(root, recursive: true);
             }
         }
+    }
+
+    [Fact]
+    public async Task Changed_retention_applies_only_to_jobs_accepted_by_the_new_coordinator()
+    {
+        using var fixture = new LocalFixture(retentionHours: 168);
+        var retained = await AcceptLocalJobAsync(
+            fixture,
+            fixture.Coordinator,
+            Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            "retained");
+        var permanent = await AcceptLocalJobAsync(
+            fixture,
+            fixture.CreateCoordinator(retentionHours: 0),
+            Guid.Parse("22222222-2222-2222-2222-222222222222"),
+            "permanent");
+
+        Assert.Equal(Now.AddHours(168), (await fixture.Store.GetAsync(retained.Id))!.ExpiresAt);
+        Assert.Null((await fixture.Store.GetAsync(permanent.Id))!.ExpiresAt);
     }
 
     [Fact]
@@ -894,6 +914,37 @@ public sealed class LocalJobUploadCoordinatorTests
         size,
         ParametersJson);
 
+    private static async Task<Job> AcceptLocalJobAsync(
+        LocalFixture fixture,
+        LocalJobUploadCoordinator coordinator,
+        Guid requestId,
+        string marker)
+    {
+        var input = Encoding.UTF8.GetBytes("MZ-" + marker);
+        var request = CreateRequest(input.Length) with
+        {
+            RequestId = requestId,
+            OriginalName = marker + ".exe",
+        };
+        var lease = Assert.IsType<LocalJobUploadLease>(
+            await coordinator.CreateAsync(request, Identity(), default));
+        await File.WriteAllBytesAsync(
+            Path.Combine(
+                fixture.Spool.Root,
+                lease.RelativePartPath.Replace('/', Path.DirectorySeparatorChar)),
+            input);
+        var accepted = Assert.IsType<LocalJobAccepted>(await coordinator.CompleteAsync(
+            new LocalJobUploadCompleted(
+                requestId,
+                lease.JobId,
+                lease.LeaseId,
+                input.Length,
+                Convert.ToHexString(SHA256.HashData(input)).ToLowerInvariant()),
+            Identity(),
+            default));
+        return Assert.IsType<Job>(await fixture.Store.GetAsync(accepted.JobId));
+    }
+
     private static AgentConnectionIdentity Identity() => new(321, 7, Sid);
 
     private static async Task WaitUntilAsync(Func<bool> condition)
@@ -943,6 +994,15 @@ public sealed class LocalJobUploadCoordinatorTests
         public RecordingDispatcher Dispatcher { get; }
         public MutableTimeProvider Time { get; }
         public LocalJobUploadCoordinator Coordinator { get; }
+
+        public LocalJobUploadCoordinator CreateCoordinator(int retentionHours) => new(
+            Store,
+            Spool,
+            Dispatcher,
+            Time,
+            Sid,
+            new XorLeaseProtector(),
+            retentionHours: retentionHours);
 
         public void Dispose()
         {
