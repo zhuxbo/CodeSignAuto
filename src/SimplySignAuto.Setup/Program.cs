@@ -17,13 +17,18 @@ internal static class Program
     [STAThread]
     private static int Main(string[] arguments)
     {
+        var culture = SetupCulture.ResolveDefault(System.Globalization.CultureInfo.CurrentUICulture);
         try
         {
             SetupCommandLine.Validate(arguments);
         }
         catch (SetupBootstrapperException error)
         {
-            MessageBox.Show(error.Message, "SimplySignAuto 安装", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(
+                error.GetLocalizedMessage(culture),
+                SetupCulture.GetString("WindowMainTitle", culture),
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
             return 2;
         }
 
@@ -43,18 +48,27 @@ internal static class Program
                     powerShell,
                     new PowerShellSetupProcessInvoker(),
                     Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles)));
-            using var form = new SetupForm(new SetupBootstrapper(operations), productKind);
+            using var form = new SetupForm(new SetupBootstrapper(operations), productKind, culture);
             Application.Run(form);
             return form.ExitCode;
         }
         catch (SetupBootstrapperException error)
         {
-            MessageBox.Show(error.Message, "SimplySignAuto 安装", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(
+                error.GetLocalizedMessage(culture),
+                SetupCulture.GetString("WindowMainTitle", culture),
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
             return 1;
         }
         catch
         {
-            MessageBox.Show("setup_failed", "SimplySignAuto 安装", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            var error = new SetupBootstrapperException("setup_failed");
+            MessageBox.Show(
+                error.GetLocalizedMessage(culture),
+                SetupCulture.GetString("WindowMainTitle", culture),
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
             return 1;
         }
     }

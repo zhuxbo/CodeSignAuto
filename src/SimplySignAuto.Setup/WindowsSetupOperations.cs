@@ -346,13 +346,13 @@ internal sealed class WindowsSetupProcessRunner(
 
         private static string Describe(int percent) => percent switch
         {
-            35 => "发布介质已验证",
-            40 => "运行时清单已验证",
-            45 => "系统前置检查已完成",
-            50 => "运行时状态已检查",
-            55 => "PDF 扩展介质已验证",
-            90 => "应用启动条件已验证",
-            92 => "产品初始化完成",
+            35 => "ProgressPublisherMediaVerified",
+            40 => "ProgressRuntimeManifestVerified",
+            45 => "ProgressSystemPrerequisitesComplete",
+            50 => "ProgressRuntimeStatusChecked",
+            55 => "ProgressPdfMediaVerified",
+            90 => "ProgressLaunchConditionsVerified",
+            92 => "ProgressProductInitializationComplete",
             _ => throw new SetupBootstrapperException("setup_progress_invalid"),
         };
     }

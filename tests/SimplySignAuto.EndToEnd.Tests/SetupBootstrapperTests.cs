@@ -39,21 +39,23 @@ public sealed class SetupBootstrapperTests
         string expectedAction)
     {
         var failure = new SetupBootstrapperException(code);
+        var message = failure.GetLocalizedMessage(SetupCulture.ResolveSelection("zh-CN"));
 
         Assert.Equal(code, failure.Code);
-        Assert.Contains(expectedReason, failure.Message, StringComparison.Ordinal);
-        Assert.Contains(expectedAction, failure.Message, StringComparison.Ordinal);
-        Assert.Contains($"错误代码：{code}", failure.Message, StringComparison.Ordinal);
+        Assert.Contains(expectedReason, message, StringComparison.Ordinal);
+        Assert.Contains(expectedAction, message, StringComparison.Ordinal);
+        Assert.Contains($"错误代码：{code}", message, StringComparison.Ordinal);
     }
 
     [Fact]
     public void Unknown_setup_failure_is_actionable_without_exposing_an_exception()
     {
         var failure = new SetupBootstrapperException("setup_resource_conflict");
+        var message = failure.GetLocalizedMessage(SetupCulture.ResolveSelection("zh-CN"));
 
-        Assert.Contains("安装未完成", failure.Message, StringComparison.Ordinal);
-        Assert.Contains("错误代码：setup_resource_conflict", failure.Message, StringComparison.Ordinal);
-        Assert.DoesNotContain("Exception", failure.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("安装未完成", message, StringComparison.Ordinal);
+        Assert.Contains("错误代码：setup_resource_conflict", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("Exception", message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -61,12 +63,13 @@ public sealed class SetupBootstrapperTests
     {
         var failure = new SetupBootstrapperException(
             "simplysign_desktop_missing install_simplysign_desktop_required");
+        var message = failure.GetLocalizedMessage(SetupCulture.ResolveSelection("zh-CN"));
 
         Assert.Equal("simplysign_desktop_missing", failure.Code);
-        Assert.Contains("SimplySign Desktop", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("SimplySign Desktop", message, StringComparison.Ordinal);
         Assert.Contains(
             "错误代码：simplysign_desktop_missing install_simplysign_desktop_required",
-            failure.Message,
+            message,
             StringComparison.Ordinal);
     }
 
@@ -245,7 +248,7 @@ public sealed class SetupBootstrapperTests
         Assert.Equal(
             [25, 55, 95, 100],
             reported.Select(item => item.Percent));
-        Assert.Equal("安装完成", reported[^1].Message);
+        Assert.Equal("ProgressInstallComplete", reported[^1].Message);
         Assert.Equal(["stage", "install:C:\\staged", "cleanup:C:\\staged"], operations.Events);
     }
 
@@ -435,6 +438,25 @@ public sealed class SetupBootstrapperTests
 
         Assert.Equal(0, exitCode);
         Assert.Equal([35, 40, 45, 50, 90, 92], reported.Select(item => item.Percent));
+        Assert.Equal(
+            [
+                "ProgressPublisherMediaVerified",
+                "ProgressRuntimeManifestVerified",
+                "ProgressSystemPrerequisitesComplete",
+                "ProgressRuntimeStatusChecked",
+                "ProgressLaunchConditionsVerified",
+                "ProgressProductInitializationComplete",
+            ],
+            reported.Select(item => item.Message));
+        Assert.All(reported, item =>
+        {
+            Assert.False(string.IsNullOrWhiteSpace(SetupCulture.GetString(
+                item.Message,
+                SetupCulture.ResolveSelection("zh-CN"))));
+            Assert.False(string.IsNullOrWhiteSpace(SetupCulture.GetString(
+                item.Message,
+                SetupCulture.ResolveSelection("en-US"))));
+        });
     }
 
     [Theory]

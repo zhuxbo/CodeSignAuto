@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="WindowMainTitle" xml:space="preserve"><value>SimplySignAuto 安装</value></data>
+  <data name="WindowPdfTitle" xml:space="preserve"><value>SimplySignAuto PDF 扩展安装</value></data>
+  <data name="MainTitle" xml:space="preserve"><value>安装 SimplySignAuto</value></data>
+  <data name="PdfTitle" xml:space="preserve"><value>安装 SimplySignAuto PDF 扩展</value></data>
+  <data name="MainDescription" xml:space="preserve"><value>安装程序将验证安装介质并初始化代码签名服务。</value></data>
+  <data name="PdfDescription" xml:space="preserve"><value>安装程序将验证离线扩展介质并安装 PDF 签名支持。</value></data>
+  <data name="LanguageLabel" xml:space="preserve"><value>语言</value></data>
+  <data name="LanguageChinese" xml:space="preserve"><value>中文</value></data>
+  <data name="LanguageEnglish" xml:space="preserve"><value>English</value></data>
+  <data name="InstallButton" xml:space="preserve"><value>安装</value></data>
+  <data name="CancelButton" xml:space="preserve"><value>取消</value></data>
+  <data name="CloseButton" xml:space="preserve"><value>关闭</value></data>
+  <data name="StatusReady" xml:space="preserve"><value>准备安装</value></data>
+  <data name="StatusVerifyingMedia" xml:space="preserve"><value>正在验证安装介质…</value></data>
+  <data name="StatusInstallComplete" xml:space="preserve"><value>安装完成</value></data>
+  <data name="StatusInstallFailed" xml:space="preserve"><value>安装失败</value></data>
+  <data name="StatusInstallFailedCode" xml:space="preserve"><value>安装失败（代码 {0}）</value></data>
+  <data name="ProgressMediaVerified" xml:space="preserve"><value>安装介质已验证</value></data>
+  <data name="ProgressPublisherMediaVerified" xml:space="preserve"><value>发布介质已验证</value></data>
+  <data name="ProgressRuntimeManifestVerified" xml:space="preserve"><value>运行时清单已验证</value></data>
+  <data name="ProgressSystemPrerequisitesComplete" xml:space="preserve"><value>系统前置检查已完成</value></data>
+  <data name="ProgressRuntimeStatusChecked" xml:space="preserve"><value>运行时状态已检查</value></data>
+  <data name="ProgressPdfMediaVerified" xml:space="preserve"><value>PDF 扩展介质已验证</value></data>
+  <data name="ProgressLaunchConditionsVerified" xml:space="preserve"><value>应用启动条件已验证</value></data>
+  <data name="ProgressProductInitializationComplete" xml:space="preserve"><value>产品初始化完成</value></data>
+  <data name="ProgressProductInstallComplete" xml:space="preserve"><value>产品安装完成</value></data>
+  <data name="ProgressInstallComplete" xml:space="preserve"><value>安装完成</value></data>
+  <data name="ErrorRequiredRuntimeMissing" xml:space="preserve"><value>缺少 SimplySignAuto 所需的 .NET 10 Windows x64 运行环境。请安装 ASP.NET Core Runtime 和 .NET Desktop Runtime 后重新运行安装程序。
+ASP.NET Core Runtime：https://dotnet.microsoft.com/en-us/download/dotnet/10.0
+.NET Desktop Runtime：https://dotnet.microsoft.com/en-us/download/dotnet/10.0/runtime</value></data>
+  <data name="ErrorSimplySignDesktopMissing" xml:space="preserve"><value>Certum SimplySign Desktop（Windows 64 位）未安装。请安装后重新运行安装程序。
+下载：https://support.certum.eu/en/software/procertum-smartsign/</value></data>
+  <data name="ErrorSimplySignPkcs11Missing" xml:space="preserve"><value>未找到 C:\Windows\System32\SimplySignPKCS.dll。请修复或重新安装 Certum SimplySign Desktop（Windows 64 位）。
+下载：https://support.certum.eu/en/software/procertum-smartsign/</value></data>
+  <data name="ErrorOsUnsupported" xml:space="preserve"><value>不支持当前 Windows 版本或版本组合。支持 x64 Windows 10 22H2、受支持的 Windows 10 LTSC/Windows 11，以及 Windows Server 2019/2022/2025 Desktop Experience。</value></data>
+  <data name="ErrorDesktopExperienceRequired" xml:space="preserve"><value>自动签名服务需要 Windows Server Desktop Experience，不支持 Server Core。</value></data>
+  <data name="ErrorArchitectureUnsupported" xml:space="preserve"><value>SimplySignAuto 只支持 x64 Windows。请在 64 位操作系统中运行 64 位安装程序。</value></data>
+  <data name="ErrorAdministratorRequired" xml:space="preserve"><value>安装需要管理员权限。请右键安装程序并选择“以管理员身份运行”，然后重新运行。</value></data>
+  <data name="ErrorDomainControllerUnsupported" xml:space="preserve"><value>不支持在域控制器上安装。请改用工作组计算机、域成员客户端或成员服务器。</value></data>
+  <data name="ErrorAutoLogonConflict" xml:space="preserve"><value>检测到已有自动登录配置。自动签名服务需要独占该配置，安装程序不会覆盖现有设置。请先安全关闭原自动登录配置，再重新运行安装程序。</value></data>
+  <data name="ErrorAutoLogonPlaintextPasswordPresent" xml:space="preserve"><value>检测到注册表中的旧式明文自动登录密码。请使用原配置工具安全移除后再安装；安装程序不会读取或覆盖该密码。</value></data>
+  <data name="ErrorGeneric" xml:space="preserve"><value>安装未完成。请检查系统要求并修正问题后重新运行安装程序。</value></data>
+  <data name="ErrorCodeFormat" xml:space="preserve"><value>错误代码：{0}</value></data>
+</root>

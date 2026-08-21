@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="WindowMainTitle" xml:space="preserve"><value>SimplySignAuto Setup</value></data>
+  <data name="WindowPdfTitle" xml:space="preserve"><value>SimplySignAuto PDF Extension Setup</value></data>
+  <data name="MainTitle" xml:space="preserve"><value>Install SimplySignAuto</value></data>
+  <data name="PdfTitle" xml:space="preserve"><value>Install SimplySignAuto PDF Extension</value></data>
+  <data name="MainDescription" xml:space="preserve"><value>Setup will verify the installation media and initialize the code-signing service.</value></data>
+  <data name="PdfDescription" xml:space="preserve"><value>Setup will verify the offline extension media and install PDF-signing support.</value></data>
+  <data name="LanguageLabel" xml:space="preserve"><value>Language</value></data>
+  <data name="LanguageChinese" xml:space="preserve"><value>中文</value></data>
+  <data name="LanguageEnglish" xml:space="preserve"><value>English</value></data>
+  <data name="InstallButton" xml:space="preserve"><value>Install</value></data>
+  <data name="CancelButton" xml:space="preserve"><value>Cancel</value></data>
+  <data name="CloseButton" xml:space="preserve"><value>Close</value></data>
+  <data name="StatusReady" xml:space="preserve"><value>Ready to install</value></data>
+  <data name="StatusVerifyingMedia" xml:space="preserve"><value>Verifying installation media…</value></data>
+  <data name="StatusInstallComplete" xml:space="preserve"><value>Installation complete</value></data>
+  <data name="StatusInstallFailed" xml:space="preserve"><value>Installation failed</value></data>
+  <data name="StatusInstallFailedCode" xml:space="preserve"><value>Installation failed (code {0})</value></data>
+  <data name="ProgressMediaVerified" xml:space="preserve"><value>Installation media verified</value></data>
+  <data name="ProgressPublisherMediaVerified" xml:space="preserve"><value>Publisher media verified</value></data>
+  <data name="ProgressRuntimeManifestVerified" xml:space="preserve"><value>Runtime manifest verified</value></data>
+  <data name="ProgressSystemPrerequisitesComplete" xml:space="preserve"><value>System prerequisite checks complete</value></data>
+  <data name="ProgressRuntimeStatusChecked" xml:space="preserve"><value>Runtime status checked</value></data>
+  <data name="ProgressPdfMediaVerified" xml:space="preserve"><value>PDF extension media verified</value></data>
+  <data name="ProgressLaunchConditionsVerified" xml:space="preserve"><value>Application launch conditions verified</value></data>
+  <data name="ProgressProductInitializationComplete" xml:space="preserve"><value>Product initialization complete</value></data>
+  <data name="ProgressProductInstallComplete" xml:space="preserve"><value>Product installation complete</value></data>
+  <data name="ProgressInstallComplete" xml:space="preserve"><value>Installation complete</value></data>
+  <data name="ErrorRequiredRuntimeMissing" xml:space="preserve"><value>The .NET 10 Windows x64 runtimes required by SimplySignAuto are missing. Install ASP.NET Core Runtime and .NET Desktop Runtime, then run Setup again.
+ASP.NET Core Runtime: https://dotnet.microsoft.com/en-us/download/dotnet/10.0
+.NET Desktop Runtime: https://dotnet.microsoft.com/en-us/download/dotnet/10.0/runtime</value></data>
+  <data name="ErrorSimplySignDesktopMissing" xml:space="preserve"><value>Certum SimplySign Desktop (Windows 64-bit) is not installed. Install it, then run Setup again.
+Download: https://support.certum.eu/en/software/procertum-smartsign/</value></data>
+  <data name="ErrorSimplySignPkcs11Missing" xml:space="preserve"><value>C:\Windows\System32\SimplySignPKCS.dll was not found. Repair or reinstall Certum SimplySign Desktop (Windows 64-bit).
+Download: https://support.certum.eu/en/software/procertum-smartsign/</value></data>
+  <data name="ErrorOsUnsupported" xml:space="preserve"><value>This Windows version or edition combination is not supported. Supported systems include x64 Windows 10 22H2, supported Windows 10 LTSC and Windows 11 versions, and Windows Server 2019/2022/2025 with Desktop Experience.</value></data>
+  <data name="ErrorDesktopExperienceRequired" xml:space="preserve"><value>The automatic-signing service requires Windows Server Desktop Experience. Server Core is not supported.</value></data>
+  <data name="ErrorArchitectureUnsupported" xml:space="preserve"><value>SimplySignAuto supports only x64 Windows. Run the 64-bit installer on a 64-bit operating system.</value></data>
+  <data name="ErrorAdministratorRequired" xml:space="preserve"><value>Administrator privileges are required. Right-click Setup, select “Run as administrator”, and try again.</value></data>
+  <data name="ErrorDomainControllerUnsupported" xml:space="preserve"><value>Installation on a domain controller is not supported. Use a workgroup computer, domain-member client, or member server.</value></data>
+  <data name="ErrorAutoLogonConflict" xml:space="preserve"><value>An existing AutoLogon configuration was detected. The automatic-signing service requires exclusive use of this configuration, and Setup will not overwrite it. Disable the existing AutoLogon configuration securely, then run Setup again.</value></data>
+  <data name="ErrorAutoLogonPlaintextPasswordPresent" xml:space="preserve"><value>A legacy plaintext AutoLogon password is present in the registry. Use the original configuration tool to remove it securely before installation; Setup will not read or overwrite the password.</value></data>
+  <data name="ErrorGeneric" xml:space="preserve"><value>Setup did not complete. Review the system requirements, correct the reported problem, and run Setup again.</value></data>
+  <data name="ErrorCodeFormat" xml:space="preserve"><value>Error code: {0}</value></data>
+</root>
