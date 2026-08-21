@@ -6,6 +6,21 @@ namespace SimplySignAuto.EndToEnd.Tests;
 public sealed class UpgradeCommandTests
 {
     [Fact]
+    public async Task Manual_upgrade_runs_only_the_common_media_transaction()
+    {
+        var transaction = new RecordingManualUpgradeTransaction();
+        using var output = new StringWriter();
+
+        await new UpgradeOrchestrator().ExecuteAsync(transaction, output, CancellationToken.None);
+
+        Assert.Equal(
+            ["stage", "replaceable", "activate", "verify", "commit"],
+            transaction.Events);
+        Assert.Equal("upgrade_complete", output.ToString().Trim());
+        Assert.False(transaction.RollbackCalled);
+    }
+
+    [Fact]
     public async Task Normal_upgrade_stages_before_drain_and_commits_only_after_runtime_verification()
     {
         var transaction = new RecordingUpgradeTransaction();
@@ -82,9 +97,10 @@ public sealed class UpgradeCommandTests
         Assert.Equal("upgrade_state_uncertain", error.Code);
     }
 
-    private sealed class RecordingUpgradeTransaction : IUpgradeTransaction
+    private sealed class RecordingUpgradeTransaction : IServiceUpgradeTransaction
     {
         public List<string> Events { get; } = [];
+        public InstallationMode Mode => InstallationMode.Service;
         public bool HasInteractiveSigningSession { get; set; } = true;
         public bool DrainSucceeded { get; set; } = true;
         public string? FailureStage { get; set; }
@@ -141,6 +157,32 @@ public sealed class UpgradeCommandTests
                 throw new SetupException(code);
             }
 
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class RecordingManualUpgradeTransaction : IUpgradeTransaction
+    {
+        public List<string> Events { get; } = [];
+        public InstallationMode Mode => InstallationMode.Manual;
+        public bool RollbackCalled { get; private set; }
+
+        public Task StageAsync(CancellationToken cancellationToken) => Step("stage");
+        public Task VerifyReplaceableAsync(CancellationToken cancellationToken) => Step("replaceable");
+        public Task ActivateAsync(CancellationToken cancellationToken) => Step("activate");
+        public Task VerifyAsync(CancellationToken cancellationToken) => Step("verify");
+        public Task CommitAsync(CancellationToken cancellationToken) => Step("commit");
+
+        public Task RollbackAsync()
+        {
+            RollbackCalled = true;
+            Events.Add("rollback");
+            return Task.CompletedTask;
+        }
+
+        private Task Step(string stage)
+        {
+            Events.Add(stage);
             return Task.CompletedTask;
         }
     }

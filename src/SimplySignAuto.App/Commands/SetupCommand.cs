@@ -768,10 +768,14 @@ public static class SetupCommand
 
         try
         {
-            var upgrade = await WindowsUpgradeTransaction.TryCreateAsync(cancellationToken)
+            IUpgradeTransaction? upgrade = await ManualUpgradeTransaction
+                .TryCreateAsync(cancellationToken)
+                .ConfigureAwait(false);
+            upgrade ??= await WindowsUpgradeTransaction.TryCreateAsync(cancellationToken)
                 .ConfigureAwait(false);
             if (upgrade is not null)
             {
+                UpgradeModePolicy.RequireMatch(mode, upgrade.Mode);
                 await new UpgradeOrchestrator()
                     .ExecuteAsync(upgrade, output, cancellationToken)
                     .ConfigureAwait(false);

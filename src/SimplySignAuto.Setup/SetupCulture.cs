@@ -41,7 +41,10 @@ internal static class SetupCulture
     public static string Format(string key, CultureInfo culture, params object?[] arguments) =>
         string.Format(culture, GetString(key, culture), arguments);
 
-    public static string DescribeError(string code, CultureInfo culture)
+    public static string DescribeError(
+        string code,
+        CultureInfo culture,
+        string? autoLogonAccount = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(code);
         var resourceKey = ReadPrimaryCode(code) switch
@@ -58,7 +61,13 @@ internal static class SetupCulture
             "autologon_plaintext_password_present" => "ErrorAutoLogonPlaintextPasswordPresent",
             _ => "ErrorGeneric",
         };
-        return GetString(resourceKey, culture) + Environment.NewLine + Environment.NewLine +
+        var reason = resourceKey == "ErrorAutoLogonConflict"
+            ? Format(
+                resourceKey,
+                culture,
+                autoLogonAccount ?? GetString("AutoLogonAccountUnknown", culture))
+            : GetString(resourceKey, culture);
+        return reason + Environment.NewLine + Environment.NewLine +
             Format("ErrorCodeFormat", culture, code);
     }
 

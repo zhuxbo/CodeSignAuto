@@ -134,6 +134,7 @@ public sealed class ManualUninstallPlanner(IManualUninstallEnvironment environme
             UninstallSigningUserOwnership.ExistingUser);
         UninstallAction[] actions =
         [
+            new RemoveOwnedPdfExtension(),
             new PurgeControlledData(
                 dataRoot,
                 receipt.UserDataRoot!,
@@ -651,13 +652,17 @@ internal sealed class WindowsManualInstalledMediaUninstallPreflight
 
 internal static class WindowsManualUninstallOwnership
 {
-    public static void Verify(ManualUninstallPlan plan)
+    public static void Verify(ManualUninstallPlan plan) => Verify(
+        plan,
+        Environment.ProcessPath is null
+            ? throw new InstallException("owned_resource_mismatch")
+            : Path.GetFullPath(Environment.ProcessPath));
+
+    internal static void Verify(ManualUninstallPlan plan, string expectedExecutable)
     {
         ArgumentNullException.ThrowIfNull(plan);
         var receipt = InstallationReceiptValidator.Validate(plan.Receipt);
-        var executable = Environment.ProcessPath is null
-            ? throw new InstallException("owned_resource_mismatch")
-            : Path.GetFullPath(Environment.ProcessPath);
+        var executable = Path.GetFullPath(expectedExecutable);
         var expectedDataRoot = Path.GetFullPath(Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
             "SimplySignAuto"));
@@ -809,6 +814,7 @@ public sealed class WindowsManualUninstallActionExecutor
 {
     private readonly IWindowsUninstallNative _native;
     private readonly IPurgeIsolationFileSystem _purgeFileSystem;
+    private readonly IOptionalToolUninstallPreflight _optionalToolPreflight;
     private readonly IManualInstalledMediaUninstallPreflight _mediaPreflight;
     private readonly IInstallationReceiptStore _receiptStore;
     private PurgeIsolationPlan? _preparedPurgePlan;
@@ -818,6 +824,7 @@ public sealed class WindowsManualUninstallActionExecutor
         : this(
             new WindowsUninstallNative(),
             new WindowsPurgeIsolationFileSystem(),
+            new WindowsOptionalToolUninstallPreflight(),
             new WindowsManualInstalledMediaUninstallPreflight(),
             new WindowsInstallationReceiptStore())
     {
@@ -826,11 +833,14 @@ public sealed class WindowsManualUninstallActionExecutor
     internal WindowsManualUninstallActionExecutor(
         IWindowsUninstallNative native,
         IPurgeIsolationFileSystem purgeFileSystem,
+        IOptionalToolUninstallPreflight optionalToolPreflight,
         IManualInstalledMediaUninstallPreflight mediaPreflight,
         IInstallationReceiptStore receiptStore)
     {
         _native = native ?? throw new ArgumentNullException(nameof(native));
         _purgeFileSystem = purgeFileSystem ?? throw new ArgumentNullException(nameof(purgeFileSystem));
+        _optionalToolPreflight = optionalToolPreflight ??
+            throw new ArgumentNullException(nameof(optionalToolPreflight));
         _mediaPreflight = mediaPreflight ?? throw new ArgumentNullException(nameof(mediaPreflight));
         _receiptStore = receiptStore ?? throw new ArgumentNullException(nameof(receiptStore));
     }
@@ -848,10 +858,19 @@ public sealed class WindowsManualUninstallActionExecutor
             throw new InstallException("owned_resource_mismatch");
         }
 
+        await _optionalToolPreflight.VerifyAsync(
+                new InstalledProductIdentity(
+                    plan.Receipt.ExecutablePath,
+                    plan.Receipt.SigningUserSid),
+                cancellationToken)
+            .ConfigureAwait(false);
+
         foreach (var action in plan.Actions)
         {
             switch (action)
             {
+                case RemoveOwnedPdfExtension:
+                    break;
                 case PurgeControlledData:
                     break;
                 case RemoveOwnedDesktopShortcut shortcut:
@@ -884,6 +903,9 @@ public sealed class WindowsManualUninstallActionExecutor
     {
         switch (action)
         {
+            case RemoveOwnedPdfExtension:
+                await _native.RemovePdfExtensionAsync(cancellationToken).ConfigureAwait(false);
+                break;
             case PurgeControlledData purge:
                 if (_preparedPurgePlan is null || _preparedPurgeAction != purge)
                 {
@@ -957,8 +979,9 @@ public sealed class WindowsUninstallActionExecutor : IUninstallActionExecutor
                 action is PurgeControlledData or RemoveOwnedPdfExtension))
         {
             await _optionalToolPreflight.VerifyAsync(
-                    plan.Configuration,
-                    plan.Identity,
+                    new InstalledProductIdentity(
+                        plan.Configuration.ExecutablePath,
+                        plan.Identity.Sid),
                     cancellationToken)
                 .ConfigureAwait(false);
         }

@@ -104,7 +104,7 @@ internal sealed class UpgradeRegistrationStore : IUpgradeRegistrationStore
         string errorCode) => WindowsProductUninstallRegistry.ReplaceExact(expected, replacement, errorCode);
 }
 
-internal sealed class WindowsUpgradeTransaction : IUpgradeTransaction
+internal sealed class WindowsUpgradeTransaction : IServiceUpgradeTransaction
 {
     private const string ServiceName = "SimplySignAuto.Service";
     private const string AgentTaskName = "SimplySignAuto.Agent";
@@ -185,6 +185,8 @@ internal sealed class WindowsUpgradeTransaction : IUpgradeTransaction
     }
 
     public bool HasInteractiveSigningSession { get; }
+
+    public InstallationMode Mode => InstallationMode.Service;
 
     internal static async Task<WindowsUpgradeTransaction?> TryCreateAsync(
         CancellationToken cancellationToken)
@@ -747,7 +749,11 @@ internal sealed class WindowsUpgradeTransaction : IUpgradeTransaction
             .VerifyAsync(plan, cancellationToken)
             .ConfigureAwait(false);
         await new WindowsOptionalToolUninstallPreflight()
-            .VerifyAsync(plan.Configuration, plan.Identity, cancellationToken)
+            .VerifyAsync(
+                new InstalledProductIdentity(
+                    plan.Configuration.ExecutablePath,
+                    plan.Identity.Sid),
+                cancellationToken)
             .ConfigureAwait(false);
         native.VerifySigningIdentityOwnership(plan.Identity, plan.Configuration);
         foreach (var action in plan.Actions)

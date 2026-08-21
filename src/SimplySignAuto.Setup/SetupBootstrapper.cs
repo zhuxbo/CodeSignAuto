@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Microsoft.Win32;
 
 namespace SimplySignAuto.Setup;
 
@@ -20,8 +21,10 @@ internal sealed class SetupBootstrapperException : Exception
 
     public string StableCode { get; }
 
-    public string GetLocalizedMessage(System.Globalization.CultureInfo culture) =>
-        SetupCulture.DescribeError(StableCode, culture);
+    public string GetLocalizedMessage(
+        System.Globalization.CultureInfo culture,
+        string? autoLogonAccount = null) =>
+        SetupCulture.DescribeError(StableCode, culture, autoLogonAccount);
 }
 
 internal enum SetupProductKind
@@ -48,6 +51,67 @@ internal static class SetupModeSelection
         2 or 3 => SetupInstallationMode.Service,
         _ => throw new SetupBootstrapperException("os_unsupported"),
     };
+}
+
+internal static class SetupFailurePolicy
+{
+    public static bool CanReturnToModeSelection(
+        SetupProductKind productKind,
+        SetupInstallationMode mode,
+        bool canChangeMode,
+        string code) =>
+        productKind == SetupProductKind.Main &&
+        mode == SetupInstallationMode.Service &&
+        canChangeMode &&
+        string.Equals(code, "autologon_conflict", StringComparison.Ordinal);
+}
+
+internal static class SetupAutoLogonConflict
+{
+    private const string WinlogonPath =
+        @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon";
+
+    public static string? ReadAccountName()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return null;
+        }
+
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(WinlogonPath, writable: false);
+            return FormatAccountName(
+                key?.GetValue("DefaultUserName", null, RegistryValueOptions.None) as string,
+                key?.GetValue("DefaultDomainName", null, RegistryValueOptions.None) as string);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    internal static string? FormatAccountName(string? userName, string? domainName)
+    {
+        var user = Normalize(userName);
+        if (user is null || user.Contains('\\', StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var domain = Normalize(domainName);
+        return domain is null ? user : $"{domain}\\{user}";
+    }
+
+    private static string? Normalize(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Length > 256 || value.Any(char.IsControl))
+        {
+            return null;
+        }
+
+        return value.Trim();
+    }
 }
 
 internal sealed record SetupProgress(int Percent, string Message);

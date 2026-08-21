@@ -49,7 +49,8 @@ ASP.NET Core Runtime：https://dotnet.microsoft.com/en-us/download/dotnet/10.0
   <data name="ErrorArchitectureUnsupported" xml:space="preserve"><value>SimplySignAuto 只支持 x64 Windows。请在 64 位操作系统中运行 64 位安装程序。</value></data>
   <data name="ErrorAdministratorRequired" xml:space="preserve"><value>安装需要管理员权限。请右键安装程序并选择“以管理员身份运行”，然后重新运行。</value></data>
   <data name="ErrorDomainControllerUnsupported" xml:space="preserve"><value>不支持在域控制器上安装。请改用工作组计算机、域成员客户端或成员服务器。</value></data>
-  <data name="ErrorAutoLogonConflict" xml:space="preserve"><value>检测到已有自动登录配置。自动签名服务需要独占该配置，安装程序不会覆盖现有设置。请先安全关闭原自动登录配置，再重新运行安装程序。</value></data>
+  <data name="ErrorAutoLogonConflict" xml:space="preserve"><value>检测到账户 {0} 已配置自动登录。自动签名服务需要独占该配置，安装程序不会覆盖现有设置。请先使用原配置工具安全关闭自动登录，或返回选择手工签名模式。</value></data>
+  <data name="AutoLogonAccountUnknown" xml:space="preserve"><value>（未知账户）</value></data>
   <data name="ErrorAutoLogonPlaintextPasswordPresent" xml:space="preserve"><value>检测到注册表中的旧式明文自动登录密码。请使用原配置工具安全移除后再安装；安装程序不会读取或覆盖该密码。</value></data>
   <data name="ErrorGeneric" xml:space="preserve"><value>安装未完成。请检查系统要求并修正问题后重新运行安装程序。</value></data>
   <data name="ErrorCodeFormat" xml:space="preserve"><value>错误代码：{0}</value></data>

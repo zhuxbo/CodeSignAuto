@@ -2,20 +2,37 @@ namespace SimplySignAuto.App.Commands;
 
 internal interface IUpgradeTransaction
 {
-    bool HasInteractiveSigningSession { get; }
+    InstallationMode Mode { get; }
 
     Task StageAsync(CancellationToken cancellationToken);
+    Task VerifyReplaceableAsync(CancellationToken cancellationToken);
+    Task ActivateAsync(CancellationToken cancellationToken);
+    Task VerifyAsync(CancellationToken cancellationToken);
+    Task CommitAsync(CancellationToken cancellationToken);
+    Task RollbackAsync();
+}
+
+internal interface IServiceUpgradeTransaction : IUpgradeTransaction
+{
+    bool HasInteractiveSigningSession { get; }
+
     Task<bool> DrainAsync(CancellationToken cancellationToken);
     Task LogoutAsync(CancellationToken cancellationToken);
     Task StopAgentAsync(CancellationToken cancellationToken);
     Task StopServiceAsync(CancellationToken cancellationToken);
-    Task VerifyReplaceableAsync(CancellationToken cancellationToken);
-    Task ActivateAsync(CancellationToken cancellationToken);
     Task StartServiceAsync(CancellationToken cancellationToken);
     Task StartAgentAsync(CancellationToken cancellationToken);
-    Task VerifyAsync(CancellationToken cancellationToken);
-    Task CommitAsync(CancellationToken cancellationToken);
-    Task RollbackAsync();
+}
+
+internal static class UpgradeModePolicy
+{
+    public static void RequireMatch(InstallationMode requested, InstallationMode installed)
+    {
+        if (requested != installed)
+        {
+            throw new SetupException("installation_mode_change_requires_reinstall");
+        }
+    }
 }
 
 internal sealed class UpgradeOrchestrator
@@ -27,7 +44,8 @@ internal sealed class UpgradeOrchestrator
     {
         ArgumentNullException.ThrowIfNull(transaction);
         ArgumentNullException.ThrowIfNull(output);
-        if (!transaction.HasInteractiveSigningSession)
+        if (transaction is IServiceUpgradeTransaction service &&
+            !service.HasInteractiveSigningSession)
         {
             throw new SetupException("restart_required");
         }
@@ -35,18 +53,26 @@ internal sealed class UpgradeOrchestrator
         try
         {
             await transaction.StageAsync(cancellationToken).ConfigureAwait(false);
-            if (!await transaction.DrainAsync(cancellationToken).ConfigureAwait(false))
+            if (transaction is IServiceUpgradeTransaction serviceTransaction)
             {
-                throw new SetupException("upgrade_drain_timeout");
+                if (!await serviceTransaction.DrainAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    throw new SetupException("upgrade_drain_timeout");
+                }
+
+                await serviceTransaction.LogoutAsync(cancellationToken).ConfigureAwait(false);
+                await serviceTransaction.StopAgentAsync(cancellationToken).ConfigureAwait(false);
+                await serviceTransaction.StopServiceAsync(cancellationToken).ConfigureAwait(false);
             }
 
-            await transaction.LogoutAsync(cancellationToken).ConfigureAwait(false);
-            await transaction.StopAgentAsync(cancellationToken).ConfigureAwait(false);
-            await transaction.StopServiceAsync(cancellationToken).ConfigureAwait(false);
             await transaction.VerifyReplaceableAsync(cancellationToken).ConfigureAwait(false);
             await transaction.ActivateAsync(cancellationToken).ConfigureAwait(false);
-            await transaction.StartServiceAsync(cancellationToken).ConfigureAwait(false);
-            await transaction.StartAgentAsync(cancellationToken).ConfigureAwait(false);
+            if (transaction is IServiceUpgradeTransaction restartedService)
+            {
+                await restartedService.StartServiceAsync(cancellationToken).ConfigureAwait(false);
+                await restartedService.StartAgentAsync(cancellationToken).ConfigureAwait(false);
+            }
+
             await transaction.VerifyAsync(cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         }

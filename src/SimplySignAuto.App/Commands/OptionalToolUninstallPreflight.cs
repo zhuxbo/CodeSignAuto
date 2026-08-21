@@ -1,6 +1,5 @@
 using SimplySignAuto.App.Tools;
 using SimplySignAuto.Core.Security;
-using SimplySignAuto.Service;
 
 namespace SimplySignAuto.App.Commands;
 
@@ -10,6 +9,10 @@ internal sealed record OptionalToolUninstallTreeEntry(
 
 internal sealed record OptionalToolUninstallTreeSnapshot(
     IReadOnlyList<OptionalToolUninstallTreeEntry> Entries);
+
+internal sealed record InstalledProductIdentity(
+    string ExecutablePath,
+    string SigningUserSid);
 
 internal interface IOptionalToolUninstallTreeInspector
 {
@@ -21,8 +24,7 @@ internal interface IOptionalToolUninstallTreeInspector
 internal interface IOptionalToolUninstallPreflight
 {
     Task VerifyAsync(
-        ServiceConfiguration configuration,
-        UninstallSigningIdentity identity,
+        InstalledProductIdentity identity,
         CancellationToken cancellationToken);
 }
 
@@ -47,31 +49,21 @@ internal sealed class WindowsOptionalToolUninstallPreflight : IOptionalToolUnins
     }
 
     public async Task VerifyAsync(
-        ServiceConfiguration configuration,
-        UninstallSigningIdentity identity,
+        InstalledProductIdentity identity,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(identity);
         cancellationToken.ThrowIfCancellationRequested();
         try
         {
-            if (!string.Equals(
-                    configuration.SigningUserSid,
-                    identity.Sid,
-                    StringComparison.Ordinal))
-            {
-                throw new IOException("optional_tool_identity_mismatch");
-            }
-
-            var productRoot = Path.GetDirectoryName(configuration.ExecutablePath)
+            var productRoot = Path.GetDirectoryName(identity.ExecutablePath)
                 ?? throw new IOException("optional_tool_path_invalid");
             var programFilesRoot = Directory.GetParent(productRoot)?.FullName
                 ?? throw new IOException("optional_tool_path_invalid");
             var paths = PdfExtensionPaths.FromProgramFiles(programFilesRoot);
             var manifestJson = await _security.ReadManifestAsync(
                     paths,
-                    identity.Sid,
+                    identity.SigningUserSid,
                     cancellationToken)
                 .ConfigureAwait(false);
             if (manifestJson is null)
@@ -80,7 +72,7 @@ internal sealed class WindowsOptionalToolUninstallPreflight : IOptionalToolUnins
             }
 
             var manifest = PdfExtensionManifestCodec.Decode(manifestJson);
-            var tree = _treeInspector.Inspect(paths.Root, identity.Sid);
+            var tree = _treeInspector.Inspect(paths.Root, identity.SigningUserSid);
             if (!HasExactReadyTree(tree.Entries))
             {
                 throw new IOException("optional_tool_tree_mismatch");
@@ -89,7 +81,7 @@ internal sealed class WindowsOptionalToolUninstallPreflight : IOptionalToolUnins
             await _security.VerifyHelperAsync(
                     paths.Helper,
                     manifest,
-                    identity.Sid,
+                    identity.SigningUserSid,
                     cancellationToken)
                 .ConfigureAwait(false);
         }

@@ -387,6 +387,7 @@ public sealed class UninstallSafetyTests
         Assert.Equal(UninstallSigningUserOwnership.ExistingUser, plan.Identity.Ownership);
         Assert.Collection(
             plan.Actions,
+            action => Assert.IsType<RemoveOwnedPdfExtension>(action),
             action =>
             {
                 var purge = Assert.IsType<PurgeControlledData>(action);
@@ -664,8 +665,7 @@ public sealed class UninstallSafetyTests
         var identity = ManagedIdentity(configuration);
 
         await preflight.VerifyAsync(
-            configuration,
-            identity,
+            new InstalledProductIdentity(configuration.ExecutablePath, identity.Sid),
             CancellationToken.None);
 
         Assert.Equal(
@@ -761,7 +761,11 @@ public sealed class UninstallSafetyTests
         await new WindowsOptionalToolUninstallPreflight(
                 emptySecurity,
                 new WindowsOptionalToolUninstallTreeInspector())
-            .VerifyAsync(fixture.Configuration, fixture.Identity, CancellationToken.None);
+            .VerifyAsync(
+                new InstalledProductIdentity(
+                    fixture.Configuration.ExecutablePath,
+                    fixture.Identity.Sid),
+                CancellationToken.None);
 
         fixture.CreateExactReadyTree();
         var readySecurity = new RecordingOptionalToolUninstallSecurity(
@@ -769,7 +773,11 @@ public sealed class UninstallSafetyTests
         await new WindowsOptionalToolUninstallPreflight(
                 readySecurity,
                 new WindowsOptionalToolUninstallTreeInspector())
-            .VerifyAsync(fixture.Configuration, fixture.Identity, CancellationToken.None);
+            .VerifyAsync(
+                new InstalledProductIdentity(
+                    fixture.Configuration.ExecutablePath,
+                    fixture.Identity.Sid),
+                CancellationToken.None);
 
         Assert.Equal(1, readySecurity.VerifyCalls);
         Assert.Equal(fixture.HelperPath, readySecurity.HelperPath);
@@ -790,8 +798,9 @@ public sealed class UninstallSafetyTests
                 new WindowsOptionalToolUninstallTreeInspector());
 
             var failure = await Record.ExceptionAsync(() => preflight.VerifyAsync(
-                fixture.Configuration,
-                fixture.Identity,
+                new InstalledProductIdentity(
+                    fixture.Configuration.ExecutablePath,
+                    fixture.Identity.Sid),
                 CancellationToken.None));
 
             var installFailure = Assert.IsAssignableFrom<InstallException>(failure);
@@ -2526,8 +2535,7 @@ public sealed class UninstallSafetyTests
         public static AllowOptionalToolUninstallPreflight Instance { get; } = new();
 
         public Task VerifyAsync(
-            SimplySignAuto.Service.ServiceConfiguration configuration,
-            UninstallSigningIdentity identity,
+            InstalledProductIdentity identity,
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();

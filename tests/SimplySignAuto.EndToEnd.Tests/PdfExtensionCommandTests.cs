@@ -11,6 +11,75 @@ namespace SimplySignAuto.EndToEnd.Tests;
 
 public sealed class PdfExtensionCommandTests
 {
+    [Fact]
+    public void Pdf_extension_identity_uses_manual_receipt_without_service_configuration()
+    {
+        var receipt = InstallationReceipt.ForManual(
+            "0123456789abcdef0123456789abcdef",
+            "S-1-5-21-1000-2000-3000-4000",
+            @"C:\Program Files\SimplySignAuto\SimplySignAuto.exe",
+            @"C:\Users\Administrator\AppData\Local\SimplySignAuto\manual");
+
+        var identity = PdfExtensionMainIdentityResolver.Resolve(receipt, configuration: null);
+
+        Assert.Equal(receipt.ExecutablePath, identity.ExecutablePath);
+        Assert.Equal(receipt.SigningUserSid, identity.SigningUserSid);
+    }
+
+    [Fact]
+    public void Pdf_extension_identity_cross_checks_service_receipt_and_configuration()
+    {
+        var configuration = ServiceConfigurationLoader.Validate(new ServiceConfiguration(
+            new string('a', 64),
+            "S-1-5-21-1000-2000-3000-4000",
+            @"C:\ProgramData\SimplySignAuto",
+            @"C:\ProgramData\SimplySignAuto\spool",
+            7080,
+            "SimplySignAuto/v1",
+            "0123456789abcdef0123456789abcdef",
+            @"C:\Program Files\SimplySignAuto\SimplySignAuto.exe",
+            @"C:\Users\SimplySignAgent\AppData\Local\SimplySignAuto\agent.json"));
+        var receipt = InstallationReceipt.ForService(configuration);
+
+        var exact = PdfExtensionMainIdentityResolver.Resolve(receipt, configuration);
+        var error = Assert.Throws<InstallException>(() =>
+            PdfExtensionMainIdentityResolver.Resolve(
+                receipt,
+                configuration with { SigningUserSid = "S-1-5-21-1000-2000-3000-4001" }));
+
+        Assert.Equal(configuration.ExecutablePath, exact.ExecutablePath);
+        Assert.Equal("pdf_extension_main_invalid", error.Code);
+    }
+
+    [Fact]
+    public void Pdf_extension_identity_rejects_missing_receipt_and_manual_service_conflicts()
+    {
+        var manual = InstallationReceipt.ForManual(
+            "0123456789abcdef0123456789abcdef",
+            "S-1-5-21-1000-2000-3000-4000",
+            @"C:\Program Files\SimplySignAuto\SimplySignAuto.exe",
+            @"C:\Users\Administrator\AppData\Local\SimplySignAuto\manual");
+        var configuration = new ServiceConfiguration(
+            new string('a', 64),
+            manual.SigningUserSid,
+            @"C:\ProgramData\SimplySignAuto",
+            @"C:\ProgramData\SimplySignAuto\spool",
+            7080,
+            "SimplySignAuto/v1",
+            manual.InstallInstanceId,
+            manual.ExecutablePath,
+            @"C:\Users\Administrator\AppData\Local\SimplySignAuto\agent.json");
+
+        Assert.Equal(
+            "pdf_extension_main_invalid",
+            Assert.Throws<InstallException>(() =>
+                PdfExtensionMainIdentityResolver.Resolve(receipt: null, configuration: null)).Code);
+        Assert.Equal(
+            "pdf_extension_main_invalid",
+            Assert.Throws<InstallException>(() =>
+                PdfExtensionMainIdentityResolver.Resolve(manual, configuration)).Code);
+    }
+
     [WindowsFact]
     public async Task Install_requires_elevated_administrator_before_planning_or_mutation()
     {
@@ -154,6 +223,28 @@ public sealed class PdfExtensionCommandTests
         Assert.Empty(Directory.EnumerateFileSystemEntries(
             fixture.ProgramFilesRoot,
             "SimplySignAuto PDF Support.part-*"));
+    }
+
+    [WindowsAdministratorFact]
+    public async Task Manual_receipt_installs_and_uninstalls_the_pdf_extension()
+    {
+        using var fixture = new WindowsInstallFixture();
+        var receipt = InstallationReceipt.ForManual(
+            fixture.Configuration.InstallInstanceId,
+            fixture.Configuration.SigningUserSid,
+            fixture.MainExecutable,
+            Path.Combine(fixture.Root, "manual"));
+        var identity = PdfExtensionMainIdentityResolver.Resolve(receipt, configuration: null);
+        var verifier = new RecordingArtifactVerifier(fixture.Manifest);
+        var registration = new RecordingRegistrationStore();
+        var operations = fixture.CreateOperations(verifier, registration, identity: identity);
+
+        var plan = await operations.PlanInstallAsync(fixture.MediaRoot, CancellationToken.None);
+        await operations.PublishInstallAsync(plan, CancellationToken.None);
+        await operations.UninstallAsync(CancellationToken.None);
+
+        Assert.False(Directory.Exists(fixture.TargetRoot));
+        Assert.Equal(["register", "remove"], registration.Events);
     }
 
     [WindowsAdministratorFact]
@@ -438,11 +529,11 @@ public sealed class PdfExtensionCommandTests
         }
     }
 
-    private sealed class StaticServiceConfigurationLoader(ServiceConfiguration configuration)
-        : IServiceConfigurationLoader
+    private sealed class StaticPdfExtensionMainIdentitySource(InstalledProductIdentity identity)
+        : IPdfExtensionMainIdentitySource
     {
-        public Task<ServiceConfiguration> LoadAsync(CancellationToken cancellationToken) =>
-            Task.FromResult(configuration);
+        public Task<InstalledProductIdentity> LoadAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(identity);
     }
 
     private sealed class WindowsInstallFixture : IDisposable
@@ -510,7 +601,7 @@ public sealed class PdfExtensionCommandTests
                 Path.Combine(ProgramDataRoot, "SimplySignAuto"),
                 Path.Combine(ProgramDataRoot, "SimplySignAuto", "spool"),
                 7080,
-                "SimplySignAuto/v1/0123456789abcdef0123456789abcdef",
+                "SimplySignAuto/v1",
                 "0123456789abcdef0123456789abcdef",
                 MainExecutable,
                 Path.Combine(Root, "agent.json"));
@@ -535,13 +626,16 @@ public sealed class PdfExtensionCommandTests
         public WindowsPdfExtensionOperations CreateOperations(
             IPdfExtensionArtifactVerifier verifier,
             IPdfExtensionRegistrationStore registration,
-            string productVersion = "0.16.0") => new(
+            string productVersion = "0.16.0",
+            InstalledProductIdentity? identity = null) => new(
                 new PdfExtensionRuntimeContext(
                     ProgramFilesRoot,
                     ProgramDataRoot,
                     MainExecutable,
                     productVersion),
-                new StaticServiceConfigurationLoader(Configuration),
+                new StaticPdfExtensionMainIdentitySource(identity ?? new InstalledProductIdentity(
+                    Configuration.ExecutablePath,
+                    Configuration.SigningUserSid)),
                 verifier,
                 registration,
                 () => "0123456789abcdef0123456789abcdef");

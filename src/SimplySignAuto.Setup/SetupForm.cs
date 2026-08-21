@@ -18,6 +18,7 @@ internal sealed class SetupForm : Form
     private readonly ProgressBar _progress;
     private readonly Button _install;
     private readonly Button _close;
+    private readonly bool _canChangeMode;
     private CultureInfo _culture;
     private string _statusResourceKey = "StatusReady";
     private object?[] _statusArguments = [];
@@ -34,6 +35,7 @@ internal sealed class SetupForm : Form
     {
         _bootstrapper = bootstrapper ?? throw new ArgumentNullException(nameof(bootstrapper));
         _productKind = productKind;
+        _canChangeMode = installationSelection?.CanChange == true;
         if (productKind == SetupProductKind.Main != (installationSelection is not null))
         {
             throw new ArgumentException("The installation selection must match the product kind.", nameof(installationSelection));
@@ -175,6 +177,7 @@ internal sealed class SetupForm : Form
         }
 
         _running = true;
+        var returnToModeSelection = false;
         _install.Enabled = false;
         _close.Enabled = false;
         _progress.Minimum = 0;
@@ -210,12 +213,30 @@ internal sealed class SetupForm : Form
         {
             ExitCode = 1;
             SetStatus("StatusInstallFailed");
+            var selectedMode = _mode.SelectedIndex == 1
+                ? SetupInstallationMode.Service
+                : SetupInstallationMode.Manual;
+            returnToModeSelection = SetupFailurePolicy.CanReturnToModeSelection(
+                _productKind,
+                selectedMode,
+                _canChangeMode,
+                error.Code);
             MessageBox.Show(
                 this,
-                error.GetLocalizedMessage(_culture),
+                error.GetLocalizedMessage(
+                    _culture,
+                    error.Code == "autologon_conflict"
+                        ? SetupAutoLogonConflict.ReadAccountName()
+                        : null),
                 Text,
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
+            if (returnToModeSelection)
+            {
+                ExitCode = 2;
+                _progress.Value = 0;
+                SetStatus("StatusReady");
+            }
         }
         catch
         {
@@ -232,9 +253,10 @@ internal sealed class SetupForm : Form
         finally
         {
             _running = false;
-            _finished = true;
+            _finished = !returnToModeSelection;
             _install.Enabled = true;
-            _close.Visible = false;
+            _close.Enabled = true;
+            _close.Visible = returnToModeSelection;
             AcceptButton = _install;
             ApplyCulture();
         }

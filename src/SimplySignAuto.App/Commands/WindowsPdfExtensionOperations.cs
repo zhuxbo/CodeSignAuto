@@ -68,12 +68,120 @@ internal interface IPdfExtensionRegistrationStore
     void Remove(PdfExtensionUninstallRegistration registration);
 }
 
+internal interface IPdfExtensionMainIdentitySource
+{
+    Task<InstalledProductIdentity> LoadAsync(CancellationToken cancellationToken);
+}
+
+internal static class PdfExtensionMainIdentityResolver
+{
+    public static InstalledProductIdentity Resolve(
+        InstallationReceipt? receipt,
+        ServiceConfiguration? configuration)
+    {
+        try
+        {
+            receipt = InstallationReceiptValidator.Validate(receipt);
+            if (receipt.Mode == InstallationMode.Service)
+            {
+                if (configuration is null)
+                {
+                    throw new InstallException("pdf_extension_main_invalid");
+                }
+
+                InstallationReceiptValidator.RequireServiceMatch(receipt, configuration);
+            }
+            else if (configuration is not null)
+            {
+                throw new InstallException("pdf_extension_main_invalid");
+            }
+
+            return new InstalledProductIdentity(
+                receipt.ExecutablePath,
+                receipt.SigningUserSid);
+        }
+        catch (InstallException error) when (error.Code == "pdf_extension_main_invalid")
+        {
+            throw;
+        }
+        catch
+        {
+            throw new InstallException("pdf_extension_main_invalid");
+        }
+    }
+}
+
+internal sealed class WindowsPdfExtensionMainIdentitySource : IPdfExtensionMainIdentitySource
+{
+    private readonly IInstallationReceiptStore _receiptStore;
+    private readonly IServiceConfigurationLoader _configurationLoader;
+
+    public WindowsPdfExtensionMainIdentitySource()
+        : this(new WindowsInstallationReceiptStore(), new ServiceConfigurationLoader())
+    {
+    }
+
+    internal WindowsPdfExtensionMainIdentitySource(
+        IInstallationReceiptStore receiptStore,
+        IServiceConfigurationLoader configurationLoader)
+    {
+        _receiptStore = receiptStore ?? throw new ArgumentNullException(nameof(receiptStore));
+        _configurationLoader = configurationLoader ??
+            throw new ArgumentNullException(nameof(configurationLoader));
+    }
+
+    public async Task<InstalledProductIdentity> LoadAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var receipt = await _receiptStore.LoadOptionalAsync(cancellationToken)
+                .ConfigureAwait(false);
+            if (receipt is null)
+            {
+                throw new InstallException("pdf_extension_main_invalid");
+            }
+
+            ServiceConfiguration? configuration = null;
+            var configurationExists = WindowsPathSafety.EntryExists(
+                WindowsUninstallEnvironment.ConfigurationPath);
+            if (receipt.Mode == InstallationMode.Service)
+            {
+                if (!configurationExists)
+                {
+                    throw new InstallException("pdf_extension_main_invalid");
+                }
+
+                configuration = await _configurationLoader.LoadAsync(cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            else if (configurationExists)
+            {
+                throw new InstallException("pdf_extension_main_invalid");
+            }
+
+            return PdfExtensionMainIdentityResolver.Resolve(receipt, configuration);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (InstallException error) when (error.Code == "pdf_extension_main_invalid")
+        {
+            throw;
+        }
+        catch
+        {
+            throw new InstallException("pdf_extension_main_invalid");
+        }
+    }
+}
+
 internal sealed class WindowsPdfExtensionOperations : IPdfExtensionOperations
 {
     private static readonly SecurityIdentifier LocalSystem =
         new(WellKnownSidType.LocalSystemSid, null);
     private readonly PdfExtensionRuntimeContext _context;
-    private readonly IServiceConfigurationLoader _configurationLoader;
+    private readonly IPdfExtensionMainIdentitySource _mainIdentitySource;
     private readonly IPdfExtensionArtifactVerifier _verifier;
     private readonly IPdfExtensionRegistrationStore _registrationStore;
     private readonly Func<string> _nonceFactory;
@@ -95,7 +203,7 @@ internal sealed class WindowsPdfExtensionOperations : IPdfExtensionOperations
                 Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
                 Environment.ProcessPath ?? string.Empty,
                 ApplicationVersion.ReadIdentity(typeof(WindowsPdfExtensionOperations).Assembly)),
-            new ServiceConfigurationLoader(),
+            new WindowsPdfExtensionMainIdentitySource(),
             new WindowsPdfExtensionArtifactVerifier(),
             new WindowsPdfExtensionRegistrationStore(),
             () => Guid.NewGuid().ToString("N"))
@@ -104,14 +212,14 @@ internal sealed class WindowsPdfExtensionOperations : IPdfExtensionOperations
 
     internal WindowsPdfExtensionOperations(
         PdfExtensionRuntimeContext context,
-        IServiceConfigurationLoader configurationLoader,
+        IPdfExtensionMainIdentitySource mainIdentitySource,
         IPdfExtensionArtifactVerifier verifier,
         IPdfExtensionRegistrationStore registrationStore,
         Func<string> nonceFactory)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
-        _configurationLoader = configurationLoader ??
-            throw new ArgumentNullException(nameof(configurationLoader));
+        _mainIdentitySource = mainIdentitySource ??
+            throw new ArgumentNullException(nameof(mainIdentitySource));
         _verifier = verifier ?? throw new ArgumentNullException(nameof(verifier));
         _registrationStore = registrationStore ??
             throw new ArgumentNullException(nameof(registrationStore));
@@ -160,17 +268,17 @@ internal sealed class WindowsPdfExtensionOperations : IPdfExtensionOperations
                 throw new InstallException("pdf_extension_main_invalid");
             }
 
-            var configuration = await _configurationLoader.LoadAsync(cancellationToken)
+            var identity = await _mainIdentitySource.LoadAsync(cancellationToken)
                 .ConfigureAwait(false);
             if (!string.Equals(
-                    configuration.ExecutablePath,
+                    identity.ExecutablePath,
                     mainExecutable,
                     StringComparison.OrdinalIgnoreCase))
             {
                 throw new InstallException("pdf_extension_main_invalid");
             }
 
-            _ = new SecurityIdentifier(configuration.SigningUserSid);
+            _ = new SecurityIdentifier(identity.SigningUserSid);
             var target = PdfExtensionPaths.FromProgramFiles(programFilesRoot);
             var targetKind = NoFollowFile.InspectPathEntry(target.Root);
 
@@ -205,7 +313,7 @@ internal sealed class WindowsPdfExtensionOperations : IPdfExtensionOperations
             var plan = new PdfExtensionInstallPlan(
                 target,
                 manifest,
-                configuration.SigningUserSid,
+                identity.SigningUserSid,
                 instanceId);
             if (targetKind != NoFollowPathEntryKind.Missing)
             {
@@ -217,7 +325,7 @@ internal sealed class WindowsPdfExtensionOperations : IPdfExtensionOperations
                 var installed = await _verifier.ReadAndVerifyInstalledAsync(
                         target,
                         mainExecutable,
-                        configuration.SigningUserSid,
+                        identity.SigningUserSid,
                         cancellationToken)
                     .ConfigureAwait(false);
                 var registration = PdfExtensionUninstallRegistration.Create(
@@ -365,6 +473,16 @@ internal sealed class WindowsPdfExtensionOperations : IPdfExtensionOperations
     public async Task UninstallAsync(CancellationToken cancellationToken)
     {
         RequireAdministrator();
+        var identity = await _mainIdentitySource.LoadAsync(cancellationToken)
+            .ConfigureAwait(false);
+        if (!string.Equals(
+                identity.ExecutablePath,
+                _context.ProcessPath,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InstallException("pdf_extension_main_invalid");
+        }
+
         var target = PdfExtensionPaths.FromProgramFiles(_context.ProgramFilesRoot);
         if (NoFollowFile.InspectPathEntry(target.Root) == NoFollowPathEntryKind.Missing)
         {
@@ -376,12 +494,10 @@ internal sealed class WindowsPdfExtensionOperations : IPdfExtensionOperations
             return;
         }
 
-        var configuration = await _configurationLoader.LoadAsync(cancellationToken)
-            .ConfigureAwait(false);
         var manifest = await _verifier.ReadAndVerifyInstalledAsync(
                 target,
                 _context.ProcessPath,
-                configuration.SigningUserSid,
+                identity.SigningUserSid,
                 cancellationToken)
             .ConfigureAwait(false);
         var registration = PdfExtensionUninstallRegistration.Create(
@@ -394,7 +510,7 @@ internal sealed class WindowsPdfExtensionOperations : IPdfExtensionOperations
             rootIdentity = RequireSingleLinkIdentity(rootHandle);
         }
 
-        var signingUser = new SecurityIdentifier(configuration.SigningUserSid);
+        var signingUser = new SecurityIdentifier(identity.SigningUserSid);
         _registrationStore.Remove(registration);
         try
         {

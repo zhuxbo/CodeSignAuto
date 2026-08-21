@@ -148,6 +148,76 @@ public sealed class WindowsUpgradeTransactionTests
     }
 
     [Fact]
+    public async Task Manual_upgrade_replaces_media_and_registration_without_rewriting_receipt()
+    {
+        var receipt = ManualReceipt();
+        var receiptStore = new FakeInstallationReceiptStore { Current = receipt };
+        var media = new FakeUpgradeMedia();
+        var registrations = new FakeRegistrationStore();
+        var owner = InstallOwnershipMarker.Create(receipt.InstallInstanceId);
+        var transaction = new ManualUpgradeTransaction(
+            receipt,
+            receiptStore,
+            ProductUninstallRegistration.Create(receipt.ExecutablePath, "1.0.0", owner),
+            ProductUninstallRegistration.Create(receipt.ExecutablePath, "2.0.0", owner),
+            media,
+            registrations);
+
+        await new UpgradeOrchestrator().ExecuteAsync(
+            transaction,
+            TextWriter.Null,
+            CancellationToken.None);
+
+        Assert.Equal(InstallationMode.Manual, transaction.Mode);
+        Assert.Equal(receipt.SigningUserSid, media.AuthorizedSid);
+        Assert.Equal(["1.0.0->2.0.0"], registrations.Replacements);
+        Assert.Equal(receipt, receiptStore.Current);
+        Assert.Empty(receiptStore.Events);
+    }
+
+    [Fact]
+    public async Task Manual_upgrade_commit_failure_restores_media_and_registration_but_never_mutates_receipt()
+    {
+        var receipt = ManualReceipt();
+        var receiptStore = new FakeInstallationReceiptStore { Current = receipt };
+        var media = new FakeUpgradeMedia
+        {
+            CommitFailure = new SetupException("upgrade_state_uncertain"),
+        };
+        var registrations = new FakeRegistrationStore();
+        var owner = InstallOwnershipMarker.Create(receipt.InstallInstanceId);
+        var transaction = new ManualUpgradeTransaction(
+            receipt,
+            receiptStore,
+            ProductUninstallRegistration.Create(receipt.ExecutablePath, "1.0.0", owner),
+            ProductUninstallRegistration.Create(receipt.ExecutablePath, "2.0.0", owner),
+            media,
+            registrations);
+
+        var error = await Assert.ThrowsAsync<SetupException>(() =>
+            new UpgradeOrchestrator().ExecuteAsync(
+                transaction,
+                TextWriter.Null,
+                CancellationToken.None));
+
+        Assert.Equal("upgrade_state_uncertain", error.Code);
+        Assert.Equal(["1.0.0->2.0.0", "2.0.0->1.0.0"], registrations.Replacements);
+        Assert.True(media.RollbackCalled);
+        Assert.Equal(receipt, receiptStore.Current);
+        Assert.Empty(receiptStore.Events);
+    }
+
+    [Fact]
+    public void Upgrade_mode_policy_rejects_setup_attempts_to_change_the_installed_mode()
+    {
+        var error = Assert.Throws<SetupException>(() =>
+            UpgradeModePolicy.RequireMatch(InstallationMode.Service, InstallationMode.Manual));
+
+        Assert.Equal("installation_mode_change_requires_reinstall", error.Code);
+        UpgradeModePolicy.RequireMatch(InstallationMode.Manual, InstallationMode.Manual);
+    }
+
+    [Fact]
     public async Task Legacy_service_without_drain_messages_upgrades_only_after_post_stop_quiescence()
     {
         var fixture = new TransactionFixture();
@@ -446,6 +516,12 @@ public sealed class WindowsUpgradeTransactionTests
             session: session);
     }
 
+    private static InstallationReceipt ManualReceipt() => InstallationReceipt.ForManual(
+        "0123456789abcdef0123456789abcdef",
+        "S-1-5-21-1-2-3-1001",
+        @"C:\Program Files\SimplySignAuto\SimplySignAuto.exe",
+        @"C:\Users\Administrator\AppData\Local\SimplySignAuto\manual");
+
     private sealed class TransactionFixture
     {
         private readonly ServiceConfiguration _configuration = new(
@@ -529,6 +605,7 @@ public sealed class WindowsUpgradeTransactionTests
         public Exception? CommitFailure { get; set; }
         public bool Activated { get; private set; }
         public bool RollbackCalled { get; private set; }
+        public string? AuthorizedSid { get; private set; }
 
         public Task<InstallMediaPlan> PlanAsync(CancellationToken cancellationToken) => Task.FromResult(new InstallMediaPlan(
             @"C:\media",
@@ -542,7 +619,11 @@ public sealed class WindowsUpgradeTransactionTests
             @"C:\Program Files\.failed"));
 
         public Task StageAsync(InstallMediaPlan plan, CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task AuthorizeAsync(InstallMediaPlan plan, string signingUserSid, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task AuthorizeAsync(InstallMediaPlan plan, string signingUserSid, CancellationToken cancellationToken)
+        {
+            AuthorizedSid = signingUserSid;
+            return Task.CompletedTask;
+        }
         public Task VerifyUpgradeTargetReplaceableAsync(InstallMediaPlan plan, CancellationToken cancellationToken) => Task.CompletedTask;
 
         public Task ActivateUpgradeAsync(InstallMediaPlan plan, CancellationToken cancellationToken)

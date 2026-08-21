@@ -48,6 +48,46 @@ public sealed class SetupBootstrapperTests
     }
 
     [Fact]
+    public void AutoLogon_conflict_safely_displays_only_the_detected_account_and_manual_option()
+    {
+        var account = Assert.IsType<string>(SetupAutoLogonConflict.FormatAccountName(
+            "administrator",
+            "SIGNING-SERVER"));
+        var failure = new SetupBootstrapperException("autologon_conflict");
+
+        var message = failure.GetLocalizedMessage(
+            SetupCulture.ResolveSelection("zh-CN"),
+            account);
+
+        Assert.Equal(@"SIGNING-SERVER\administrator", account);
+        Assert.Contains(account, message, StringComparison.Ordinal);
+        Assert.Contains("手工签名模式", message, StringComparison.Ordinal);
+        Assert.Contains("不会覆盖", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("password", message, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(SetupAutoLogonConflict.FormatAccountName("bad\nname", "DOMAIN"));
+    }
+
+    [Theory]
+    [InlineData("autologon_conflict", "Service", true, true)]
+    [InlineData("autologon_conflict", "Manual", true, false)]
+    [InlineData("autologon_conflict", "Service", false, false)]
+    [InlineData("autologon_plaintext_password_present", "Service", true, false)]
+    public void Only_changeable_service_AutoLogon_conflicts_return_to_mode_selection(
+        string code,
+        string modeName,
+        bool canChange,
+        bool expected)
+    {
+        var mode = Enum.Parse<SetupInstallationMode>(modeName);
+
+        Assert.Equal(expected, SetupFailurePolicy.CanReturnToModeSelection(
+            SetupProductKind.Main,
+            mode,
+            canChange,
+            code));
+    }
+
+    [Fact]
     public void Unknown_setup_failure_is_actionable_without_exposing_an_exception()
     {
         var failure = new SetupBootstrapperException("setup_resource_conflict");
