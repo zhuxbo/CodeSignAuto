@@ -419,6 +419,43 @@ public sealed class UninstallSafetyTests
         Assert.Equal(receipt.UserDataRoot, purge.AgentDirectory);
     }
 
+    [Theory]
+    [InlineData("S-1-5-21-1000-2000-3000-4000", FileAttributes.Directory, true)]
+    [InlineData("S-1-5-32-544", FileAttributes.Directory, true)]
+    [InlineData("S-1-5-18", FileAttributes.Directory, false)]
+    [InlineData("S-1-5-21-1000-2000-3000-4999", FileAttributes.Directory, false)]
+    [InlineData(
+        "S-1-5-32-544",
+        FileAttributes.Directory | FileAttributes.ReparsePoint,
+        false)]
+    public void Manual_user_data_accepts_only_the_signing_user_or_administrators_owner(
+        string ownerSid,
+        FileAttributes attributes,
+        bool accepted)
+    {
+        const string signingUserSid = "S-1-5-21-1000-2000-3000-4000";
+        var snapshot = new WindowsNoFollowSecuritySnapshot(
+            attributes,
+            new RawSecurityDescriptor(
+                ControlFlags.None,
+                new SecurityIdentifier(ownerSid),
+                group: null,
+                systemAcl: null,
+                discretionaryAcl: null));
+
+        var error = Record.Exception(() =>
+            WindowsManualUninstallOwnership.VerifyUserDataSnapshot(snapshot, signingUserSid));
+
+        if (accepted)
+        {
+            Assert.Null(error);
+        }
+        else
+        {
+            Assert.Equal("owned_resource_mismatch", Assert.IsType<InstallException>(error).Code);
+        }
+    }
+
     [Fact]
     public async Task Default_uninstall_preserves_an_existing_user_and_profile()
     {

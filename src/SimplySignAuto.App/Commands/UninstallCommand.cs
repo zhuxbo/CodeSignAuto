@@ -652,6 +652,8 @@ internal sealed class WindowsManualInstalledMediaUninstallPreflight
 
 internal static class WindowsManualUninstallOwnership
 {
+    private const string AdministratorsSid = "S-1-5-32-544";
+
     public static void Verify(ManualUninstallPlan plan) => Verify(
         plan,
         Environment.ProcessPath is null
@@ -707,17 +709,24 @@ internal static class WindowsManualUninstallOwnership
             signingUser);
         if (Directory.Exists(expectedUserData))
         {
-            var snapshot = WindowsNoFollowSecurity.ReadDirectory(expectedUserData);
-            if ((snapshot.Attributes & FileAttributes.ReparsePoint) != 0 ||
-                !string.Equals(
-                    snapshot.Security.Owner?.Value,
-                    receipt.SigningUserSid,
-                    StringComparison.Ordinal))
-            {
-                throw new InstallException("owned_resource_mismatch");
-            }
+            VerifyUserDataSnapshot(
+                WindowsNoFollowSecurity.ReadDirectory(expectedUserData),
+                receipt.SigningUserSid);
         }
         else if (WindowsPathSafety.EntryExists(expectedUserData))
+        {
+            throw new InstallException("owned_resource_mismatch");
+        }
+    }
+
+    internal static void VerifyUserDataSnapshot(
+        WindowsNoFollowSecuritySnapshot snapshot,
+        string signingUserSid)
+    {
+        var ownerSid = snapshot.Security.Owner?.Value;
+        if ((snapshot.Attributes & FileAttributes.ReparsePoint) != 0 ||
+            !string.Equals(ownerSid, signingUserSid, StringComparison.Ordinal) &&
+            !string.Equals(ownerSid, AdministratorsSid, StringComparison.Ordinal))
         {
             throw new InstallException("owned_resource_mismatch");
         }
