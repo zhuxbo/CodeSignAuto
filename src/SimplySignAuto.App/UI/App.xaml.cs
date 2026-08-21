@@ -7,6 +7,7 @@ using SimplySignAuto.App.Commands;
 using SimplySignAuto.App.Control;
 using SimplySignAuto.App.UI.ViewModels;
 using SimplySignAuto.App.UI.Views;
+using SimplySignAuto.App.UI.Localization;
 using SimplySignAuto.Agent.LocalJobs;
 using SimplySignAuto.Core.Security;
 using SimplySignAuto.Service;
@@ -688,7 +689,8 @@ public sealed class AdminDesktopApplication
             terminalJobs: null,
             clipboard: null,
             serviceConfigurationEditor: settingsEditor,
-            serviceSettingsDialogs: settingsDialogs.ServiceSettingsDialogs);
+            serviceSettingsDialogs: settingsDialogs.ServiceSettingsDialogs,
+            uiPreferenceStore: new UiPreferenceStore());
         await runtime.InitializeAsync(viewModel, cancellationToken).ConfigureAwait(false);
 
         using var activationCancellation = CancellationTokenSource.CreateLinkedTokenSource(

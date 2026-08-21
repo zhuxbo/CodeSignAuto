@@ -2,11 +2,13 @@ using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.Security.Principal;
 using SimplySignAuto.Agent;
 using SimplySignAuto.Agent.SimplySign;
 using SimplySignAuto.App.Commands;
 using SimplySignAuto.App.UI;
+using SimplySignAuto.App.UI.Localization;
 using SimplySignAuto.App.UI.Testing;
 using SimplySignAuto.Service;
 
@@ -33,6 +35,19 @@ internal static class Program
                 if (!AdminDesktopElevation.IsElevated())
                 {
                     return AdminDesktopElevation.RelaunchElevated(Console.Error);
+                }
+
+                try
+                {
+                    var culture = await new UiPreferenceStore().LoadAsync(
+                        CultureInfo.InstalledUICulture,
+                        cancellationToken).ConfigureAwait(false);
+                    UiCulture.Apply(culture);
+                }
+                catch (InvalidDataException preferenceError)
+                {
+                    Console.Error.WriteLine(preferenceError.Message);
+                    return 1;
                 }
 
                 if (ShouldDetachConsole(route))

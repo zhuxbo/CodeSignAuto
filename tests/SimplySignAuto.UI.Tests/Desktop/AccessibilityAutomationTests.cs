@@ -1,5 +1,7 @@
 #if SIMPLYSIGN_WPF
+using System.Globalization;
 using System.Windows.Automation;
+using SimplySignAuto.App.UI.Localization;
 
 namespace SimplySignAuto.UI.Tests.Desktop;
 
@@ -11,7 +13,10 @@ public sealed class AccessibilityAutomationTests
     public async Task Every_interactive_element_has_a_stable_non_secret_name()
     {
         await using var app = await DesktopTestApp.StartAsync("token-missing");
-        foreach (var page in new[] { "概览", "快速签名", "签名任务", "激活凭证", "服务设置" })
+        var settingsTitle = UiCulture.GetString(
+            "ApplicationSettingsTitle",
+            UiCulture.ResolveDefault(CultureInfo.CurrentUICulture));
+        foreach (var page in new[] { "概览", "快速签名", "签名任务", "激活凭证", "服务设置", settingsTitle })
         {
             app.SelectNavigation(page);
             var controls = app.MainWindow.FindAll(

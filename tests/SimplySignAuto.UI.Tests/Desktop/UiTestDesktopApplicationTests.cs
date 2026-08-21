@@ -18,7 +18,7 @@ public sealed class UiTestDesktopApplicationTests
         var run = application.ExecuteAsync(options, CancellationToken.None);
         var viewModel = await runtime.Initialized.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
-        Assert.Equal(5, viewModel.Pages.Count);
+        Assert.Equal(6, viewModel.Pages.Count);
         Assert.All(viewModel.Pages, page => Assert.NotNull(page.Content));
         Assert.Same(viewModel.Overview!.ManagementClient, viewModel.Activation!.ManagementClient);
         Assert.Same(viewModel.Jobs!.LocalJobClient, viewModel.QuickSign!.LocalJobsClient);

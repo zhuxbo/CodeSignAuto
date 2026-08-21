@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using SimplySignAuto.Agent.Ipc;
 using SimplySignAuto.Agent.LocalJobs;
 using SimplySignAuto.App.Commands;
+using SimplySignAuto.App.UI.Localization;
 using SimplySignAuto.App.UI.Status;
 using SimplySignAuto.App.UI.ViewModels;
 
@@ -262,7 +263,8 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
         _window = window ?? throw new ArgumentNullException(nameof(window));
         ArgumentNullException.ThrowIfNull(agentLifetime);
         _dispatcher = dispatcher ?? InlineAppUiDispatcher.Instance;
-        _pages = CreatePages(null, null, null, null, null);
+        ApplicationSettings = new ApplicationSettingsViewModel(new UiPreferenceStore());
+        _pages = CreatePages(null, null, null, null, null, ApplicationSettings);
         _currentPage = _pages[0];
     }
 
@@ -294,7 +296,8 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
             TerminalJobs = terminalJobs ?? new TerminalJobFeed(administration);
         }
         Overview.PropertyChanged += HandleOverviewPropertyChanged;
-        _pages = CreatePages(Overview, null, null, null, null);
+        ApplicationSettings = new ApplicationSettingsViewModel(new UiPreferenceStore());
+        _pages = CreatePages(Overview, null, null, null, null, ApplicationSettings);
         _currentPage = _pages[0];
     }
 
@@ -329,7 +332,8 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
         ITerminalJobFeed? terminalJobs,
         IClipboardService? clipboard = null,
         IServiceConfigurationEditor? serviceConfigurationEditor = null,
-        IServiceSettingsDialogService? serviceSettingsDialogs = null)
+        IServiceSettingsDialogService? serviceSettingsDialogs = null,
+        UiPreferenceStore? uiPreferenceStore = null)
         : this(
             management,
             localJobs,
@@ -340,7 +344,8 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
             terminalJobs,
             clipboard,
             serviceConfigurationEditor,
-            serviceSettingsDialogs)
+            serviceSettingsDialogs,
+            uiPreferenceStore)
     {
         ArgumentNullException.ThrowIfNull(configuration);
     }
@@ -373,7 +378,8 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
         ITerminalJobFeed? terminalJobs,
         IClipboardService? clipboard = null,
         IServiceConfigurationEditor? serviceConfigurationEditor = null,
-        IServiceSettingsDialogService? serviceSettingsDialogs = null)
+        IServiceSettingsDialogService? serviceSettingsDialogs = null,
+        UiPreferenceStore? uiPreferenceStore = null)
     {
         ArgumentNullException.ThrowIfNull(management);
         ArgumentNullException.ThrowIfNull(localJobs);
@@ -409,7 +415,15 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
             TerminalJobs);
 
         Overview.PropertyChanged += HandleOverviewPropertyChanged;
-        _pages = CreatePages(Overview, QuickSign, Jobs, Activation, ServiceSettings);
+        ApplicationSettings = new ApplicationSettingsViewModel(
+            uiPreferenceStore ?? new UiPreferenceStore());
+        _pages = CreatePages(
+            Overview,
+            QuickSign,
+            Jobs,
+            Activation,
+            ServiceSettings,
+            ApplicationSettings);
         _currentPage = _pages[0];
     }
 
@@ -426,6 +440,8 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
     public ActivationViewModel? Activation { get; }
 
     public ServiceSettingsViewModel? ServiceSettings { get; }
+
+    public ApplicationSettingsViewModel ApplicationSettings { get; }
 
     internal ITerminalJobFeed? TerminalJobs { get; }
 
@@ -525,13 +541,15 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
         QuickSignViewModel? quickSign,
         JobsViewModel? jobs,
         ActivationViewModel? activation,
-        ServiceSettingsViewModel? serviceSettings) =>
+        ServiceSettingsViewModel? serviceSettings,
+        ApplicationSettingsViewModel applicationSettings) =>
     [
         new("概览", "●", "概览信息将在状态检查后显示。", overview),
         new("快速签名", "✎", "请选择本机文件进行签名。", quickSign),
         new("签名任务", "≡", "任务列表将在服务连接后显示。", jobs),
         new("激活凭证", "◆", "激活凭证状态将在后续版本启用。", activation),
         new("服务设置", "⚙", "服务设置将在后续版本启用。", serviceSettings),
+        new(applicationSettings.PageTitle, "⚙", string.Empty, applicationSettings),
     ];
 
     private void OpenJobs() => _ = InvokeUiAsync(() => CurrentPage = Pages[2]);

@@ -31,6 +31,9 @@
     <DataTemplate DataType="{x:Type viewModels:ServiceSettingsViewModel}">
       <views:ServiceSettingsView />
     </DataTemplate>
+    <DataTemplate DataType="{x:Type viewModels:ApplicationSettingsViewModel}">
+      <views:ApplicationSettingsView />
+    </DataTemplate>
     <DataTemplate DataType="{x:Type ui:NavigationPage}">
       <Grid>
         <ContentPresenter Content="{Binding Content}" />

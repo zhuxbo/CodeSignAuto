@@ -12,7 +12,7 @@ public sealed class DpiLayoutTests
 {
     [WindowsDesktopFact]
     [Trait("Category", "Desktop")]
-    public async Task Four_dpi_levels_render_all_five_real_pages_inside_minimum_and_default_clients()
+    public async Task Four_dpi_levels_render_all_six_real_pages_inside_minimum_and_default_clients()
     {
         foreach (var dpi in new[] { 96, 120, 144, 192 })
         {
@@ -21,7 +21,7 @@ public sealed class DpiLayoutTests
                 foreach (var size in new[] { UiWindowGeometry.Minimum, UiWindowGeometry.Default })
                 {
                     var result = await WpfLayoutProbe.RenderAsync(dpi, size, state);
-                    Assert.Equal(5, result.Pages.Count);
+                    Assert.Equal(6, result.Pages.Count);
                     Assert.All(result.Pages, page =>
                     {
                         Assert.True(page.NavigationVisible);
@@ -68,7 +68,7 @@ namespace SimplySignAuto.UI.Tests.Desktop;
 public sealed class DpiLayoutTests
 {
     [Fact(Skip = "Requires isolated STA WPF rendering on Windows.")]
-    public void Four_dpi_levels_render_all_five_real_pages_inside_minimum_and_default_clients() { }
+    public void Four_dpi_levels_render_all_six_real_pages_inside_minimum_and_default_clients() { }
 
     [Fact(Skip = "Requires isolated STA WPF rendering on Windows.")]
     public void Activation_primary_action_is_validly_nested_and_reachable_at_all_four_dpi_levels() { }

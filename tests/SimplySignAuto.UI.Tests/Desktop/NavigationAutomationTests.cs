@@ -1,5 +1,7 @@
 #if SIMPLYSIGN_WPF
 using System.Windows.Automation;
+using System.Globalization;
+using SimplySignAuto.App.UI.Localization;
 
 namespace SimplySignAuto.UI.Tests.Desktop;
 
@@ -8,10 +10,13 @@ public sealed class NavigationAutomationTests
 {
     [WindowsDesktopFact]
     [Trait("Category", "Desktop")]
-    public async Task Five_pages_have_fixed_unique_names_and_real_selection_navigation()
+    public async Task Six_pages_have_fixed_unique_names_and_real_selection_navigation()
     {
         await using var app = await DesktopTestApp.StartAsync("ready");
-        string[] expected = ["概览", "快速签名", "签名任务", "激活凭证", "服务设置"];
+        var settingsTitle = UiCulture.GetString(
+            "ApplicationSettingsTitle",
+            UiCulture.ResolveDefault(CultureInfo.CurrentUICulture));
+        string[] expected = ["概览", "快速签名", "签名任务", "激活凭证", "服务设置", settingsTitle];
 
         Assert.Equal(expected, app.NavigationNames());
         foreach (var name in expected)
@@ -59,7 +64,7 @@ namespace SimplySignAuto.UI.Tests.Desktop;
 public sealed class NavigationAutomationTests
 {
     [Fact(Skip = "Requires real WPF UI Automation in a non-zero Windows session.")]
-    public void Five_pages_have_fixed_unique_names_and_real_selection_navigation() { }
+    public void Six_pages_have_fixed_unique_names_and_real_selection_navigation() { }
 
     [Fact(Skip = "Requires real WPF UI Automation in a non-zero Windows session.")]
     public void Overview_logout_and_close_hide_keep_fake_heartbeat_alive() { }

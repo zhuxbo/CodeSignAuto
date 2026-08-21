@@ -34,6 +34,7 @@
     <None Remove="UI/Views/ActivationImportDialog.xaml" />
     <None Remove="UI/Views/ServiceSettingsView.xaml" />
     <None Remove="UI/Views/ServiceSettingsDialog.xaml" />
+    <None Remove="UI/Views/ApplicationSettingsView.xaml" />
     <None Remove="UI/Themes/Colors.Light.xaml" />
     <None Remove="UI/Themes/Colors.Dark.xaml" />
     <None Remove="UI/Themes/Controls.xaml" />
@@ -47,6 +48,7 @@
     <Page Include="UI/Views/ActivationImportDialog.xaml" />
     <Page Include="UI/Views/ServiceSettingsView.xaml" />
     <Page Include="UI/Views/ServiceSettingsDialog.xaml" />
+    <Page Include="UI/Views/ApplicationSettingsView.xaml" />
     <Page Include="UI/Themes/Colors.Light.xaml" />
     <Page Include="UI/Themes/Colors.Dark.xaml" />
     <Page Include="UI/Themes/Controls.xaml" />

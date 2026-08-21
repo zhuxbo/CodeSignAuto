@@ -15,7 +15,9 @@ public sealed class ShellLifecycleTests
 
         Assert.Equal(
             ["概览", "快速签名", "签名任务", "激活凭证", "服务设置"],
-            viewModel.Pages.Select(page => page.Title).ToArray());
+            viewModel.Pages.Take(5).Select(page => page.Title).ToArray());
+        Assert.Equal(viewModel.ApplicationSettings.PageTitle, viewModel.Pages[5].Title);
+        Assert.Same(viewModel.ApplicationSettings, viewModel.Pages[5].Content);
         Assert.Equal("尚未检查", viewModel.OverallStatusText);
     }
 

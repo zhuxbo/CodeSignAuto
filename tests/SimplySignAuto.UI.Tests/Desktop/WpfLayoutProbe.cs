@@ -4,7 +4,9 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using System.Globalization;
 using SimplySignAuto.App.UI;
+using SimplySignAuto.App.UI.Localization;
 using SimplySignAuto.App.UI.Testing;
 using SimplySignAuto.App.UI.ViewModels;
 
@@ -42,9 +44,16 @@ internal static class WpfLayoutProbe
             ["签名任务"] = new("刷新签名任务", "签名任务状态区"),
             ["激活凭证"] = new("导入 Certum 激活内容", "激活状态区"),
             ["服务设置"] = new("修改", "服务设置状态区"),
+            [SettingsText("ApplicationSettingsTitle")] = new(
+                SettingsText("SaveButton"),
+                SettingsText("ApplicationSettingsStatusArea")),
         };
 
     private static readonly Lazy<Task<Dispatcher>> ProbeDispatcher = new(StartDispatcher);
+
+    private static string SettingsText(string key) => UiCulture.GetString(
+        key,
+        UiCulture.ResolveDefault(CultureInfo.CurrentUICulture));
 
     public static async Task<WpfLayoutResult> RenderAsync(
         int dpi,

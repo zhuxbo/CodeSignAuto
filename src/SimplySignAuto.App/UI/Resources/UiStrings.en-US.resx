@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="ApplicationSettingsTitle" xml:space="preserve"><value>Application settings</value></data>
+  <data name="ApplicationSettingsDescription" xml:space="preserve"><value>Set the interface language for this administrator account.</value></data>
+  <data name="InterfaceLanguageLabel" xml:space="preserve"><value>Interface language</value></data>
+  <data name="LanguageChinese" xml:space="preserve"><value>Simplified Chinese</value></data>
+  <data name="LanguageEnglish" xml:space="preserve"><value>English</value></data>
+  <data name="SaveButton" xml:space="preserve"><value>Save</value></data>
+  <data name="ApplicationSettingsStatusArea" xml:space="preserve"><value>Application settings status</value></data>
+  <data name="RestartRequired" xml:space="preserve"><value>Language saved. Restart SimplySignAuto to apply it.</value></data>
+</root>
