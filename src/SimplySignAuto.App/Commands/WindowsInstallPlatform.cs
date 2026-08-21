@@ -9,6 +9,52 @@ using SimplySignAuto.Service;
 
 namespace SimplySignAuto.App.Commands;
 
+public sealed class WindowsManualInstallEnvironment : IManualInstallEnvironment
+{
+    private readonly string _signingUserSid;
+    private readonly string _localApplicationDataPath;
+
+    public WindowsManualInstallEnvironment()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            throw new InstallException("windows_required");
+        }
+
+        using var identity = WindowsIdentity.GetCurrent();
+        if (identity.User is null ||
+            !new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator))
+        {
+            throw new InstallException("administrator_required");
+        }
+
+        _signingUserSid = identity.User.Value;
+        _localApplicationDataPath = Path.GetFullPath(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
+        if (string.IsNullOrWhiteSpace(_localApplicationDataPath))
+        {
+            throw new InstallException("signing_user_profile_missing");
+        }
+    }
+
+    public bool IsWindows => OperatingSystem.IsWindows();
+
+    public string ExecutablePath => InstallMediaPaths.GetTargetExecutablePath(
+        Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles));
+
+    public string ProgramDataRoot => Path.GetFullPath(
+        Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData));
+
+    public string CommonDesktopDirectory => Path.GetFullPath(
+        Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory));
+
+    public string SigningUserSid => _signingUserSid;
+
+    public string LocalApplicationDataPath => _localApplicationDataPath;
+
+    public string InstallInstanceId { get; } = Guid.NewGuid().ToString("N");
+}
+
 public sealed class WindowsInstallEnvironment : IInstallEnvironment
 {
     private readonly object _validatedOwnerSync = new();
@@ -299,6 +345,8 @@ public sealed class WindowsInstallActionExecutor : IInstallActionExecutor
             CreateInteractiveLogonTask task => await CreateTaskRegistrationAsync(task, cancellationToken).ConfigureAwait(false),
             CreateOwnedFirewallRule firewall => ApplyFirewall(firewall),
             VerifyInstallSecurity verify => await VerifyAsync(verify, cancellationToken).ConfigureAwait(false),
+            VerifyManualInstallSecurity verify => await VerifyManualAsync(verify, cancellationToken)
+                .ConfigureAwait(false),
             _ => throw new InstallException("install_action_invalid"),
         };
     }
@@ -793,6 +841,53 @@ public sealed class WindowsInstallActionExecutor : IInstallActionExecutor
                     allowConfiguredPort: true);
             }
 
+            return new AppliedInstallAction(action, Created: false, RollbackState: null);
+        }
+        catch (InstallException)
+        {
+            throw;
+        }
+        catch
+        {
+            throw new InstallException("acl_verification_failed");
+        }
+    }
+
+    private async Task<AppliedInstallAction> VerifyManualAsync(
+        VerifyManualInstallSecurity action,
+        CancellationToken cancellationToken)
+    {
+        var signingUser = new SecurityIdentifier(_signingUserSid);
+        try
+        {
+            WindowsInstallAcl.VerifyDirectory(
+                action.Paths.DataRoot,
+                InstallAclProfile.AdministratorsOnly,
+                signingUser);
+            WindowsInstallAcl.VerifyFile(
+                action.Paths.InstallationReceiptPath,
+                InstallAclProfile.AdministratorsOnly,
+                signingUser);
+            var receipt = await new WindowsInstallationReceiptStore(
+                    action.Paths.InstallationReceiptPath)
+                .LoadOptionalAsync(cancellationToken)
+                .ConfigureAwait(false);
+            if (receipt != action.Receipt)
+            {
+                throw new InstallException("installation_receipt_invalid");
+            }
+
+            WindowsProductUninstallRegistry.Verify(
+                action.Registration,
+                "owned_resource_mismatch");
+            WindowsDesktopShortcut.VerifyExact(
+                new CreateDesktopShortcut(
+                    action.Paths.DesktopShortcutPath,
+                    action.Paths.ExecutablePath,
+                    action.Registration.OwnerMarker),
+                signingUser,
+                "owned_resource_mismatch");
+            WindowsExecutableSecurity.Verify(action.Paths.ExecutablePath, _signingUserSid);
             return new AppliedInstallAction(action, Created: false, RollbackState: null);
         }
         catch (InstallException)

@@ -21,10 +21,16 @@ internal sealed record ManualRuntimePaths(
     string SpoolPath,
     string OtpPath)
 {
-    public static ManualRuntimePaths Default => ForDataRoot(Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "SimplySignAuto",
-        "manual"));
+    public static ManualRuntimePaths Default => ForLocalApplicationData(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
+
+    public static ManualRuntimePaths ForLocalApplicationData(string localApplicationData) =>
+        ForDataRoot(Path.Combine(
+            string.IsNullOrWhiteSpace(localApplicationData)
+                ? throw new ArgumentException("Local application data is required.", nameof(localApplicationData))
+                : localApplicationData,
+            "SimplySignAuto",
+            "manual"));
 
     public static ManualRuntimePaths ForDataRoot(string dataRoot)
     {

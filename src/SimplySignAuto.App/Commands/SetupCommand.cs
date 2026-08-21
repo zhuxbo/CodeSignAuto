@@ -60,6 +60,134 @@ internal interface ISetupPreflight
         CancellationToken cancellationToken);
 }
 
+internal interface IManualSetupPreflight
+{
+    SetupPreflightResult Inspect();
+}
+
+internal sealed class WindowsManualSetupPreflight : IManualSetupPreflight
+{
+    public SetupPreflightResult Inspect()
+    {
+        if (!WindowsSupportPolicy.IsCurrentWindowsSupported())
+        {
+            throw new SetupException("os_unsupported");
+        }
+
+        try
+        {
+            if (WindowsDomainRole.IsDomainController())
+            {
+                throw new SetupException("domain_controller_unsupported");
+            }
+
+            var lookup = new WindowsInstallResourceLookup();
+            var dataRoot = Path.GetFullPath(Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                "SimplySignAuto"));
+            if (lookup.ServiceExists("SimplySignAuto.Service") ||
+                lookup.TaskExists("SimplySignAuto.Agent") ||
+                WindowsPathSafety.EntryExists(dataRoot))
+            {
+                throw new SetupException("setup_resource_conflict");
+            }
+
+            return WindowsSetupPreflight.InspectSigningPrerequisites();
+        }
+        catch (SetupException)
+        {
+            throw;
+        }
+        catch (ProvisionAgentUserException error)
+        {
+            throw new SetupException(error.Code);
+        }
+        catch
+        {
+            throw new SetupException("resource_preflight_failed");
+        }
+    }
+}
+
+internal sealed class ManualSetupOrchestrator(
+    IInstallMediaStager mediaStager,
+    IManualSetupPreflight preflight,
+    ISetupResourceReservation resourceReservation,
+    IManualInstallEnvironment installEnvironment,
+    IInstallActionExecutor installExecutor)
+{
+    public async Task ExecuteAsync(TextWriter output, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(output);
+        var mediaPlan = await mediaStager.PlanAsync(cancellationToken).ConfigureAwait(false);
+        string? reservedDataRoot = null;
+        try
+        {
+            var inspection = preflight.Inspect();
+            await mediaStager.StageAsync(mediaPlan, cancellationToken).ConfigureAwait(false);
+            reservedDataRoot = resourceReservation.Reserve();
+            var installPlan = new ManualInstallPlanner(installEnvironment).Plan();
+            if (!string.Equals(
+                    Path.GetFullPath(reservedDataRoot),
+                    installPlan.Paths.DataRoot,
+                    OperatingSystem.IsWindows()
+                        ? StringComparison.OrdinalIgnoreCase
+                        : StringComparison.Ordinal))
+            {
+                throw new SetupException("setup_state_uncertain");
+            }
+
+            await mediaStager.AuthorizeAsync(
+                    mediaPlan,
+                    installEnvironment.SigningUserSid,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            await new ManualInstallOrchestrator(installExecutor)
+                .ExecuteAsync(installPlan, cancellationToken)
+                .ConfigureAwait(false);
+            if (inspection.SignToolPath is null)
+            {
+                await output.WriteLineAsync("authenticode_disabled_signtool_missing")
+                    .ConfigureAwait(false);
+            }
+
+            await output.WriteLineAsync("manual_install_complete").ConfigureAwait(false);
+        }
+        catch (Exception original)
+        {
+            var uncertain = false;
+            if (reservedDataRoot is not null)
+            {
+                try
+                {
+                    await resourceReservation.RollbackAsync(reservedDataRoot).ConfigureAwait(false);
+                }
+                catch
+                {
+                    uncertain = true;
+                }
+            }
+
+            try
+            {
+                await mediaStager.RollbackAsync(mediaPlan).ConfigureAwait(false);
+            }
+            catch
+            {
+                uncertain = true;
+            }
+
+            if (uncertain)
+            {
+                throw new SetupException("setup_state_uncertain");
+            }
+
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(original).Throw();
+            throw;
+        }
+    }
+}
+
 internal interface ISetupProvisioner
 {
     Task<ProvisionedAgentUser> ProvisionAsync(
@@ -599,10 +727,24 @@ internal sealed class ExistingInstallSetupInstaller(
 
 public static class SetupCommand
 {
-    public static bool TryParse(string[] args)
+    public static bool TryParse(string[] args) => TryParse(args, out _);
+
+    public static bool TryParse(string[] args, out InstallationMode mode)
     {
         ArgumentNullException.ThrowIfNull(args);
-        return args.Length == 0;
+        mode = default;
+        if (args is not ["--mode", var value])
+        {
+            return false;
+        }
+
+        mode = value switch
+        {
+            "manual" => InstallationMode.Manual,
+            "service" => InstallationMode.Service,
+            _ => default,
+        };
+        return value is "manual" or "service";
     }
 
     public static async Task<int> ExecuteAsync(
@@ -611,7 +753,7 @@ public static class SetupCommand
         TextWriter error,
         CancellationToken cancellationToken = default)
     {
-        if (!TryParse(args))
+        if (!TryParse(args, out var mode))
         {
             await error.WriteLineAsync("setup_arguments_invalid").ConfigureAwait(false);
             return 2;
@@ -632,6 +774,20 @@ public static class SetupCommand
             {
                 await new UpgradeOrchestrator()
                     .ExecuteAsync(upgrade, output, cancellationToken)
+                    .ConfigureAwait(false);
+                return 0;
+            }
+
+            if (mode == InstallationMode.Manual)
+            {
+                var environment = new WindowsManualInstallEnvironment();
+                await new ManualSetupOrchestrator(
+                        new WindowsInstallMediaStager(),
+                        new WindowsManualSetupPreflight(),
+                        new WindowsSetupResourceReservation(),
+                        environment,
+                        new WindowsInstallActionExecutor(environment.SigningUserSid))
+                    .ExecuteAsync(output, cancellationToken)
                     .ConfigureAwait(false);
                 return 0;
             }

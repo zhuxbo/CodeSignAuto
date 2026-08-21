@@ -21,12 +21,101 @@ public sealed class InstallCommandTests
         "SimplySignAuto/v1/0123456789abcdef0123456789abcdef";
 
     [Fact]
-    public void Setup_route_accepts_only_the_parameterless_command()
+    public void Setup_route_accepts_only_one_exact_mode()
     {
-        Assert.Equal(ApplicationEntryKind.Setup, ApplicationEntryRoute.Parse(["setup"]).Kind);
-        Assert.True(SetupCommand.TryParse([]));
+        Assert.Equal(
+            ApplicationEntryKind.Setup,
+            ApplicationEntryRoute.Parse(["setup", "--mode", "manual"]).Kind);
+        Assert.True(SetupCommand.TryParse(["--mode", "manual"], out var manual));
+        Assert.Equal(InstallationMode.Manual, manual);
+        Assert.True(SetupCommand.TryParse(["--mode", "service"], out var service));
+        Assert.Equal(InstallationMode.Service, service);
+        Assert.False(SetupCommand.TryParse([], out _));
+        Assert.False(SetupCommand.TryParse(["--mode", "Manual"], out _));
+        Assert.False(SetupCommand.TryParse(["--mode", "service", "extra"], out _));
         Assert.False(SetupCommand.TryParse(["--user", "other"]));
-        Assert.Equal(ApplicationEntryKind.Invalid, ApplicationEntryRoute.Parse(["setup", "--user", "other"]).Kind);
+        Assert.Equal(
+            ApplicationEntryKind.Invalid,
+            ApplicationEntryRoute.Parse(["setup", "--user", "other"]).Kind);
+    }
+
+    [Fact]
+    public async Task Manual_install_plan_contains_only_receipt_registration_shortcut_and_verification()
+    {
+        using var fixture = new InstallFixture();
+        var environment = new RecordingManualInstallEnvironment(fixture);
+
+        var plan = new ManualInstallPlanner(environment).Plan();
+
+        Assert.Equal(InstallationMode.Manual, plan.Receipt.Mode);
+        Assert.Equal(
+            Path.Combine(fixture.LocalApplicationData, "SimplySignAuto", "manual"),
+            plan.Receipt.UserDataRoot);
+        Assert.Collection(
+            plan.Actions,
+            action => Assert.Equal(
+                InstallContent.InstallationReceipt,
+                Assert.IsType<WriteProtectedFile>(action).Content),
+            action => Assert.IsType<RegisterProductUninstall>(action),
+            action => Assert.IsType<CreateDesktopShortcut>(action),
+            action => Assert.IsType<VerifyManualInstallSecurity>(action));
+        Assert.DoesNotContain(plan.Actions, action => action is CreateWindowsService);
+        Assert.DoesNotContain(plan.Actions, action => action is CreateInteractiveLogonTask);
+        Assert.DoesNotContain(plan.Actions, action => action is CreateOwnedFirewallRule);
+        Assert.DoesNotContain(plan.Actions, action => action is StartAndVerifyWindowsService);
+        Assert.DoesNotContain(plan.Actions, action => action is StartInteractiveAgentTask);
+        Assert.DoesNotContain(plan.Actions, action =>
+            action is WriteProtectedFile file &&
+            file.Content is InstallContent.ServiceConfiguration or
+                InstallContent.AgentConfiguration or InstallContent.InstallToken or InstallContent.Empty);
+    }
+
+    [Fact]
+    public async Task Manual_install_failure_rolls_back_only_applied_machine_resources_in_reverse_order()
+    {
+        using var fixture = new InstallFixture();
+        var plan = new ManualInstallPlanner(new RecordingManualInstallEnvironment(fixture)).Plan();
+        var executor = new RecordingInstallActionExecutor { FailManualVerification = true };
+
+        var failure = await Assert.ThrowsAsync<InstallException>(() =>
+            new ManualInstallOrchestrator(executor)
+                .ExecuteAsync(plan, CancellationToken.None));
+
+        Assert.Equal("acl_verification_failed", failure.Code);
+        Assert.Equal(
+            executor.Applied.Take(executor.Applied.Count - 1).Reverse(),
+            executor.RolledBack);
+    }
+
+    [Fact]
+    public async Task Manual_setup_stages_for_the_current_admin_without_user_autologon_or_service_mutation()
+    {
+        using var fixture = new InstallFixture();
+        var events = new List<string>();
+        var media = new RecordingInstallMediaStager(events);
+        var executor = new RecordingInstallActionExecutor();
+        using var output = new StringWriter();
+
+        await new ManualSetupOrchestrator(
+                media,
+                new RecordingManualSetupPreflight(events),
+                new RecordingManualResourceReservation(events, fixture.DataRoot),
+                new RecordingManualInstallEnvironment(fixture),
+                executor)
+            .ExecuteAsync(output, CancellationToken.None);
+
+        Assert.Equal(
+            [
+                "media-plan", "manual-preflight", "media-stage", "reserve-manual",
+                $"media-authorize:{InstallFixture.SigningSid}",
+            ],
+            events);
+        Assert.Equal(InstallFixture.SigningSid, media.AuthorizedSid);
+        Assert.DoesNotContain(executor.Applied, action => action is CreateWindowsService);
+        Assert.DoesNotContain(executor.Applied, action => action is CreateInteractiveLogonTask);
+        Assert.DoesNotContain(executor.Applied, action => action is CreateOwnedFirewallRule);
+        Assert.Contains("manual_install_complete", output.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("restart_required", output.ToString(), StringComparison.Ordinal);
     }
 
     [Theory]
@@ -2387,6 +2476,35 @@ public sealed class InstallCommandTests
         }
     }
 
+    private sealed class RecordingManualSetupPreflight(List<string> events) : IManualSetupPreflight
+    {
+        public SetupPreflightResult Inspect()
+        {
+            events.Add("manual-preflight");
+            return new SetupPreflightResult(
+                @"C:\Program Files\Certum\SimplySign Desktop\SimplySignDesktop.exe",
+                @"C:\Windows\System32\SimplySignPKCS.dll",
+                SignToolPath: null);
+        }
+    }
+
+    private sealed class RecordingManualResourceReservation(
+        List<string> events,
+        string dataRoot) : ISetupResourceReservation
+    {
+        public string Reserve()
+        {
+            events.Add("reserve-manual");
+            return dataRoot;
+        }
+
+        public Task RollbackAsync(string reservedDataRoot)
+        {
+            events.Add("rollback-reserve-manual");
+            return Task.CompletedTask;
+        }
+    }
+
     private sealed class RecordingInstallMediaStager(List<string> events) : IInstallMediaStager
     {
         private bool _stageAttempted;
@@ -2746,6 +2864,7 @@ public sealed class InstallCommandTests
         public bool FailRollbackOwnership { get; init; }
         public bool FailFirstRollbackWithIoException { get; init; }
         public bool FailReceiptWrite { get; init; }
+        public bool FailManualVerification { get; init; }
 
         public Task<AppliedInstallAction> ApplyAsync(
             InstallAction action,
@@ -2764,6 +2883,11 @@ public sealed class InstallCommandTests
             }
 
             if (FailVerification && action is VerifyInstallSecurity)
+            {
+                throw new InstallException("acl_verification_failed");
+            }
+
+            if (FailManualVerification && action is VerifyManualInstallSecurity)
             {
                 throw new InstallException("acl_verification_failed");
             }
@@ -3283,6 +3407,18 @@ public sealed class InstallCommandTests
         public Task<string?> GetProvisionedInstallInstanceIdAsync(
             ResolvedSigningAccount account,
             CancellationToken cancellationToken) => Task.FromResult(ProvisionedInstanceId);
+    }
+
+    private sealed class RecordingManualInstallEnvironment(InstallFixture fixture)
+        : IManualInstallEnvironment
+    {
+        public bool IsWindows => true;
+        public string ExecutablePath => fixture.ExecutablePath;
+        public string ProgramDataRoot => fixture.ProgramDataRoot;
+        public string CommonDesktopDirectory => fixture.CommonDesktopDirectory;
+        public string SigningUserSid => InstallFixture.SigningSid;
+        public string LocalApplicationDataPath => fixture.LocalApplicationData;
+        public string InstallInstanceId => "0123456789abcdef0123456789abcdef";
     }
 
     public enum AutoLogonContractFailure

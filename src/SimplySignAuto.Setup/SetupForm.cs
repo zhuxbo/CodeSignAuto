@@ -10,6 +10,10 @@ internal sealed class SetupForm : Form
     private readonly Label _description;
     private readonly Label _languageLabel;
     private readonly ComboBox _language;
+    private readonly Label _modeLabel;
+    private readonly ComboBox _mode;
+    private readonly Label _modeDescription;
+    private readonly Label _modeWarning;
     private readonly Label _status;
     private readonly ProgressBar _progress;
     private readonly Button _install;
@@ -18,22 +22,29 @@ internal sealed class SetupForm : Form
     private string _statusResourceKey = "StatusReady";
     private object?[] _statusArguments = [];
     private bool _updatingLanguage;
+    private bool _updatingMode;
     private bool _running;
     private bool _finished;
 
     public SetupForm(
         SetupBootstrapper bootstrapper,
         SetupProductKind productKind,
-        CultureInfo initialCulture)
+        CultureInfo initialCulture,
+        SetupInstallationSelection? installationSelection)
     {
         _bootstrapper = bootstrapper ?? throw new ArgumentNullException(nameof(bootstrapper));
         _productKind = productKind;
+        if (productKind == SetupProductKind.Main != (installationSelection is not null))
+        {
+            throw new ArgumentException("The installation selection must match the product kind.", nameof(installationSelection));
+        }
+
         _culture = SetupCulture.ResolveSelection(initialCulture?.Name ?? string.Empty);
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
-        ClientSize = new Size(620, 230);
+        ClientSize = new Size(620, productKind == SetupProductKind.Main ? 350 : 230);
         AutoScaleMode = AutoScaleMode.Dpi;
 
         _title = new Label
@@ -66,24 +77,59 @@ internal sealed class SetupForm : Form
             Location = new Point(28, 62),
             Size = new Size(564, 38),
         };
+        _modeLabel = new Label
+        {
+            Name = "SetupModeLabel",
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleRight,
+            Location = new Point(28, 108),
+            Size = new Size(100, 28),
+            Visible = productKind == SetupProductKind.Main,
+        };
+        _mode = new ComboBox
+        {
+            Name = "SetupMode",
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            Location = new Point(134, 109),
+            Size = new Size(180, 28),
+            Enabled = installationSelection?.CanChange == true,
+            Visible = productKind == SetupProductKind.Main,
+        };
+        _modeDescription = new Label
+        {
+            Name = "SetupModeDescription",
+            AutoSize = false,
+            Location = new Point(28, 146),
+            Size = new Size(564, 40),
+            Visible = productKind == SetupProductKind.Main,
+        };
+        _modeWarning = new Label
+        {
+            Name = "SetupModeWarning",
+            AutoSize = false,
+            ForeColor = SystemColors.GrayText,
+            Location = new Point(28, 190),
+            Size = new Size(564, 30),
+            Visible = productKind == SetupProductKind.Main,
+        };
         _status = new Label
         {
             Name = "SetupStatus",
             AutoSize = false,
-            Location = new Point(28, 109),
+            Location = new Point(28, productKind == SetupProductKind.Main ? 229 : 109),
             Size = new Size(564, 24),
         };
         _progress = new ProgressBar
         {
             Name = "SetupProgress",
-            Location = new Point(28, 136),
+            Location = new Point(28, productKind == SetupProductKind.Main ? 256 : 136),
             Size = new Size(564, 18),
             Style = ProgressBarStyle.Blocks,
         };
         _install = new Button
         {
             Name = "SetupInstall",
-            Location = new Point(426, 178),
+            Location = new Point(426, productKind == SetupProductKind.Main ? 298 : 178),
             Size = new Size(80, 30),
         };
         _install.Click += InstallClicked;
@@ -91,17 +137,26 @@ internal sealed class SetupForm : Form
         {
             Name = "SetupClose",
             DialogResult = DialogResult.Cancel,
-            Location = new Point(512, 178),
+            Location = new Point(512, productKind == SetupProductKind.Main ? 298 : 178),
             Size = new Size(80, 30),
         };
         _close.Click += (_, _) => Close();
         _language.SelectedIndexChanged += LanguageChanged;
+        _mode.SelectedIndexChanged += ModeChanged;
         Controls.AddRange(
-            [_title, _languageLabel, _language, _description, _status, _progress, _install, _close]);
+            [
+                _title, _languageLabel, _language, _description, _modeLabel, _mode,
+                _modeDescription, _modeWarning, _status, _progress, _install, _close,
+            ]);
         CancelButton = _close;
         AcceptButton = _install;
         FormClosing += HandleFormClosing;
         ApplyCulture();
+        if (installationSelection is not null)
+        {
+            _mode.SelectedIndex = installationSelection.Mode == SetupInstallationMode.Manual ? 0 : 1;
+            ApplyModeText();
+        }
     }
 
     public int ExitCode { get; private set; } = 2;
@@ -133,7 +188,15 @@ internal sealed class SetupForm : Form
                 _progress.Value = value.Percent;
                 SetStatus(value.Message);
             });
-            ExitCode = await _bootstrapper.RunAsync(progress, CancellationToken.None);
+            SetupInstallationMode? mode = _productKind == SetupProductKind.Main
+                ? _mode.SelectedIndex switch
+                {
+                    0 => SetupInstallationMode.Manual,
+                    1 => SetupInstallationMode.Service,
+                    _ => throw new SetupBootstrapperException("setup_mode_invalid"),
+                }
+                : null;
+            ExitCode = await _bootstrapper.RunAsync(mode, progress, CancellationToken.None);
             if (ExitCode == 0)
             {
                 SetStatus("StatusInstallComplete");
@@ -177,6 +240,16 @@ internal sealed class SetupForm : Form
         }
     }
 
+    private void ModeChanged(object? sender, EventArgs eventArgs)
+    {
+        if (_updatingMode || _mode.SelectedIndex is < 0 or > 1)
+        {
+            return;
+        }
+
+        ApplyModeText();
+    }
+
     private void LanguageChanged(object? sender, EventArgs eventArgs)
     {
         if (_updatingLanguage || _language.SelectedIndex is < 0 or > 1)
@@ -198,6 +271,8 @@ internal sealed class SetupForm : Form
             isPdfExtension ? "PdfDescription" : "MainDescription",
             _culture);
         _languageLabel.Text = SetupCulture.GetString("LanguageLabel", _culture);
+        _modeLabel.Text = SetupCulture.GetString("ModeLabel", _culture);
+        _modeWarning.Text = SetupCulture.GetString("ModeSwitchRequiresReinstall", _culture);
         _status.Text = SetupCulture.Format(_statusResourceKey, _culture, _statusArguments);
         _install.Text = SetupCulture.GetString(_finished ? "CloseButton" : "InstallButton", _culture);
         _close.Text = SetupCulture.GetString("CancelButton", _culture);
@@ -214,6 +289,32 @@ internal sealed class SetupForm : Form
         {
             _updatingLanguage = false;
         }
+
+        if (!isPdfExtension)
+        {
+            var selected = _mode.SelectedIndex is 0 or 1 ? _mode.SelectedIndex : 0;
+            _updatingMode = true;
+            try
+            {
+                _mode.Items.Clear();
+                _mode.Items.Add(SetupCulture.GetString("ModeManualName", _culture));
+                _mode.Items.Add(SetupCulture.GetString("ModeServiceName", _culture));
+                _mode.SelectedIndex = selected;
+            }
+            finally
+            {
+                _updatingMode = false;
+            }
+
+            ApplyModeText();
+        }
+    }
+
+    private void ApplyModeText()
+    {
+        _modeDescription.Text = SetupCulture.GetString(
+            _mode.SelectedIndex == 0 ? "ModeManualDescription" : "ModeServiceDescription",
+            _culture);
     }
 
     private void SetStatus(string resourceKey, params object?[] arguments)

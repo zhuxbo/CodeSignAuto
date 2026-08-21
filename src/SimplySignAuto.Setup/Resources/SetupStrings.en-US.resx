@@ -8,11 +8,17 @@
   <data name="WindowPdfTitle" xml:space="preserve"><value>SimplySignAuto PDF Extension Setup</value></data>
   <data name="MainTitle" xml:space="preserve"><value>Install SimplySignAuto</value></data>
   <data name="PdfTitle" xml:space="preserve"><value>Install SimplySignAuto PDF Extension</value></data>
-  <data name="MainDescription" xml:space="preserve"><value>Setup will verify the installation media and initialize the code-signing service.</value></data>
+  <data name="MainDescription" xml:space="preserve"><value>Setup will verify the installation media and initialize the selected code-signing mode.</value></data>
   <data name="PdfDescription" xml:space="preserve"><value>Setup will verify the offline extension media and install PDF-signing support.</value></data>
   <data name="LanguageLabel" xml:space="preserve"><value>Language</value></data>
   <data name="LanguageChinese" xml:space="preserve"><value>中文</value></data>
   <data name="LanguageEnglish" xml:space="preserve"><value>English</value></data>
+  <data name="ModeLabel" xml:space="preserve"><value>Install mode</value></data>
+  <data name="ModeManualName" xml:space="preserve"><value>Manual signing</value></data>
+  <data name="ModeServiceName" xml:space="preserve"><value>Automatic signing service</value></data>
+  <data name="ModeManualDescription" xml:space="preserve"><value>For a Windows 10/11 administrator who opens the app and submits signatures manually; no service, dedicated user, or AutoLogon is created.</value></data>
+  <data name="ModeServiceDescription" xml:space="preserve"><value>For unattended server signing; creates the signing service, a dedicated signing user, and controlled AutoLogon.</value></data>
+  <data name="ModeSwitchRequiresReinstall" xml:space="preserve"><value>The mode is fixed after installation. To switch modes, uninstall and reinstall the product.</value></data>
   <data name="InstallButton" xml:space="preserve"><value>Install</value></data>
   <data name="CancelButton" xml:space="preserve"><value>Cancel</value></data>
   <data name="CloseButton" xml:space="preserve"><value>Close</value></data>

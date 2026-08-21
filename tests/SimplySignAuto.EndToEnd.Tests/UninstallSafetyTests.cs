@@ -378,6 +378,47 @@ public sealed class UninstallSafetyTests
     }
 
     [Fact]
+    public async Task Manual_default_uninstall_removes_only_owned_machine_resources_and_preserves_user_data()
+    {
+        var receipt = ManualReceipt();
+        var plan = await new ManualUninstallPlanner(new RecordingManualUninstallEnvironment(receipt))
+            .PlanAsync(new UninstallOptions(PurgeData: false, Confirmation: null), CancellationToken.None);
+
+        Assert.Equal(UninstallSigningUserOwnership.ExistingUser, plan.Identity.Ownership);
+        Assert.Collection(
+            plan.Actions,
+            action =>
+            {
+                var purge = Assert.IsType<PurgeControlledData>(action);
+                Assert.False(purge.IncludeAgentDirectory);
+                Assert.Equal(receipt.UserDataRoot, purge.AgentDirectory);
+            },
+            action => Assert.IsType<RemoveOwnedDesktopShortcut>(action),
+            action => Assert.IsType<RemoveOwnedProductUninstall>(action));
+        Assert.DoesNotContain(plan.Actions, action => action is RemoveOwnedWindowsService);
+        Assert.DoesNotContain(plan.Actions, action => action is RemoveOwnedInteractiveLogonTask);
+        Assert.DoesNotContain(plan.Actions, action => action is RemoveOwnedAutoLogon);
+        Assert.DoesNotContain(plan.Actions, action => action is RemoveOwnedAccountRights);
+        Assert.DoesNotContain(plan.Actions, action => action is DeleteOwnedLocalUser);
+        Assert.DoesNotContain(plan.Actions, action => action is DeleteOwnedWindowsProfile);
+    }
+
+    [Fact]
+    public async Task Manual_user_data_is_purged_only_with_the_existing_exact_confirmation()
+    {
+        var receipt = ManualReceipt();
+        var planner = new ManualUninstallPlanner(new RecordingManualUninstallEnvironment(receipt));
+
+        var plan = await planner.PlanAsync(
+            new UninstallOptions(PurgeData: true, Confirmation: "PURGE"),
+            CancellationToken.None);
+
+        var purge = Assert.Single(plan.Actions.OfType<PurgeControlledData>());
+        Assert.True(purge.IncludeAgentDirectory);
+        Assert.Equal(receipt.UserDataRoot, purge.AgentDirectory);
+    }
+
+    [Fact]
     public async Task Default_uninstall_preserves_an_existing_user_and_profile()
     {
         var configuration = Configuration();
@@ -1879,6 +1920,54 @@ public sealed class UninstallSafetyTests
     }
 
     [Fact]
+    public void Manual_resume_accepts_only_program_data_and_the_exact_manual_user_data_root()
+    {
+        var fixture = ResumeManifestFixture();
+        var manualRoot = Path.Combine(
+            fixture.DisabledAutoLogon.ProfilePath,
+            "AppData",
+            "Local",
+            "SimplySignAuto",
+            "manual");
+        var manualTarget = new PurgeQuarantineTarget(
+            manualRoot,
+            Path.Combine(fixture.Manifest.StagingRoots[0], "agent-data"));
+        var manifest = fixture.Manifest with
+        {
+            Targets = [.. fixture.Manifest.Targets, manualTarget],
+        };
+
+        var plan = PurgeResumeManifestValidator.ValidateManual(
+            fixture.OperationRoot,
+            fixture.ProgramDataRoot,
+            fixture.ExecutablePath,
+            fixture.ExecutableSha256,
+            fixture.DisabledAutoLogon.ProfilePath,
+            manifest);
+
+        Assert.Contains(
+            plan.Groups.SelectMany(group => group.Targets),
+            target => string.Equals(target.SourcePath, manualRoot, StringComparison.Ordinal));
+        var serviceRoot = Path.GetDirectoryName(manualRoot)!;
+        var failure = Assert.Throws<InstallException>(() =>
+            PurgeResumeManifestValidator.ValidateManual(
+                fixture.OperationRoot,
+                fixture.ProgramDataRoot,
+                fixture.ExecutablePath,
+                fixture.ExecutableSha256,
+                fixture.DisabledAutoLogon.ProfilePath,
+                manifest with
+                {
+                    Targets =
+                    [
+                        fixture.Manifest.Targets[0],
+                        manualTarget with { SourcePath = serviceRoot },
+                    ],
+                }));
+        Assert.Equal("uninstall_state_uncertain", failure.Code);
+    }
+
+    [Fact]
     public async Task Existing_user_resume_only_moves_recorded_product_data_and_never_requests_user_or_profile_deletion()
     {
         var plan = ResumePlan();
@@ -2784,6 +2873,40 @@ public sealed class UninstallSafetyTests
             "0123456789abcdef0123456789abcdef",
             Path.Combine(root, "SimplySignAuto.exe"),
             Path.Combine(root, "user", "AppData", "Local", "SimplySignAuto", "agent.json"));
+    }
+
+    private static InstallationReceipt ManualReceipt()
+    {
+        var root = Path.GetFullPath(Path.Combine(
+            Path.GetTempPath(),
+            "SimplySignAuto.Tests",
+            "manual-owned"));
+        return new InstallationReceipt(
+            InstallationReceipt.CurrentSchemaVersion,
+            InstallationMode.Manual,
+            "0123456789abcdef0123456789abcdef",
+            "S-1-5-21-1000-2000-3000-4000",
+            Path.Combine(root, "Program Files", "SimplySignAuto", "SimplySignAuto.exe"),
+            Path.Combine(root, "Users", "admin", "AppData", "Local", "SimplySignAuto", "manual"));
+    }
+
+    private sealed class RecordingManualUninstallEnvironment(InstallationReceipt receipt)
+        : IManualUninstallEnvironment
+    {
+        public bool IsWindows => true;
+
+        public string CommonDesktopDirectory => Path.Combine(
+            Path.GetTempPath(),
+            "SimplySignAuto.Tests",
+            "PublicDesktop");
+
+        public string ProgramDataRoot => Path.GetFullPath(Path.Combine(
+            Path.GetTempPath(),
+            "SimplySignAuto.Tests",
+            "ProgramData"));
+
+        public Task<InstallationReceipt> LoadReceiptAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(receipt);
     }
 
     private sealed class RecordingUninstallEnvironment(

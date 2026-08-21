@@ -34,6 +34,18 @@ public sealed record InstallationReceipt(
             configuration.ExecutablePath,
             UserDataRoot: null);
     }
+
+    public static InstallationReceipt ForManual(
+        string installInstanceId,
+        string signingUserSid,
+        string executablePath,
+        string userDataRoot) => InstallationReceiptValidator.Validate(new InstallationReceipt(
+            CurrentSchemaVersion,
+            InstallationMode.Manual,
+            installInstanceId,
+            signingUserSid,
+            Path.GetFullPath(executablePath),
+            Path.GetFullPath(userDataRoot)));
 }
 
 public static class InstallationReceiptValidator

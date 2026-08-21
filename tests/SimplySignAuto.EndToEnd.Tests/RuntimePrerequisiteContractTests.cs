@@ -160,6 +160,20 @@ public sealed class RuntimePrerequisiteContractTests
     }
 
     [Fact]
+    public void Install_mode_is_forwarded_through_elevation_and_the_exact_internal_setup_route()
+    {
+        var script = File.ReadAllText(ScriptPath());
+
+        Assert.Contains("[ValidateSet('manual', 'service')]", script, StringComparison.Ordinal);
+        Assert.Contains("'-InstallMode', $Mode", script, StringComparison.Ordinal);
+        Assert.Contains("-Mode $InstallMode", script, StringComparison.Ordinal);
+        Assert.Contains(
+            "& $applicationPath setup --mode $InstallMode",
+            script,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Contract_fixture_loads_overrides_only_in_its_temporary_script_copy()
     {
         RequireWindows();

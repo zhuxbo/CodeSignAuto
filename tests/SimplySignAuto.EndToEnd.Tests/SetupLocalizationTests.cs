@@ -34,6 +34,62 @@ public sealed class SetupLocalizationTests
         Assert.Throws<ArgumentException>(() => SetupCulture.ResolveSelection("fr-FR"));
     }
 
+    [Theory]
+    [InlineData(1, "Manual")]
+    [InlineData(2, "Service")]
+    [InlineData(3, "Service")]
+    public void Fresh_client_defaults_to_manual_and_server_defaults_to_service(
+        byte productType,
+        string expected)
+    {
+        Assert.Equal(expected, SetupModeSelection.ResolveDefault(productType).ToString());
+    }
+
+    [Fact]
+    public void Existing_receipt_or_legacy_service_locks_the_setup_mode()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"ssa-setup-mode-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        try
+        {
+            var fresh = SetupInstallationDiscovery.Resolve(
+                SetupProductKind.Main,
+                root,
+                () => 1);
+            Assert.Equal(SetupInstallationMode.Manual, fresh!.Mode);
+            Assert.True(fresh.CanChange);
+
+            File.WriteAllText(Path.Combine(root, "install.json"), """
+                {
+                  "schemaVersion": 1,
+                  "mode": "service",
+                  "installInstanceId": "0123456789abcdef0123456789abcdef",
+                  "signingUserSid": "S-1-5-21-1000-2000-3000-4000",
+                  "executablePath": "C:\\Program Files\\SimplySignAuto\\SimplySignAuto.exe"
+                }
+                """);
+            var installed = SetupInstallationDiscovery.Resolve(
+                SetupProductKind.Main,
+                root,
+                () => throw new InvalidOperationException("installed mode must win"));
+            Assert.Equal(SetupInstallationMode.Service, installed!.Mode);
+            Assert.False(installed.CanChange);
+
+            File.Delete(Path.Combine(root, "install.json"));
+            File.WriteAllText(Path.Combine(root, "service.json"), "legacy");
+            var legacy = SetupInstallationDiscovery.Resolve(
+                SetupProductKind.Main,
+                root,
+                () => throw new InvalidOperationException("legacy service mode must win"));
+            Assert.Equal(SetupInstallationMode.Service, legacy!.Mode);
+            Assert.False(legacy.CanChange);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     [Fact]
     public void Chinese_and_english_setup_resources_have_identical_nonempty_keys()
     {
@@ -113,23 +169,44 @@ public sealed class SetupLocalizationTests
             using var form = new SetupForm(
                 new SetupBootstrapper(operations),
                 SetupProductKind.Main,
-                SetupCulture.ResolveSelection("zh-CN"));
+                SetupCulture.ResolveSelection("zh-CN"),
+                new SetupInstallationSelection(SetupInstallationMode.Manual, CanChange: true));
             var language = Find<ComboBox>(form, "SetupLanguage");
+            var mode = Find<ComboBox>(form, "SetupMode");
 
             Assert.Equal("SimplySignAuto 安装", form.Text);
             Assert.Equal("准备安装", Find<Label>(form, "SetupStatus").Text);
+            Assert.Contains("手工", mode.Text, StringComparison.Ordinal);
+            Assert.Contains("当前管理员", Find<Label>(form, "SetupModeDescription").Text, StringComparison.Ordinal);
+            Assert.Contains("卸载重装", Find<Label>(form, "SetupModeWarning").Text, StringComparison.Ordinal);
+
+            mode.SelectedIndex = 1;
+
+            Assert.Contains("服务", mode.Text, StringComparison.Ordinal);
+            Assert.Contains("无人值守", Find<Label>(form, "SetupModeDescription").Text, StringComparison.Ordinal);
 
             language.SelectedIndex = 1;
 
             Assert.Equal("SimplySignAuto Setup", form.Text);
             Assert.Equal("Ready to install", Find<Label>(form, "SetupStatus").Text);
             Assert.Equal("Install", Find<Button>(form, "SetupInstall").Text);
+            Assert.Equal("Automatic signing service", mode.Text);
+            Assert.Contains("unattended", Find<Label>(form, "SetupModeDescription").Text, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("uninstall", Find<Label>(form, "SetupModeWarning").Text, StringComparison.OrdinalIgnoreCase);
 
             language.SelectedIndex = 0;
 
             Assert.Equal("SimplySignAuto 安装", form.Text);
             Assert.Equal("准备安装", Find<Label>(form, "SetupStatus").Text);
             Assert.Equal(0, operations.StageCalls);
+
+            using var locked = new SetupForm(
+                new SetupBootstrapper(operations),
+                SetupProductKind.Main,
+                SetupCulture.ResolveSelection("zh-CN"),
+                new SetupInstallationSelection(SetupInstallationMode.Service, CanChange: false));
+            Assert.False(Find<ComboBox>(locked, "SetupMode").Enabled);
+            Assert.Contains("服务", Find<ComboBox>(locked, "SetupMode").Text, StringComparison.Ordinal);
         });
     }
 
@@ -183,6 +260,7 @@ public sealed class SetupLocalizationTests
 
         public Task<int> InstallAsync(
             StagedSetupPayload staged,
+            SetupInstallationMode? mode,
             IProgress<SetupProgress>? progress,
             CancellationToken cancellationToken) => throw new NotSupportedException();
 

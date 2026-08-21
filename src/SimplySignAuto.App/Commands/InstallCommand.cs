@@ -1,6 +1,8 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using SimplySignAuto.App.Manual;
+using SimplySignAuto.Core.Security;
 using SimplySignAuto.Service;
 
 namespace SimplySignAuto.App.Commands;
@@ -137,6 +139,17 @@ public sealed record VerifyInstallSecurity(
     int FirewallPort,
     string OwnerMarker) : InstallAction;
 
+public sealed record ManualInstallPaths(
+    string DataRoot,
+    string InstallationReceiptPath,
+    string DesktopShortcutPath,
+    string ExecutablePath);
+
+public sealed record VerifyManualInstallSecurity(
+    ManualInstallPaths Paths,
+    InstallationReceipt Receipt,
+    ProductUninstallRegistration Registration) : InstallAction;
+
 public sealed record StartAndVerifyWindowsService(
     string Name,
     string OwnerMarker) : InstallAction;
@@ -158,6 +171,105 @@ public sealed record InstallPlan(
     InstallPaths Paths,
     string InstallInstanceId,
     IReadOnlyList<InstallAction> Actions);
+
+public sealed record ManualInstallPlan(
+    InstallationReceipt Receipt,
+    ManualInstallPaths Paths,
+    IReadOnlyList<InstallAction> Actions);
+
+public interface IManualInstallEnvironment
+{
+    bool IsWindows { get; }
+
+    string ExecutablePath { get; }
+
+    string ProgramDataRoot { get; }
+
+    string CommonDesktopDirectory { get; }
+
+    string SigningUserSid { get; }
+
+    string LocalApplicationDataPath { get; }
+
+    string InstallInstanceId { get; }
+}
+
+public sealed class ManualInstallPlanner(IManualInstallEnvironment environment)
+{
+    public ManualInstallPlan Plan()
+    {
+        ArgumentNullException.ThrowIfNull(environment);
+        if (!environment.IsWindows)
+        {
+            throw new InstallException("windows_required");
+        }
+
+        if (!CanonicalWindowsSid.IsValid(environment.SigningUserSid) ||
+            !InstallOwnershipMarker.IsInstanceId(environment.InstallInstanceId))
+        {
+            throw new InstallException("install_arguments_invalid");
+        }
+
+        var executablePath = Canonical(environment.ExecutablePath);
+        var dataRoot = Canonical(Path.Combine(environment.ProgramDataRoot, "SimplySignAuto"));
+        var userDataRoot = ManualRuntimePaths
+            .ForLocalApplicationData(environment.LocalApplicationDataPath)
+            .DataRoot;
+        var commonDesktop = Canonical(environment.CommonDesktopDirectory);
+        if (!Path.IsPathFullyQualified(commonDesktop) ||
+            InstallControlledPath.IsSameOrDescendant(dataRoot, executablePath) ||
+            InstallControlledPath.IsSameOrDescendant(userDataRoot, executablePath))
+        {
+            throw new InstallException("install_arguments_invalid");
+        }
+
+        var receipt = InstallationReceipt.ForManual(
+            environment.InstallInstanceId,
+            environment.SigningUserSid,
+            executablePath,
+            userDataRoot);
+        var marker = InstallOwnershipMarker.Create(receipt.InstallInstanceId);
+        var registration = ProductUninstallRegistration.Create(
+            executablePath,
+            SimplySignAuto.App.ApplicationVersion.ReadIdentity(typeof(ManualInstallPlanner).Assembly),
+            marker);
+        var paths = new ManualInstallPaths(
+            dataRoot,
+            Canonical(Path.Combine(dataRoot, "install.json")),
+            Canonical(Path.Combine(commonDesktop, "SimplySignAuto.lnk")),
+            executablePath);
+        InstallAction[] actions =
+        [
+            new WriteProtectedFile(
+                paths.InstallationReceiptPath,
+                InstallAclProfile.AdministratorsOnly,
+                InstallContent.InstallationReceipt),
+            new RegisterProductUninstall(registration),
+            new CreateDesktopShortcut(paths.DesktopShortcutPath, executablePath, marker),
+            new VerifyManualInstallSecurity(paths, receipt, registration),
+        ];
+        return new ManualInstallPlan(receipt, paths, actions);
+    }
+
+    private static string Canonical(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !Path.IsPathFullyQualified(path))
+        {
+            throw new InstallException("install_arguments_invalid");
+        }
+
+        var canonical = Path.GetFullPath(path);
+        if (!string.Equals(path, canonical, PathComparison()))
+        {
+            throw new InstallException("install_arguments_invalid");
+        }
+
+        return canonical;
+    }
+
+    private static StringComparison PathComparison() =>
+        OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+}
 
 public interface IInstallInstanceIdGenerator
 {
@@ -660,5 +772,52 @@ public sealed class InstallOrchestrator(
             plan.Paths.ExecutablePath,
             plan.Paths.AgentConfigurationPath,
             24));
+    }
+}
+
+public sealed class ManualInstallOrchestrator(IInstallActionExecutor executor)
+{
+    public async Task ExecuteAsync(
+        ManualInstallPlan plan,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+        var material = new InstallExecutionMaterial(
+            ServiceConfiguration: [],
+            AgentConfiguration: [],
+            InstallToken: [],
+            InstallationReceipt: InstallationReceiptCodec.Serialize(plan.Receipt));
+        var applied = new List<AppliedInstallAction>();
+        try
+        {
+            foreach (var action in plan.Actions)
+            {
+                applied.Add(await executor.ApplyAsync(action, material, cancellationToken)
+                    .ConfigureAwait(false));
+            }
+        }
+        catch (Exception original)
+        {
+            var stateUncertain = false;
+            foreach (var action in applied.AsEnumerable().Reverse())
+            {
+                try
+                {
+                    await executor.RollbackAsync(action, CancellationToken.None).ConfigureAwait(false);
+                }
+                catch
+                {
+                    stateUncertain = true;
+                }
+            }
+
+            if (stateUncertain)
+            {
+                throw new InstallException("install_state_uncertain");
+            }
+
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(original).Throw();
+            throw;
+        }
     }
 }

@@ -30,6 +30,26 @@ internal enum SetupProductKind
     PdfExtension,
 }
 
+internal enum SetupInstallationMode
+{
+    Manual,
+    Service,
+}
+
+internal sealed record SetupInstallationSelection(
+    SetupInstallationMode Mode,
+    bool CanChange);
+
+internal static class SetupModeSelection
+{
+    public static SetupInstallationMode ResolveDefault(byte productType) => productType switch
+    {
+        1 => SetupInstallationMode.Manual,
+        2 or 3 => SetupInstallationMode.Service,
+        _ => throw new SetupBootstrapperException("os_unsupported"),
+    };
+}
+
 internal sealed record SetupProgress(int Percent, string Message);
 
 internal sealed record SetupPayloadMetadata(
@@ -324,6 +344,7 @@ internal interface ISetupProcessRunner
     Task<int> RunAsync(
         SetupProductKind productKind,
         string mediaRoot,
+        SetupInstallationMode? mode,
         IProgress<SetupProgress>? progress,
         CancellationToken cancellationToken);
 }
@@ -388,11 +409,13 @@ internal sealed class SetupBootstrapperOperations(
 
     public Task<int> InstallAsync(
         StagedSetupPayload staged,
+        SetupInstallationMode? mode,
         IProgress<SetupProgress>? progress,
         CancellationToken cancellationToken) =>
         processRunner.RunAsync(
             staged.Metadata.ProductKind,
             staged.MediaRoot,
+            mode,
             progress,
             cancellationToken);
 
@@ -405,6 +428,7 @@ internal interface ISetupBootstrapperOperations
 
     Task<int> InstallAsync(
         StagedSetupPayload staged,
+        SetupInstallationMode? mode,
         IProgress<SetupProgress>? progress,
         CancellationToken cancellationToken);
 
@@ -414,6 +438,7 @@ internal interface ISetupBootstrapperOperations
 internal sealed class SetupBootstrapper(ISetupBootstrapperOperations operations)
 {
     public async Task<int> RunAsync(
+        SetupInstallationMode? mode,
         IProgress<SetupProgress>? progress,
         CancellationToken cancellationToken)
     {
@@ -425,7 +450,12 @@ internal sealed class SetupBootstrapper(ISetupBootstrapperOperations operations)
         {
             staged = await operations.StageAsync(cancellationToken).ConfigureAwait(false);
             tracker.Report(new SetupProgress(25, "ProgressMediaVerified"));
-            var exitCode = await operations.InstallAsync(staged, tracker, cancellationToken)
+            if (staged.Metadata.ProductKind == SetupProductKind.Main != mode.HasValue)
+            {
+                throw new SetupBootstrapperException("setup_mode_invalid");
+            }
+
+            var exitCode = await operations.InstallAsync(staged, mode, tracker, cancellationToken)
                 .ConfigureAwait(false);
             installSucceeded = exitCode == 0;
             if (installSucceeded)

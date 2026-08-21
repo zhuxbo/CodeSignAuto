@@ -7,6 +7,10 @@ param(
     [string]$ReleaseMediaRoot,
 
     [Parameter()]
+    [ValidateSet('manual', 'service')]
+    [string]$InstallMode,
+
+    [Parameter()]
     [switch]$VerifyMediaOnly
 )
 
@@ -220,7 +224,10 @@ function Test-ProcessElevated {
 }
 
 function Invoke-ElevatedReleaseInstall {
-    param([Parameter(Mandatory = $true)][string]$Root)
+    param(
+        [Parameter(Mandatory = $true)][string]$Root,
+        [Parameter(Mandatory = $true)][ValidateSet('manual', 'service')][string]$Mode
+    )
 
     $systemPowerShell = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::System)) (
         'WindowsPowerShell\v1.0\powershell.exe')
@@ -233,7 +240,8 @@ function Invoke-ElevatedReleaseInstall {
         '-NonInteractive',
         '-ExecutionPolicy', 'Bypass',
         '-File', ('"' + $PSCommandPath + '"'),
-        '-ReleaseMediaRoot', ('"' + $Root + '"'))
+        '-ReleaseMediaRoot', ('"' + $Root + '"'),
+        '-InstallMode', $Mode)
     $process = Start-Process `
         -FilePath $systemPowerShell `
         -ArgumentList $arguments `
@@ -891,6 +899,10 @@ try {
     if ($VerifyMediaOnly -and [string]::IsNullOrWhiteSpace($ReleaseMediaRoot)) {
         Stop-PrerequisiteCheck 'media' 'media_missing'
     }
+    if (-not [string]::IsNullOrWhiteSpace($ReleaseMediaRoot) -and
+        [string]::IsNullOrWhiteSpace($InstallMode)) {
+        Stop-PrerequisiteCheck 'media' 'install_mode_required'
+    }
     if (-not [string]::IsNullOrWhiteSpace($ReleaseMediaRoot)) {
         Test-ReleaseMedia -Root $ReleaseMediaRoot
         Write-PrerequisiteStatus 'media' 'ready'
@@ -900,13 +912,15 @@ try {
         $result = 0
     }
     elseif (-not [string]::IsNullOrWhiteSpace($ReleaseMediaRoot) -and -not (Test-ProcessElevated)) {
-        $result = Invoke-ElevatedReleaseInstall -Root ([IO.Path]::GetFullPath($ReleaseMediaRoot))
+        $result = Invoke-ElevatedReleaseInstall `
+            -Root ([IO.Path]::GetFullPath($ReleaseMediaRoot)) `
+            -Mode $InstallMode
     }
     else {
         $result = Invoke-PrerequisiteCheck
         if ($result -eq 0 -and -not [string]::IsNullOrWhiteSpace($ReleaseMediaRoot)) {
             $applicationPath = Join-Path ([IO.Path]::GetFullPath($ReleaseMediaRoot)) 'SimplySignAuto.exe'
-            & $applicationPath setup | ForEach-Object { [Console]::Out.WriteLine($_) }
+            & $applicationPath setup --mode $InstallMode | ForEach-Object { [Console]::Out.WriteLine($_) }
             $result = $LASTEXITCODE
         }
     }

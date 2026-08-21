@@ -8,11 +8,17 @@
   <data name="WindowPdfTitle" xml:space="preserve"><value>SimplySignAuto PDF 扩展安装</value></data>
   <data name="MainTitle" xml:space="preserve"><value>安装 SimplySignAuto</value></data>
   <data name="PdfTitle" xml:space="preserve"><value>安装 SimplySignAuto PDF 扩展</value></data>
-  <data name="MainDescription" xml:space="preserve"><value>安装程序将验证安装介质并初始化代码签名服务。</value></data>
+  <data name="MainDescription" xml:space="preserve"><value>安装程序将验证安装介质并初始化所选代码签名模式。</value></data>
   <data name="PdfDescription" xml:space="preserve"><value>安装程序将验证离线扩展介质并安装 PDF 签名支持。</value></data>
   <data name="LanguageLabel" xml:space="preserve"><value>语言</value></data>
   <data name="LanguageChinese" xml:space="preserve"><value>中文</value></data>
   <data name="LanguageEnglish" xml:space="preserve"><value>English</value></data>
+  <data name="ModeLabel" xml:space="preserve"><value>安装模式</value></data>
+  <data name="ModeManualName" xml:space="preserve"><value>手工签名模式</value></data>
+  <data name="ModeServiceName" xml:space="preserve"><value>自动签名服务模式</value></data>
+  <data name="ModeManualDescription" xml:space="preserve"><value>适合 Windows 10/11 当前管理员按需打开程序并手工提交签名；不创建服务、专用用户或自动登录。</value></data>
+  <data name="ModeServiceDescription" xml:space="preserve"><value>适合服务器无人值守自动签名；会创建签名服务、专用签名用户和受控自动登录。</value></data>
+  <data name="ModeSwitchRequiresReinstall" xml:space="preserve"><value>安装后模式固定；切换模式需卸载重装。</value></data>
   <data name="InstallButton" xml:space="preserve"><value>安装</value></data>
   <data name="CancelButton" xml:space="preserve"><value>取消</value></data>
   <data name="CloseButton" xml:space="preserve"><value>关闭</value></data>

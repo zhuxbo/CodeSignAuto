@@ -206,6 +206,7 @@ internal sealed class WindowsSetupProcessRunner(
     public async Task<int> RunAsync(
         SetupProductKind productKind,
         string mediaRoot,
+        SetupInstallationMode? mode,
         IProgress<SetupProgress>? progress,
         CancellationToken cancellationToken)
     {
@@ -213,11 +214,13 @@ internal sealed class WindowsSetupProcessRunner(
         {
             SetupProductKind.Main => await RunMainAsync(
                     mediaRoot,
+                    mode ?? throw new SetupBootstrapperException("setup_mode_invalid"),
                     progress,
                     cancellationToken)
                 .ConfigureAwait(false),
             SetupProductKind.PdfExtension => await RunPdfExtensionAsync(
                     mediaRoot,
+                    mode,
                     progress,
                     cancellationToken)
                 .ConfigureAwait(false),
@@ -227,6 +230,7 @@ internal sealed class WindowsSetupProcessRunner(
 
     private async Task<int> RunMainAsync(
         string mediaRoot,
+        SetupInstallationMode mode,
         IProgress<SetupProgress>? progress,
         CancellationToken cancellationToken)
     {
@@ -236,6 +240,7 @@ internal sealed class WindowsSetupProcessRunner(
         {
             "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
             "-File", script, "-ReleaseMediaRoot", root,
+            "-InstallMode", mode == SetupInstallationMode.Manual ? "manual" : "service",
         };
         var mappedProgress = new SetupStatusProgress(progress);
         var verifyExitCode = await invoker.RunAsync(
@@ -262,9 +267,15 @@ internal sealed class WindowsSetupProcessRunner(
 
     private Task<int> RunPdfExtensionAsync(
         string mediaRoot,
+        SetupInstallationMode? mode,
         IProgress<SetupProgress>? progress,
         CancellationToken cancellationToken)
     {
+        if (mode is not null)
+        {
+            throw new SetupBootstrapperException("setup_mode_invalid");
+        }
+
         var root = Path.GetFullPath(mediaRoot);
         WindowsProtectedFile.Apply(Path.Combine(root, "extension.json"));
         WindowsProtectedFile.Apply(Path.Combine(root, "SimplySignPdfSigner.exe"));

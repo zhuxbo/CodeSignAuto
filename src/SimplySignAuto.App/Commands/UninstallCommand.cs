@@ -76,6 +76,101 @@ public sealed record UninstallPlan(
     IReadOnlyList<UninstallAction> Actions,
     InstallationReceipt? Receipt = null);
 
+public sealed record ManualUninstallPlan(
+    InstallationReceipt Receipt,
+    UninstallSigningIdentity Identity,
+    string DataRoot,
+    IReadOnlyList<UninstallAction> Actions);
+
+public interface IManualUninstallEnvironment
+{
+    bool IsWindows { get; }
+
+    string CommonDesktopDirectory { get; }
+
+    string ProgramDataRoot { get; }
+
+    Task<InstallationReceipt> LoadReceiptAsync(CancellationToken cancellationToken);
+}
+
+public sealed class ManualUninstallPlanner(IManualUninstallEnvironment environment)
+{
+    public async Task<ManualUninstallPlan> PlanAsync(
+        UninstallOptions options,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(environment);
+        if (!environment.IsWindows)
+        {
+            throw new InstallException("windows_required");
+        }
+
+        if (options.PurgeData && !string.Equals(options.Confirmation, "PURGE", StringComparison.Ordinal))
+        {
+            throw new InstallException("purge_confirmation_required");
+        }
+
+        if (!options.PurgeData && options.Confirmation is not null)
+        {
+            throw new InstallException("uninstall_arguments_invalid");
+        }
+
+        var receipt = InstallationReceiptValidator.Validate(
+            await environment.LoadReceiptAsync(cancellationToken).ConfigureAwait(false));
+        if (receipt.Mode != InstallationMode.Manual)
+        {
+            throw new InstallException("owned_resource_mismatch");
+        }
+
+        var marker = InstallOwnershipMarker.Create(receipt.InstallInstanceId);
+        var dataRoot = Canonical(Path.Combine(environment.ProgramDataRoot, "SimplySignAuto"));
+        var desktop = Canonical(environment.CommonDesktopDirectory);
+        var identity = new UninstallSigningIdentity(
+            string.Empty,
+            string.Empty,
+            receipt.SigningUserSid,
+            receipt.UserDataRoot!,
+            marker,
+            UninstallSigningUserOwnership.ExistingUser);
+        UninstallAction[] actions =
+        [
+            new PurgeControlledData(
+                dataRoot,
+                receipt.UserDataRoot!,
+                IncludeAgentDirectory: options.PurgeData),
+            new RemoveOwnedDesktopShortcut(
+                Canonical(Path.Combine(desktop, "SimplySignAuto.lnk")),
+                receipt.ExecutablePath,
+                receipt.SigningUserSid,
+                marker),
+            new RemoveOwnedProductUninstall(ProductUninstallRegistration.Create(
+                receipt.ExecutablePath,
+                SimplySignAuto.App.ApplicationVersion.ReadIdentity(typeof(ManualUninstallPlanner).Assembly),
+                marker)),
+        ];
+        return new ManualUninstallPlan(receipt, identity, dataRoot, actions);
+    }
+
+    private static string Canonical(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !Path.IsPathFullyQualified(path))
+        {
+            throw new InstallException("uninstall_configuration_invalid");
+        }
+
+        var canonical = Path.GetFullPath(path);
+        if (!string.Equals(path, canonical, PathComparison()))
+        {
+            throw new InstallException("uninstall_configuration_invalid");
+        }
+
+        return canonical;
+    }
+
+    private static StringComparison PathComparison() =>
+        OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+}
+
 public interface IUninstallEnvironment
 {
     bool IsWindows { get; }
@@ -478,6 +573,152 @@ public sealed class WindowsUninstallEnvironment : IUninstallEnvironment
         string ownerMarker) => WindowsUninstallIdentity.Inspect(configuration, ownerMarker);
 }
 
+public sealed class WindowsManualUninstallEnvironment(InstallationReceipt receipt)
+    : IManualUninstallEnvironment
+{
+    private readonly InstallationReceipt _receipt =
+        InstallationReceiptValidator.Validate(receipt);
+
+    public bool IsWindows => OperatingSystem.IsWindows();
+
+    public string CommonDesktopDirectory => Path.GetFullPath(
+        Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory));
+
+    public string ProgramDataRoot => Path.GetFullPath(
+        Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData));
+
+    public Task<InstallationReceipt> LoadReceiptAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(_receipt);
+    }
+}
+
+internal interface IManualInstalledMediaUninstallPreflight
+{
+    Task VerifyAsync(InstallationReceipt receipt, CancellationToken cancellationToken);
+}
+
+internal sealed class WindowsManualInstalledMediaUninstallPreflight
+    : IManualInstalledMediaUninstallPreflight
+{
+    private readonly IInstallMediaVerifier _verifier;
+
+    public WindowsManualInstalledMediaUninstallPreflight()
+        : this(new WindowsInstallMediaVerifier())
+    {
+    }
+
+    internal WindowsManualInstalledMediaUninstallPreflight(IInstallMediaVerifier verifier) =>
+        _verifier = verifier ?? throw new ArgumentNullException(nameof(verifier));
+
+    public async Task VerifyAsync(
+        InstallationReceipt receipt,
+        CancellationToken cancellationToken)
+    {
+        receipt = InstallationReceiptValidator.Validate(receipt);
+        try
+        {
+            var root = Path.GetDirectoryName(receipt.ExecutablePath)
+                ?? throw new InstallException("owned_resource_mismatch");
+            var expectedRoot = InstallMediaPaths.GetTargetRoot(
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles));
+            if (!string.Equals(root, expectedRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InstallException("owned_resource_mismatch");
+            }
+
+            var publisher = _verifier.VerifyInitialPublisher(
+                receipt.ExecutablePath,
+                Path.Combine(root, InstallMediaPaths.VerificationScriptFileName));
+            await _verifier.VerifyMediaAsync(root, publisher, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (InstallException)
+        {
+            throw;
+        }
+        catch
+        {
+            throw new InstallException("owned_resource_mismatch");
+        }
+    }
+}
+
+internal static class WindowsManualUninstallOwnership
+{
+    public static void Verify(ManualUninstallPlan plan)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+        var receipt = InstallationReceiptValidator.Validate(plan.Receipt);
+        var executable = Environment.ProcessPath is null
+            ? throw new InstallException("owned_resource_mismatch")
+            : Path.GetFullPath(Environment.ProcessPath);
+        var expectedDataRoot = Path.GetFullPath(Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+            "SimplySignAuto"));
+        if (receipt.Mode != InstallationMode.Manual ||
+            !string.Equals(receipt.ExecutablePath, executable, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(plan.DataRoot, expectedDataRoot, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InstallException("owned_resource_mismatch");
+        }
+
+        using var profileKey = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+            $@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\{receipt.SigningUserSid}",
+            writable: false);
+        var profilePath = profileKey?.GetValue(
+            "ProfileImagePath",
+            null,
+            Microsoft.Win32.RegistryValueOptions.None) as string;
+        if (string.IsNullOrWhiteSpace(profilePath) || !Path.IsPathFullyQualified(profilePath))
+        {
+            throw new InstallException("owned_resource_mismatch");
+        }
+
+        var expectedUserData = Path.GetFullPath(Path.Combine(
+            profilePath,
+            "AppData",
+            "Local",
+            "SimplySignAuto",
+            "manual"));
+        if (!string.Equals(receipt.UserDataRoot, expectedUserData, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InstallException("owned_resource_mismatch");
+        }
+
+        var signingUser = new System.Security.Principal.SecurityIdentifier(receipt.SigningUserSid);
+        WindowsInstallAcl.VerifyDirectory(
+            plan.DataRoot,
+            InstallAclProfile.AdministratorsOnly,
+            signingUser);
+        WindowsInstallAcl.VerifyFile(
+            Path.Combine(plan.DataRoot, "install.json"),
+            InstallAclProfile.AdministratorsOnly,
+            signingUser);
+        if (Directory.Exists(expectedUserData))
+        {
+            var snapshot = WindowsNoFollowSecurity.ReadDirectory(expectedUserData);
+            if ((snapshot.Attributes & FileAttributes.ReparsePoint) != 0 ||
+                !string.Equals(
+                    snapshot.Security.Owner?.Value,
+                    receipt.SigningUserSid,
+                    StringComparison.Ordinal))
+            {
+                throw new InstallException("owned_resource_mismatch");
+            }
+        }
+        else if (WindowsPathSafety.EntryExists(expectedUserData))
+        {
+            throw new InstallException("owned_resource_mismatch");
+        }
+    }
+}
+
 internal interface IWindowsUninstallNative
 {
     void VerifySigningIdentityOwnership(
@@ -539,6 +780,130 @@ internal interface IWindowsUninstallNative
     void RemoveDesktopShortcut(RemoveOwnedDesktopShortcut action);
 
     Task RemovePdfExtensionAsync(CancellationToken cancellationToken);
+}
+
+public sealed class ManualUninstallOrchestrator(WindowsManualUninstallActionExecutor executor)
+{
+    public async Task ExecuteAsync(
+        ManualUninstallPlan plan,
+        TextWriter output,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+        ArgumentNullException.ThrowIfNull(output);
+        await executor.PreflightAsync(plan, cancellationToken).ConfigureAwait(false);
+        foreach (var action in plan.Actions)
+        {
+            await executor.ExecuteAsync(action, cancellationToken).ConfigureAwait(false);
+        }
+
+        await output.WriteLineAsync(
+            plan.Actions.OfType<PurgeControlledData>().Single().IncludeAgentDirectory
+                ? "SimplySignAuto was removed with the exact-owned manual task data."
+                : "SimplySignAuto was removed; manual task history and signed results were preserved.")
+            .ConfigureAwait(false);
+    }
+}
+
+public sealed class WindowsManualUninstallActionExecutor
+{
+    private readonly IWindowsUninstallNative _native;
+    private readonly IPurgeIsolationFileSystem _purgeFileSystem;
+    private readonly IManualInstalledMediaUninstallPreflight _mediaPreflight;
+    private readonly IInstallationReceiptStore _receiptStore;
+    private PurgeIsolationPlan? _preparedPurgePlan;
+    private PurgeControlledData? _preparedPurgeAction;
+
+    public WindowsManualUninstallActionExecutor()
+        : this(
+            new WindowsUninstallNative(),
+            new WindowsPurgeIsolationFileSystem(),
+            new WindowsManualInstalledMediaUninstallPreflight(),
+            new WindowsInstallationReceiptStore())
+    {
+    }
+
+    internal WindowsManualUninstallActionExecutor(
+        IWindowsUninstallNative native,
+        IPurgeIsolationFileSystem purgeFileSystem,
+        IManualInstalledMediaUninstallPreflight mediaPreflight,
+        IInstallationReceiptStore receiptStore)
+    {
+        _native = native ?? throw new ArgumentNullException(nameof(native));
+        _purgeFileSystem = purgeFileSystem ?? throw new ArgumentNullException(nameof(purgeFileSystem));
+        _mediaPreflight = mediaPreflight ?? throw new ArgumentNullException(nameof(mediaPreflight));
+        _receiptStore = receiptStore ?? throw new ArgumentNullException(nameof(receiptStore));
+    }
+
+    public async Task PreflightAsync(
+        ManualUninstallPlan plan,
+        CancellationToken cancellationToken)
+    {
+        _preparedPurgePlan = null;
+        _preparedPurgeAction = null;
+        await _mediaPreflight.VerifyAsync(plan.Receipt, cancellationToken).ConfigureAwait(false);
+        WindowsManualUninstallOwnership.Verify(plan);
+        if (await _receiptStore.LoadOptionalAsync(cancellationToken).ConfigureAwait(false) != plan.Receipt)
+        {
+            throw new InstallException("owned_resource_mismatch");
+        }
+
+        foreach (var action in plan.Actions)
+        {
+            switch (action)
+            {
+                case PurgeControlledData:
+                    break;
+                case RemoveOwnedDesktopShortcut shortcut:
+                    _native.VerifyDesktopShortcutOwnership(shortcut);
+                    break;
+                case RemoveOwnedProductUninstall product:
+                    _native.VerifyProductRegistrationOwnership(product);
+                    break;
+                default:
+                    throw new InstallException("uninstall_action_invalid");
+            }
+        }
+
+        var purge = plan.Actions.OfType<PurgeControlledData>().Single();
+        _preparedPurgePlan = _purgeFileSystem.Plan(
+            purge.DataRoot,
+            purge.IncludeAgentDirectory ? purge.AgentDirectory : null,
+            new PurgeInstallIdentity(
+                plan.Identity.OwnerMarker,
+                plan.Receipt.SigningUserSid,
+                plan.Receipt.InstallInstanceId,
+                UninstallSigningUserOwnership.ExistingUser,
+                plan.Receipt.ExecutablePath));
+        _preparedPurgeAction = purge;
+    }
+
+    public async Task ExecuteAsync(
+        UninstallAction action,
+        CancellationToken cancellationToken)
+    {
+        switch (action)
+        {
+            case PurgeControlledData purge:
+                if (_preparedPurgePlan is null || _preparedPurgeAction != purge)
+                {
+                    throw new InstallException("uninstall_state_uncertain");
+                }
+
+                await new PurgeIsolationCoordinator(_purgeFileSystem)
+                    .ExecuteAsync(_preparedPurgePlan, cancellationToken)
+                    .ConfigureAwait(false);
+                break;
+            case RemoveOwnedDesktopShortcut shortcut:
+                _native.RemoveDesktopShortcut(shortcut);
+                break;
+            case RemoveOwnedProductUninstall product:
+                _native.RemoveProductRegistration(product);
+                break;
+            default:
+                throw new InstallException("uninstall_action_invalid");
+        }
+    }
 }
 
 public sealed class WindowsUninstallActionExecutor : IUninstallActionExecutor
@@ -764,6 +1129,22 @@ public static class UninstallCommand
 
         try
         {
+            var receipt = await new WindowsInstallationReceiptStore()
+                .LoadOptionalAsync(cancellationToken)
+                .ConfigureAwait(false);
+            if (receipt?.Mode == InstallationMode.Manual)
+            {
+                var manualPlan = await new ManualUninstallPlanner(
+                        new WindowsManualUninstallEnvironment(receipt))
+                    .PlanAsync(options!, cancellationToken)
+                    .ConfigureAwait(false);
+                await new ManualUninstallOrchestrator(
+                        new WindowsManualUninstallActionExecutor())
+                    .ExecuteAsync(manualPlan, output, cancellationToken)
+                    .ConfigureAwait(false);
+                return 0;
+            }
+
             if (!options!.PurgeData &&
                 !File.Exists(WindowsUninstallEnvironment.ConfigurationPath) &&
                 !WindowsPathSafety.EntryExists(WindowsInstallationReceiptStore.ReceiptPath) &&

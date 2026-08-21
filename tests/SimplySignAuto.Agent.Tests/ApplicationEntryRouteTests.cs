@@ -5,6 +5,26 @@ namespace SimplySignAuto.Agent.Tests;
 
 public sealed class ApplicationEntryRouteTests
 {
+    [Theory]
+    [InlineData("manual")]
+    [InlineData("service")]
+    public void Setup_route_accepts_only_one_exact_installation_mode(string mode)
+    {
+        var route = ApplicationEntryRoute.Parse(["setup", "--mode", mode]);
+
+        Assert.Equal(ApplicationEntryKind.Setup, route.Kind);
+        Assert.Equal(["--mode", mode], route.Arguments);
+        Assert.False(route.ShowInitially);
+
+        Assert.Equal(ApplicationEntryKind.Invalid, ApplicationEntryRoute.Parse(["setup"]).Kind);
+        Assert.Equal(
+            ApplicationEntryKind.Invalid,
+            ApplicationEntryRoute.Parse(["setup", "--mode", "Manual"]).Kind);
+        Assert.Equal(
+            ApplicationEntryKind.Invalid,
+            ApplicationEntryRoute.Parse(["setup", "--mode", mode, "extra"]).Kind);
+    }
+
     [WindowsFact]
     public void Pdf_extension_route_accepts_only_exact_install_and_uninstall_commands()
     {

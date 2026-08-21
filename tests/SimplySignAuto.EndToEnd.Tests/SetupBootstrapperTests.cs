@@ -209,7 +209,10 @@ public sealed class SetupBootstrapperTests
         var operations = new RecordingSetupOperations(installExitCode: 0);
         var bootstrapper = new SetupBootstrapper(operations);
 
-        var exitCode = await bootstrapper.RunAsync(progress: null, CancellationToken.None);
+        var exitCode = await bootstrapper.RunAsync(
+            SetupInstallationMode.Manual,
+            progress: null,
+            CancellationToken.None);
 
         Assert.Equal(0, exitCode);
         Assert.Equal(["stage", "install:C:\\staged", "cleanup:C:\\staged"], operations.Events);
@@ -221,7 +224,10 @@ public sealed class SetupBootstrapperTests
         var operations = new RecordingSetupOperations(installExitCode: 1);
         var bootstrapper = new SetupBootstrapper(operations);
 
-        var exitCode = await bootstrapper.RunAsync(progress: null, CancellationToken.None);
+        var exitCode = await bootstrapper.RunAsync(
+            SetupInstallationMode.Manual,
+            progress: null,
+            CancellationToken.None);
 
         Assert.Equal(1, exitCode);
         Assert.Equal(["stage", "install:C:\\staged", "cleanup:C:\\staged"], operations.Events);
@@ -241,6 +247,7 @@ public sealed class SetupBootstrapperTests
         var reported = new List<SetupProgress>();
 
         var exitCode = await new SetupBootstrapper(operations).RunAsync(
+            SetupInstallationMode.Manual,
             new InlineProgress<SetupProgress>(reported.Add),
             CancellationToken.None);
 
@@ -262,6 +269,7 @@ public sealed class SetupBootstrapperTests
         var reported = new List<SetupProgress>();
 
         var exitCode = await new SetupBootstrapper(operations).RunAsync(
+            SetupInstallationMode.Manual,
             new InlineProgress<SetupProgress>(reported.Add),
             CancellationToken.None);
 
@@ -323,7 +331,11 @@ public sealed class SetupBootstrapperTests
         try
         {
             var staged = await operations.StageAsync(CancellationToken.None);
-            var exitCode = await operations.InstallAsync(staged, progress: null, CancellationToken.None);
+            var exitCode = await operations.InstallAsync(
+                staged,
+                SetupInstallationMode.Service,
+                progress: null,
+                CancellationToken.None);
             var stagedContent = await File.ReadAllTextAsync(Path.Combine(root, "nested", "payload.txt"));
             await operations.CleanupAsync(staged.MediaRoot);
 
@@ -387,6 +399,7 @@ public sealed class SetupBootstrapperTests
         var exitCode = await runner.RunAsync(
             SetupProductKind.Main,
             "C:\\media",
+            SetupInstallationMode.Manual,
             progress: null,
             CancellationToken.None);
 
@@ -396,14 +409,14 @@ public sealed class SetupBootstrapperTests
             [
                 "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
                 "-File", "C:\\media\\install-prerequisites.ps1",
-                "-ReleaseMediaRoot", "C:\\media", "-VerifyMediaOnly",
+                "-ReleaseMediaRoot", "C:\\media", "-InstallMode", "manual", "-VerifyMediaOnly",
             ],
             invoker.Arguments[0]);
         Assert.Equal(
             [
                 "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
                 "-File", "C:\\media\\install-prerequisites.ps1",
-                "-ReleaseMediaRoot", "C:\\media",
+                "-ReleaseMediaRoot", "C:\\media", "-InstallMode", "manual",
             ],
             invoker.Arguments[1]);
     }
@@ -433,6 +446,7 @@ public sealed class SetupBootstrapperTests
         var exitCode = await runner.RunAsync(
             SetupProductKind.Main,
             "C:\\media",
+            SetupInstallationMode.Service,
             new InlineProgress<SetupProgress>(reported.Add),
             CancellationToken.None);
 
@@ -482,6 +496,7 @@ public sealed class SetupBootstrapperTests
             runner.RunAsync(
                 SetupProductKind.Main,
                 "C:\\media",
+                SetupInstallationMode.Service,
                 progress: null,
                 CancellationToken.None));
 
@@ -512,6 +527,7 @@ public sealed class SetupBootstrapperTests
             var exitCode = await runner.RunAsync(
                 SetupProductKind.PdfExtension,
                 mediaRoot,
+                null,
                 new InlineProgress<SetupProgress>(reported.Add),
                 CancellationToken.None);
 
@@ -746,6 +762,7 @@ public sealed class SetupBootstrapperTests
 
         public Task<int> InstallAsync(
             StagedSetupPayload staged,
+            SetupInstallationMode? mode,
             IProgress<SetupProgress>? progress,
             CancellationToken cancellationToken)
         {
@@ -856,6 +873,7 @@ public sealed class SetupBootstrapperTests
         public Task<int> RunAsync(
             SetupProductKind productKind,
             string mediaRoot,
+            SetupInstallationMode? mode,
             IProgress<SetupProgress>? progress,
             CancellationToken cancellationToken)
         {

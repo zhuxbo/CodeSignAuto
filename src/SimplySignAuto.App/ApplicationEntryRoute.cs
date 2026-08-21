@@ -38,7 +38,8 @@ public sealed record ApplicationEntryRoute(
             ["configure-otp", .. var tail] => new(ApplicationEntryKind.ConfigureOtp, tail, ShowInitially: false),
             ["configure-service"] => new(ApplicationEntryKind.ConfigureService, [], ShowInitially: false),
             ["install", .. var tail] => new(ApplicationEntryKind.Install, tail, ShowInitially: false),
-            ["setup"] => new(ApplicationEntryKind.Setup, [], ShowInitially: false),
+            ["setup", "--mode", var mode] when mode is "manual" or "service" =>
+                new(ApplicationEntryKind.Setup, ["--mode", mode], ShowInitially: false),
             ["provision-agent-user", .. var tail] =>
                 new(ApplicationEntryKind.ProvisionAgentUser, tail, ShowInitially: false),
             ["uninstall", .. var tail] => new(ApplicationEntryKind.Uninstall, tail, ShowInitially: false),

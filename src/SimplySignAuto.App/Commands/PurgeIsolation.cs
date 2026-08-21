@@ -364,12 +364,9 @@ internal static class PurgeResumeManifestValidator
     {
         try
         {
-            manifest = PurgeQuarantineManifestCodec.Validate(manifest);
-            operationRoot = Path.GetFullPath(operationRoot);
-            programDataRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(programDataRoot));
-            executablePath = Path.GetFullPath(executablePath);
-            var manifestPath = Path.Combine(operationRoot, "manifest.json");
-            var dataRoot = Path.Combine(programDataRoot, "SimplySignAuto");
+            var canonicalProgramDataRoot = Path.TrimEndingDirectorySeparator(
+                Path.GetFullPath(programDataRoot));
+            var dataRoot = Path.Combine(canonicalProgramDataRoot, "SimplySignAuto");
             var agentRoot = Path.GetFullPath(Path.Combine(
                 disabledAutoLogon.ProfilePath,
                 "AppData",
@@ -382,46 +379,17 @@ internal static class PurgeResumeManifestValidator
             allowedSources.Add(verifiedOwnership == UninstallSigningUserOwnership.ExistingUser
                 ? agentRoot
                 : Path.GetFullPath(disabledAutoLogon.ProfilePath));
-            if (!string.Equals(Path.GetDirectoryName(operationRoot), programDataRoot, PathComparison()) ||
-                !string.Equals(
-                    Path.GetFileName(operationRoot),
-                    $"SimplySignAuto.Purge.{manifest.OperationId}",
-                    StringComparison.Ordinal) ||
-                !string.Equals(manifest.InstallOwnerMarker, disabledAutoLogon.OwnerMarker, StringComparison.Ordinal) ||
-                !string.Equals(manifest.SigningUserSid, disabledAutoLogon.SigningUserSid, StringComparison.Ordinal) ||
-                manifest.SigningUserOwnership != verifiedOwnership ||
-                !string.Equals(manifest.ExecutablePath, executablePath, PathComparison()) ||
-                !string.Equals(manifest.ExecutableSha256, executableSha256, StringComparison.Ordinal) ||
-                !manifest.Targets.Any(target => string.Equals(target.SourcePath, dataRoot, PathComparison())) ||
-                manifest.Targets.Any(target => !allowedSources.Contains(target.SourcePath)))
-            {
-                throw new InstallException("uninstall_state_uncertain");
-            }
-
-            var groups = manifest.StagingRoots.Select(stagingRoot =>
-                new PurgeIsolationGroup(
-                    Path.GetPathRoot(stagingRoot)!,
-                    stagingRoot,
-                    manifest.Targets
-                        .Where(target => string.Equals(
-                            Path.GetDirectoryName(target.StagedPath),
-                            stagingRoot,
-                            PathComparison()))
-                        .Select(target => new PurgeIsolationTarget(target.SourcePath, target.StagedPath))
-                        .ToArray()))
-                .ToArray();
-            return new PurgeIsolationPlan(
-                manifest.OperationId,
-                manifestPath,
-                manifest.CleanupTaskName,
+            return ValidateCore(
+                operationRoot,
+                canonicalProgramDataRoot,
                 executablePath,
-                groups,
-                new PurgeInstallIdentity(
-                    manifest.InstallOwnerMarker,
-                    manifest.SigningUserSid,
-                    manifest.InstallInstanceId,
-                    manifest.SigningUserOwnership,
-                    executablePath));
+                executableSha256,
+                disabledAutoLogon.OwnerMarker,
+                disabledAutoLogon.SigningUserSid,
+                verifiedOwnership,
+                dataRoot,
+                allowedSources,
+                manifest);
         }
         catch (InstallException error) when (error.Code == "uninstall_state_uncertain")
         {
@@ -431,6 +399,106 @@ internal static class PurgeResumeManifestValidator
         {
             throw new InstallException("uninstall_state_uncertain");
         }
+    }
+
+    public static PurgeIsolationPlan ValidateManual(
+        string operationRoot,
+        string programDataRoot,
+        string executablePath,
+        string executableSha256,
+        string profilePath,
+        PurgeQuarantineManifest manifest)
+    {
+        try
+        {
+            var canonicalProgramDataRoot = Path.TrimEndingDirectorySeparator(
+                Path.GetFullPath(programDataRoot));
+            var dataRoot = Path.GetFullPath(Path.Combine(canonicalProgramDataRoot, "SimplySignAuto"));
+            var manualRoot = Path.GetFullPath(Path.Combine(
+                profilePath,
+                "AppData",
+                "Local",
+                "SimplySignAuto",
+                "manual"));
+            return ValidateCore(
+                operationRoot,
+                canonicalProgramDataRoot,
+                executablePath,
+                executableSha256,
+                manifest.InstallOwnerMarker,
+                manifest.SigningUserSid,
+                UninstallSigningUserOwnership.ExistingUser,
+                dataRoot,
+                new HashSet<string>(PathComparer()) { dataRoot, manualRoot },
+                manifest);
+        }
+        catch (InstallException error) when (error.Code == "uninstall_state_uncertain")
+        {
+            throw;
+        }
+        catch
+        {
+            throw new InstallException("uninstall_state_uncertain");
+        }
+    }
+
+    private static PurgeIsolationPlan ValidateCore(
+        string operationRoot,
+        string programDataRoot,
+        string executablePath,
+        string executableSha256,
+        string expectedOwnerMarker,
+        string expectedSigningUserSid,
+        UninstallSigningUserOwnership expectedOwnership,
+        string dataRoot,
+        HashSet<string> allowedSources,
+        PurgeQuarantineManifest manifest)
+    {
+        manifest = PurgeQuarantineManifestCodec.Validate(manifest);
+        operationRoot = Path.GetFullPath(operationRoot);
+        programDataRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(programDataRoot));
+        executablePath = Path.GetFullPath(executablePath);
+        var manifestPath = Path.Combine(operationRoot, "manifest.json");
+        if (!string.Equals(Path.GetDirectoryName(operationRoot), programDataRoot, PathComparison()) ||
+            !string.Equals(
+                Path.GetFileName(operationRoot),
+                $"SimplySignAuto.Purge.{manifest.OperationId}",
+                StringComparison.Ordinal) ||
+            !string.Equals(manifest.InstallOwnerMarker, expectedOwnerMarker, StringComparison.Ordinal) ||
+            !string.Equals(manifest.SigningUserSid, expectedSigningUserSid, StringComparison.Ordinal) ||
+            manifest.SigningUserOwnership != expectedOwnership ||
+            !string.Equals(manifest.ExecutablePath, executablePath, PathComparison()) ||
+            !string.Equals(manifest.ExecutableSha256, executableSha256, StringComparison.Ordinal) ||
+            !manifest.Targets.Any(target => string.Equals(target.SourcePath, dataRoot, PathComparison())) ||
+            manifest.Targets.Any(target => !allowedSources.Contains(target.SourcePath)))
+        {
+            throw new InstallException("uninstall_state_uncertain");
+        }
+
+        var groups = manifest.StagingRoots.Select(stagingRoot =>
+            new PurgeIsolationGroup(
+                Path.GetPathRoot(stagingRoot)!,
+                stagingRoot,
+                manifest.Targets
+                    .Where(target => string.Equals(
+                        Path.GetDirectoryName(target.StagedPath),
+                        stagingRoot,
+                        PathComparison()))
+                    .Select(target => new PurgeIsolationTarget(target.SourcePath, target.StagedPath))
+                    .ToArray()))
+            .ToArray();
+        return new PurgeIsolationPlan(
+            manifest.OperationId,
+            manifestPath,
+            manifest.CleanupTaskName,
+            executablePath,
+            groups,
+            new PurgeInstallIdentity(
+                manifest.InstallOwnerMarker,
+                manifest.SigningUserSid,
+                manifest.InstallInstanceId,
+                manifest.SigningUserOwnership,
+                executablePath));
     }
 
     private static StringComparison PathComparison() =>
@@ -856,18 +924,48 @@ internal sealed class WindowsInterruptedPurgeResume
             var executableSha256 = await HashFileAsync(executablePath, cancellationToken)
                 .ConfigureAwait(false);
             var disabledAutoLogon = WindowsAutoLogonPlatform.ReadDisabledAutoLogon(
-                    manifest.InstallOwnerMarker)
-                ?? throw new InstallException("uninstall_state_uncertain");
-            var verifiedOwnership = WindowsUninstallIdentity.InspectInterruptedOwnership(
-                disabledAutoLogon);
-            var plan = PurgeResumeManifestValidator.Validate(
-                operationRoot,
-                programDataRoot,
-                executablePath,
-                executableSha256,
-                disabledAutoLogon,
-                verifiedOwnership,
-                manifest);
+                manifest.InstallOwnerMarker);
+            PurgeIsolationPlan plan;
+            if (disabledAutoLogon is not null)
+            {
+                var verifiedOwnership = WindowsUninstallIdentity.InspectInterruptedOwnership(
+                    disabledAutoLogon);
+                plan = PurgeResumeManifestValidator.Validate(
+                    operationRoot,
+                    programDataRoot,
+                    executablePath,
+                    executableSha256,
+                    disabledAutoLogon,
+                    verifiedOwnership,
+                    manifest);
+            }
+            else if (manifest.SigningUserOwnership == UninstallSigningUserOwnership.ExistingUser)
+            {
+                using var profileKey = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                    $@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\{manifest.SigningUserSid}",
+                    writable: false);
+                var profilePath = profileKey?.GetValue(
+                    "ProfileImagePath",
+                    null,
+                    Microsoft.Win32.RegistryValueOptions.None) as string;
+                if (string.IsNullOrWhiteSpace(profilePath) || !Path.IsPathFullyQualified(profilePath))
+                {
+                    throw new InstallException("uninstall_state_uncertain");
+                }
+
+                plan = PurgeResumeManifestValidator.ValidateManual(
+                    operationRoot,
+                    programDataRoot,
+                    executablePath,
+                    executableSha256,
+                    Path.GetFullPath(profilePath),
+                    manifest);
+            }
+            else
+            {
+                throw new InstallException("uninstall_state_uncertain");
+            }
+
             await new PurgeResumeCoordinator(new WindowsPurgeResumeRuntime())
                 .ResumeAsync(plan, cancellationToken)
                 .ConfigureAwait(false);
