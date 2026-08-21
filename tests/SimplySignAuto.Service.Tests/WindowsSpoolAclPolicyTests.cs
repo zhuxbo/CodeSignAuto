@@ -40,6 +40,31 @@ public sealed class WindowsSpoolAclPolicyTests
         Assert.Equal(PropagationFlags.None, inputSigningRule.PropagationFlags);
     }
 
+    [WindowsAdministratorFact]
+    public void Manual_user_policy_keeps_the_signing_user_as_spool_owner()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "SimplySignAuto.ManualSpoolAcl.Contract",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var signingUser = WindowsIdentity.GetCurrent().User!;
+        try
+        {
+            WindowsSpoolAclPolicy.ForManualUser(signingUser.Value).ProtectRoot(root);
+
+            var security = new DirectoryInfo(root).GetAccessControl();
+            Assert.True(security.AreAccessRulesProtected);
+            Assert.Equal(
+                signingUser,
+                security.GetOwner(typeof(SecurityIdentifier)));
+        }
+        finally
+        {
+            Directory.Delete(root);
+        }
+    }
+
     [WindowsInteractiveFact]
     public void Windows_signing_user_can_delete_only_the_part_it_created()
     {
@@ -92,6 +117,21 @@ public sealed class WindowsSpoolAclPolicyTests
                     StringComparison.Ordinal))
             {
                 Skip = "Requires the signing-user WTS interactive ACL fixture.";
+            }
+        }
+    }
+
+    private sealed class WindowsAdministratorFactAttribute : FactAttribute
+    {
+        public WindowsAdministratorFactAttribute()
+        {
+            if (!OperatingSystem.IsWindows() ||
+                !string.Equals(
+                    Environment.GetEnvironmentVariable("SIMPLYSIGN_RUN_ADMIN_INTEGRATION"),
+                    "1",
+                    StringComparison.Ordinal))
+            {
+                Skip = "Requires an explicitly enabled elevated Windows spool integration run.";
             }
         }
     }

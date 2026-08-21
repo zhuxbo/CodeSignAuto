@@ -58,16 +58,36 @@ internal static class WindowsSpoolAclRules
 public sealed class WindowsSpoolAclPolicy : ISpoolAclPolicy
 {
     private static readonly SecurityIdentifier LocalSystem = new(WellKnownSidType.LocalSystemSid, null);
+    private readonly SecurityIdentifier _owner;
     private readonly SecurityIdentifier _signingUser;
 
     public WindowsSpoolAclPolicy(string signingUserSid)
+        : this(ParseSigningUser(signingUserSid), LocalSystem)
+    {
+    }
+
+    private WindowsSpoolAclPolicy(
+        SecurityIdentifier signingUser,
+        SecurityIdentifier owner)
+    {
+        _signingUser = signingUser;
+        _owner = owner;
+    }
+
+    public static WindowsSpoolAclPolicy ForManualUser(string signingUserSid)
+    {
+        var signingUser = ParseSigningUser(signingUserSid);
+        return new WindowsSpoolAclPolicy(signingUser, signingUser);
+    }
+
+    private static SecurityIdentifier ParseSigningUser(string signingUserSid)
     {
         if (!CanonicalWindowsSid.IsValid(signingUserSid))
         {
             throw new ArgumentException("Signing user SID is invalid.", nameof(signingUserSid));
         }
 
-        _signingUser = new SecurityIdentifier(signingUserSid);
+        return new SecurityIdentifier(signingUserSid);
     }
 
     public void ProtectRoot(string path) => ProtectDirectory(path, Rules(WindowsSpoolAclRules.Root(_signingUser.Value)));
@@ -88,14 +108,14 @@ public sealed class WindowsSpoolAclPolicy : ISpoolAclPolicy
             rule.PropagationFlags,
             AccessControlType.Allow)).ToArray();
 
-    private static void ProtectDirectory(string path, IReadOnlyList<FileSystemAccessRule> expected)
+    private void ProtectDirectory(string path, IReadOnlyList<FileSystemAccessRule> expected)
     {
         EnsureWindows();
         try
         {
             var security = new DirectorySecurity();
             security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
-            security.SetOwner(LocalSystem);
+            security.SetOwner(_owner);
             foreach (var rule in expected)
             {
                 security.AddAccessRule(rule);
@@ -112,14 +132,14 @@ public sealed class WindowsSpoolAclPolicy : ISpoolAclPolicy
         }
     }
 
-    private static void ProtectFile(string path, IReadOnlyList<FileSystemAccessRule> expected)
+    private void ProtectFile(string path, IReadOnlyList<FileSystemAccessRule> expected)
     {
         EnsureWindows();
         try
         {
             var security = new FileSecurity();
             security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
-            security.SetOwner(LocalSystem);
+            security.SetOwner(_owner);
             foreach (var rule in expected)
             {
                 security.AddAccessRule(rule);
@@ -136,10 +156,10 @@ public sealed class WindowsSpoolAclPolicy : ISpoolAclPolicy
         }
     }
 
-    private static void Verify(FileSystemSecurity actual, IReadOnlyList<FileSystemAccessRule> expected)
+    private void Verify(FileSystemSecurity actual, IReadOnlyList<FileSystemAccessRule> expected)
     {
         var owner = actual.GetOwner(typeof(SecurityIdentifier));
-        if (!actual.AreAccessRulesProtected || !LocalSystem.Equals(owner))
+        if (!actual.AreAccessRulesProtected || !_owner.Equals(owner))
         {
             throw new SpoolAclException();
         }

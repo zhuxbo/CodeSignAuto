@@ -132,7 +132,7 @@ internal sealed class ManualAgentRunner :
         _backends = new DefaultAgentSigningBackendFactory(_diagnostics);
         _sessionResolver = expectedSid =>
             new InteractiveSessionGuard().ValidateCurrentProcess(expectedSid);
-        _spoolAclPolicyFactory = signingUserSid => new WindowsSpoolAclPolicy(signingUserSid);
+        _spoolAclPolicyFactory = WindowsSpoolAclPolicy.ForManualUser;
         _leaseProtector = new WindowsLocalLeaseProtector();
         _timeProvider = TimeProvider.System;
         _retentionHours = DefaultRetentionHours;
