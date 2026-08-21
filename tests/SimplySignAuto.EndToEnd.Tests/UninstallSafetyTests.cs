@@ -1714,18 +1714,35 @@ public sealed class UninstallSafetyTests
     }
 
     [Fact]
-    public void Purge_cleaner_passes_the_manifest_exact_autologon_identity_to_the_finalizer()
+    public void Purge_cleaner_passes_the_service_manifest_exact_autologon_identity_to_the_finalizer()
     {
         var fixture = ResumeManifestFixture();
+        var manifest = fixture.Manifest with
+        {
+            SigningUserOwnership = UninstallSigningUserOwnership.ProductManaged,
+        };
         (string Owner, string Sid, string Install)? captured = null;
 
         WindowsPurgeQuarantineCleaner.FinalizeAutoLogon(
-            fixture.Manifest,
+            manifest,
             (owner, sid, install) => captured = (owner, sid, install));
 
-        Assert.Equal(fixture.Manifest.InstallOwnerMarker, captured?.Owner);
-        Assert.Equal(fixture.Manifest.SigningUserSid, captured?.Sid);
-        Assert.Equal(fixture.Manifest.InstallInstanceId, captured?.Install);
+        Assert.Equal(manifest.InstallOwnerMarker, captured?.Owner);
+        Assert.Equal(manifest.SigningUserSid, captured?.Sid);
+        Assert.Equal(manifest.InstallInstanceId, captured?.Install);
+    }
+
+    [Fact]
+    public void Purge_cleaner_skips_autologon_finalization_for_manual_install()
+    {
+        var fixture = ResumeManifestFixture();
+        var calls = 0;
+
+        WindowsPurgeQuarantineCleaner.FinalizeAutoLogon(
+            fixture.Manifest,
+            (_, _, _) => calls++);
+
+        Assert.Equal(0, calls);
     }
 
     [Fact]

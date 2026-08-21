@@ -59,6 +59,7 @@ internal static class SetupCulture
             "domain_controller_unsupported" => "ErrorDomainControllerUnsupported",
             "autologon_conflict" => "ErrorAutoLogonConflict",
             "autologon_plaintext_password_present" => "ErrorAutoLogonPlaintextPasswordPresent",
+            "install_media_target_exists" => "ErrorInstallMediaTargetExists",
             _ => "ErrorGeneric",
         };
         var reason = resourceKey == "ErrorAutoLogonConflict"

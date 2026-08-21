@@ -142,6 +142,11 @@ internal static class WindowsPurgeQuarantineCleaner
     {
         ArgumentNullException.ThrowIfNull(manifest);
         ArgumentNullException.ThrowIfNull(finalizer);
+        if (manifest.SigningUserOwnership == UninstallSigningUserOwnership.ExistingUser)
+        {
+            return;
+        }
+
         finalizer(
             manifest.InstallOwnerMarker,
             manifest.SigningUserSid,

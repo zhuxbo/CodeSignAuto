@@ -126,6 +126,8 @@ public sealed class SetupLocalizationTests
     [InlineData("en-US", "autologon_conflict", "AutoLogon", "will not overwrite", "Error code: ")]
     [InlineData("zh-CN", "autologon_plaintext_password_present", "明文自动登录密码", "安全移除", "错误代码：")]
     [InlineData("en-US", "autologon_plaintext_password_present", "plaintext AutoLogon password", "remove it securely", "Error code: ")]
+    [InlineData("zh-CN", "install_media_target_exists", "安装目录", "重启 Windows", "错误代码：")]
+    [InlineData("en-US", "install_media_target_exists", "installation directory", "restart Windows", "Error code: ")]
     public void Stable_prerequisite_codes_have_actionable_messages_in_both_languages(
         string cultureName,
         string code,
