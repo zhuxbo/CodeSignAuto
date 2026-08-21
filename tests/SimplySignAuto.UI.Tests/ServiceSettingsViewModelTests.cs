@@ -13,6 +13,20 @@ namespace SimplySignAuto.UI.Tests;
 public sealed class ServiceSettingsViewModelTests
 {
     [Fact]
+    public void Dialog_uses_the_selected_English_resources()
+    {
+        using var culture = new UiTestCultureScope("en-US");
+        using var vm = DialogViewModel(Summary());
+
+        vm.RetentionHoursText = "0";
+        Assert.Equal("Keep forever", vm.RetentionDisplay);
+        Assert.Equal("Editing service settings", vm.StateText);
+
+        vm.RetentionHoursText = "168";
+        Assert.Equal("168 hours", vm.RetentionDisplay);
+    }
+
+    [Fact]
     public async Task Deferred_dialog_service_releases_the_target_and_can_rebind()
     {
         var inner = new RecordingDialogService();

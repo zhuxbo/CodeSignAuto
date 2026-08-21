@@ -53,6 +53,7 @@ public sealed class UiTestEntryGateTests
             [UiTestLaunchOptions.ModeEnvironmentVariable] = "1",
             [UiTestLaunchOptions.PipeEnvironmentVariable] = "SSA.UI.abcdefabcdefabcdefabcdefabcdefab",
             [UiTestLaunchOptions.NonceEnvironmentVariable] = new string('C', 64),
+            [UiTestLaunchOptions.CultureEnvironmentVariable] = "en-US",
         };
 
         var exitCode = await UiTestProgramGate.DispatchAsync(
@@ -73,6 +74,7 @@ public sealed class UiTestEntryGateTests
         Assert.Equal(1, executions);
         Assert.NotNull(received);
         Assert.Equal("ready", received.State.Code);
+        Assert.Equal("en-US", received.CultureName);
         Assert.DoesNotContain(received.Nonce, received.PipeName, StringComparison.Ordinal);
     }
 }

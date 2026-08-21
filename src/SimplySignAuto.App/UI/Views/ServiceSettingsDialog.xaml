@@ -1,7 +1,8 @@
 <Window x:Class="SimplySignAuto.App.UI.Views.ServiceSettingsDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="修改服务设置"
+        xmlns:localization="clr-namespace:SimplySignAuto.App.UI.Localization"
+        Title="{localization:UiString ServiceSettingsEditTitle}"
         Width="620"
         Height="520"
         MinWidth="560"
@@ -12,13 +13,13 @@
         Foreground="{DynamicResource TextPrimaryBrush}"
         Closing="OnClosing"
         Closed="OnClosed"
-        AutomationProperties.Name="修改服务设置">
+        AutomationProperties.Name="{localization:UiString ServiceSettingsEditTitle}">
   <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Margin="24">
-      <TextBlock Text="修改服务设置"
+      <TextBlock Text="{localization:UiString ServiceSettingsEditTitle}"
                  FontSize="22"
                  FontWeight="SemiBold" />
-      <TextBlock Text="修改会在当前管理员控制台内完成；应用期间服务会重启并重新连接。"
+      <TextBlock Text="{localization:UiString ServiceSettingsEditDescription}"
                  Margin="0,6,0,0"
                  Foreground="{DynamicResource TextSecondaryBrush}"
                  TextWrapping="Wrap" />
@@ -34,26 +35,26 @@
           <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <TextBlock Text="HTTP 端口" VerticalAlignment="Center" />
+        <TextBlock Text="{localization:UiString ServiceSettingsHttpPort}" VerticalAlignment="Center" />
         <TextBox Grid.Column="1"
                  Text="{Binding ListenPortText, UpdateSourceTrigger=PropertyChanged}"
-                 AutomationProperties.Name="服务监听端口" />
+                 AutomationProperties.Name="{localization:UiString ServiceSettingsListenPort}" />
 
-        <TextBlock Grid.Row="1" Text="结果保留小时" Margin="0,12,0,0" VerticalAlignment="Center" />
+        <TextBlock Grid.Row="1" Text="{localization:UiString ServiceSettingsRetentionHours}" Margin="0,12,0,0" VerticalAlignment="Center" />
         <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,12,0,0">
           <TextBox Text="{Binding RetentionHoursText, UpdateSourceTrigger=PropertyChanged}"
-                   AutomationProperties.Name="结果保留小时" />
+                   AutomationProperties.Name="{localization:UiString ServiceSettingsRetentionHours}" />
           <TextBlock Text="{Binding RetentionDisplay}"
                      Margin="0,4,0,0"
                      Foreground="{DynamicResource TextSecondaryBrush}"
-                     AutomationProperties.Name="结果保留说明" />
+                     AutomationProperties.Name="{localization:UiString ServiceSettingsRetentionDescription}" />
         </StackPanel>
 
         <CheckBox Grid.Row="2" Grid.Column="1"
                   Margin="0,14,0,0"
                   IsChecked="{Binding RotateToken}"
-                  Content="轮换 API Token"
-                  AutomationProperties.Name="轮换 API Token" />
+                  Content="{localization:UiString ServiceSettingsRotateToken}"
+                  AutomationProperties.Name="{localization:UiString ServiceSettingsRotateToken}" />
       </Grid>
 
       <Border Margin="0,18,0,0"
@@ -63,7 +64,7 @@
         <StackPanel>
           <TextBlock Text="{Binding StateText}"
                      FontWeight="SemiBold"
-                     AutomationProperties.Name="服务设置修改状态" />
+                     AutomationProperties.Name="{localization:UiString ServiceSettingsEditStatus}" />
           <TextBlock Text="{Binding ErrorCode}"
                      Margin="0,5,0,0"
                      Foreground="{DynamicResource TextSecondaryBrush}"
@@ -84,37 +85,37 @@
           </Style>
         </Border.Style>
         <StackPanel>
-          <TextBlock Text="一次性 API Token"
+          <TextBlock Text="{localization:UiString ServiceSettingsOneTimeToken}"
                      FontWeight="SemiBold" />
-          <TextBlock Text="此值只显示一次。复制并安全保存后，请明确确认。"
+          <TextBlock Text="{localization:UiString ServiceSettingsOneTimeTokenNotice}"
                      Margin="0,5,0,0"
                      TextWrapping="Wrap" />
           <TextBox Text="{Binding OneTimeApiToken, Mode=OneWay}"
                    Margin="0,10,0,0"
                    IsReadOnly="True"
                    FontFamily="Consolas"
-                   AutomationProperties.Name="一次性 API Token" />
+                   AutomationProperties.Name="{localization:UiString ServiceSettingsOneTimeToken}" />
           <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
-            <Button Content="复制"
+            <Button Content="{localization:UiString ActionCopy}"
                     Click="OnCopyToken"
-                    AutomationProperties.Name="复制一次性 API Token" />
-            <Button Content="我已安全保存"
+                    AutomationProperties.Name="{localization:UiString ServiceSettingsCopyToken}" />
+            <Button Content="{localization:UiString ServiceSettingsAcknowledge}"
                     Click="OnAcknowledgeToken"
-                    AutomationProperties.Name="确认已安全保存一次性 API Token" />
+                    AutomationProperties.Name="{localization:UiString ServiceSettingsAcknowledgeAutomation}" />
           </StackPanel>
         </StackPanel>
       </Border>
 
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
-        <Button Content="关闭"
+        <Button Content="{localization:UiString ActionClose}"
                 IsEnabled="{Binding CanClose}"
                 Click="OnClose"
-                AutomationProperties.Name="关闭服务设置修改" />
-        <Button Content="应用"
+                AutomationProperties.Name="{localization:UiString ServiceSettingsCloseAutomation}" />
+        <Button Content="{localization:UiString ActionApply}"
                 IsDefault="True"
                 IsEnabled="{Binding CanApply}"
                 Click="OnApply"
-                AutomationProperties.Name="应用服务设置修改" />
+                AutomationProperties.Name="{localization:UiString ServiceSettingsApplyAutomation}" />
       </StackPanel>
     </StackPanel>
   </ScrollViewer>

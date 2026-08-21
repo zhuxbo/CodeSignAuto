@@ -74,7 +74,9 @@ internal sealed class DesktopTestApp : IAsyncDisposable
 
     public string TrayIdentity { get; }
 
-    public static async Task<DesktopTestApp> StartAsync(string stateCode)
+    public static async Task<DesktopTestApp> StartAsync(
+        string stateCode,
+        string cultureName = "zh-CN")
     {
         if (!OperatingSystem.IsWindows())
         {
@@ -94,7 +96,7 @@ internal sealed class DesktopTestApp : IAsyncDisposable
         Task<string[]>? stderr = null;
         try
         {
-            var start = CreateStartInfo(appHost, stateCode, pipeName, nonce);
+            var start = CreateStartInfo(appHost, stateCode, pipeName, nonce, cultureName);
             process = Process.Start(start) ?? throw new InvalidOperationException("ui_test_process_start_failed");
             host.BindProcessId(process.Id);
             stdout = DrainAsync(process.StandardOutput);
@@ -136,9 +138,9 @@ internal sealed class DesktopTestApp : IAsyncDisposable
         }
     }
 
-    public IReadOnlyList<string> NavigationNames()
+    public IReadOnlyList<string> NavigationNames(string mainNavigationName = "主导航")
     {
-        var navigation = WaitForElement("主导航", ControlType.List, TimeSpan.FromSeconds(5));
+        var navigation = WaitForElement(mainNavigationName, ControlType.List, TimeSpan.FromSeconds(5));
         return navigation.FindAll(
                 TreeScope.Children,
                 new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.ListItem))
@@ -732,7 +734,8 @@ internal sealed class DesktopTestApp : IAsyncDisposable
         string appHost,
         string state,
         string pipeName,
-        string nonce)
+        string nonce,
+        string cultureName)
     {
         var start = new ProcessStartInfo
         {
@@ -759,6 +762,7 @@ internal sealed class DesktopTestApp : IAsyncDisposable
         start.Environment[UiTestLaunchOptions.ModeEnvironmentVariable] = "1";
         start.Environment[UiTestLaunchOptions.PipeEnvironmentVariable] = pipeName;
         start.Environment[UiTestLaunchOptions.NonceEnvironmentVariable] = nonce;
+        start.Environment[UiTestLaunchOptions.CultureEnvironmentVariable] = cultureName;
         return start;
     }
 

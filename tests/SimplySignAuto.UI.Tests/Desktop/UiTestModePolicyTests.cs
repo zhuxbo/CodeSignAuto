@@ -10,6 +10,7 @@ public sealed class UiTestModePolicyTests
             [UiTestLaunchOptions.ModeEnvironmentVariable] = "1",
             [UiTestLaunchOptions.PipeEnvironmentVariable] = "SSA.UI.0123456789abcdef0123456789abcdef",
             [UiTestLaunchOptions.NonceEnvironmentVariable] = new string('A', 64),
+            [UiTestLaunchOptions.CultureEnvironmentVariable] = "zh-CN",
         };
 
     [Theory]
@@ -26,6 +27,7 @@ public sealed class UiTestModePolicyTests
         Assert.True(result.IsAccepted);
         Assert.Equal(state, result.Options!.State.Code);
         Assert.Equal(4123, result.Options.ProcessId);
+        Assert.Equal("zh-CN", result.Options.CultureName);
         Assert.DoesNotContain("SimplySignAuto.Agent.v1", result.Options.PipeName, StringComparison.Ordinal);
         Assert.DoesNotContain("SimplySignAuto.Activation", result.Options.PipeName, StringComparison.Ordinal);
     }
@@ -44,6 +46,9 @@ public sealed class UiTestModePolicyTests
             (["--ui-test-state", "ready"], With(UiTestLaunchOptions.PipeEnvironmentVariable, "SimplySignAuto.Agent.v1")),
             (["--ui-test-state", "ready"], With(UiTestLaunchOptions.PipeEnvironmentVariable, "C:\\secret\\pipe")),
             (["--ui-test-state", "ready"], With(UiTestLaunchOptions.NonceEnvironmentVariable, new string('A', 63))),
+            (["--ui-test-state", "ready"], Without(UiTestLaunchOptions.CultureEnvironmentVariable)),
+            (["--ui-test-state", "ready"], With(UiTestLaunchOptions.CultureEnvironmentVariable, "en-us")),
+            (["--ui-test-state", "ready"], With(UiTestLaunchOptions.CultureEnvironmentVariable, "fr-FR")),
         ];
         foreach (var (arguments, environment) in rejectedLaunches)
         {

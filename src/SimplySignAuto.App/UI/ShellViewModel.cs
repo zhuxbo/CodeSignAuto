@@ -452,10 +452,10 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
 
     public string OverallStatusText => Overview?.Status?.Overall switch
     {
-        OverallReadiness.Ready => "签名服务已就绪",
-        OverallReadiness.Partial => "部分签名能力可用",
-        OverallReadiness.ActionRequired => "需要处理",
-        _ => "尚未检查",
+        OverallReadiness.Ready => UiCulture.Text("OverallReady"),
+        OverallReadiness.Partial => UiCulture.Text("OverallPartial"),
+        OverallReadiness.ActionRequired => UiCulture.Text("OverallActionRequired"),
+        _ => UiCulture.Text("OverallNotChecked"),
     };
 
     public string OverallStatusIcon => Overview?.Status?.Overall switch
@@ -466,7 +466,8 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
         _ => "○",
     };
 
-    public string OverallStatusAutomationName => $"服务状态：{OverallStatusText}";
+    public string OverallStatusAutomationName =>
+        UiCulture.Format("OverallStatusAutomation", OverallStatusText);
 
     public NavigationPage CurrentPage
     {
@@ -544,11 +545,11 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
         ServiceSettingsViewModel? serviceSettings,
         ApplicationSettingsViewModel applicationSettings) =>
     [
-        new("概览", "●", "概览信息将在状态检查后显示。", overview),
-        new("快速签名", "✎", "请选择本机文件进行签名。", quickSign),
-        new("签名任务", "≡", "任务列表将在服务连接后显示。", jobs),
-        new("激活凭证", "◆", "激活凭证状态将在后续版本启用。", activation),
-        new("服务设置", "⚙", "服务设置将在后续版本启用。", serviceSettings),
+        new(UiCulture.Text("NavigationOverview"), "●", UiCulture.Text("NavigationOverviewPlaceholder"), overview),
+        new(UiCulture.Text("NavigationQuickSign"), "✎", UiCulture.Text("NavigationQuickSignPlaceholder"), quickSign),
+        new(UiCulture.Text("NavigationJobs"), "≡", UiCulture.Text("NavigationJobsPlaceholder"), jobs),
+        new(UiCulture.Text("NavigationActivation"), "◆", UiCulture.Text("NavigationActivationPlaceholder"), activation),
+        new(UiCulture.Text("NavigationServiceSettings"), "⚙", UiCulture.Text("NavigationServiceSettingsPlaceholder"), serviceSettings),
         new(applicationSettings.PageTitle, "⚙", string.Empty, applicationSettings),
     ];
 

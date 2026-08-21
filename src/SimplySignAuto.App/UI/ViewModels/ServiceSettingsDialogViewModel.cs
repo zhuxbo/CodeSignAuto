@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using SimplySignAuto.Agent.Ipc;
 using SimplySignAuto.App.Commands;
+using SimplySignAuto.App.UI.Localization;
 using SimplySignAuto.Protocol;
 
 namespace SimplySignAuto.App.UI.ViewModels;
@@ -159,8 +160,10 @@ internal sealed class ServiceSettingsDialogViewModel : INotifyPropertyChanged, I
     public string RetentionDisplay =>
         TryParseAsciiInteger(RetentionHoursText, out var retentionHours) &&
         retentionHours is >= 0 and <= 168
-            ? retentionHours == 0 ? "永久保留" : $"{retentionHours} 小时"
-            : "请输入 0 至 168 的整数";
+            ? retentionHours == 0
+                ? UiCulture.Text("ServiceSettingsKeepForever")
+                : UiCulture.Format("ServiceSettingsHoursFormat", retentionHours)
+            : UiCulture.Text("ServiceSettingsRetentionInvalid");
 
     public bool RotateToken
     {
@@ -184,12 +187,12 @@ internal sealed class ServiceSettingsDialogViewModel : INotifyPropertyChanged, I
 
     public string StateText => State switch
     {
-        ServiceSettingsDialogState.Editing => "编辑服务设置",
-        ServiceSettingsDialogState.Applying => "正在应用配置并重启服务",
-        ServiceSettingsDialogState.Restarting => "服务已重启，正在等待连接准备",
-        ServiceSettingsDialogState.Reconnecting => "正在重新连接管理服务",
-        ServiceSettingsDialogState.Succeeded => "服务设置修改成功",
-        ServiceSettingsDialogState.Failed => "服务设置修改失败",
+        ServiceSettingsDialogState.Editing => UiCulture.Text("ServiceSettingsStateEditing"),
+        ServiceSettingsDialogState.Applying => UiCulture.Text("ServiceSettingsStateApplying"),
+        ServiceSettingsDialogState.Restarting => UiCulture.Text("ServiceSettingsStateRestarting"),
+        ServiceSettingsDialogState.Reconnecting => UiCulture.Text("ServiceSettingsStateReconnecting"),
+        ServiceSettingsDialogState.Succeeded => UiCulture.Text("ServiceSettingsStateSucceeded"),
+        ServiceSettingsDialogState.Failed => UiCulture.Text("ServiceSettingsStateFailed"),
         _ => throw new InvalidOperationException("service_settings_state_invalid"),
     };
 

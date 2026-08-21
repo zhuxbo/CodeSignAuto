@@ -2,6 +2,7 @@
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Threading;
+using SimplySignAuto.App.UI.Localization;
 
 namespace SimplySignAuto.App.UI;
 
@@ -73,7 +74,7 @@ public partial class MainWindow : Window, IWindowController
         InvokeOnDispatcher(() => System.Windows.MessageBox.Show(
             this,
             message,
-            "SimplySign Auto",
+            UiCulture.Text("WindowTitle"),
             System.Windows.MessageBoxButton.OK,
             System.Windows.MessageBoxImage.Information));
     }
@@ -152,15 +153,15 @@ public partial class MainWindow : Window, IWindowController
 
     private bool ShowReloginConfirmation() => System.Windows.MessageBox.Show(
         this,
-        "检测到 SimplySign 正在其他 Windows 会话运行。将关闭该会话并在当前会话登录，是否继续？",
-        "SimplySign Auto",
+        UiCulture.Text("ConfirmRelogin"),
+        UiCulture.Text("WindowTitle"),
         System.Windows.MessageBoxButton.YesNo,
         System.Windows.MessageBoxImage.Warning) == System.Windows.MessageBoxResult.Yes;
 
     private bool ShowClearOtpConfirmation() => System.Windows.MessageBox.Show(
         this,
-        "此操作会退出当前 SimplySign 登录并永久删除本机保存的 TOTP 激活内容。确定继续吗？",
-        "SimplySign Auto",
+        UiCulture.Text("ConfirmClearActivation"),
+        UiCulture.Text("WindowTitle"),
         System.Windows.MessageBoxButton.YesNo,
         System.Windows.MessageBoxImage.Warning) == System.Windows.MessageBoxResult.Yes;
 

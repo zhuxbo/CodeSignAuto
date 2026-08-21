@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using SimplySignAuto.Agent.Ipc;
 using SimplySignAuto.App.UI;
+using SimplySignAuto.App.UI.Localization;
 using SimplySignAuto.App.UI.Status;
 using SimplySignAuto.Protocol;
 
@@ -15,38 +16,38 @@ public interface IReloginConfirmation
 
 public sealed class OverviewViewModel : INotifyPropertyChanged, IDisposable
 {
-    private static readonly IReadOnlyDictionary<string, string> ReasonText =
+    private static readonly IReadOnlyDictionary<string, string> ReasonResourceKeys =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            ["not_configured"] = "未配置",
-            ["process_missing"] = "SimplySign 未运行",
-            ["process_session_mismatch"] = "SimplySign 不在当前登录会话",
-            ["process_probe_failed"] = "无法检查 SimplySign 进程",
-            ["token_missing"] = "未找到令牌",
-            ["token_identifier_mismatch"] = "令牌标识不匹配",
-            ["certificate_missing"] = "未找到证书",
-            ["certificate_identifier_mismatch"] = "证书标识不匹配",
-            ["not_yet_valid"] = "证书尚未生效",
-            ["expired"] = "证书已过期",
-            ["private_key_ambiguous"] = "证书私钥不唯一",
-            ["certificate_serial_ambiguous"] = "证书序列号不唯一",
-            ["unsupported_purpose"] = "证书不支持该签名用途",
-            ["catalog_stale"] = "证书目录已失效",
-            ["private_key_missing"] = "未找到私钥",
-            ["private_key_identifier_mismatch"] = "私钥标识不匹配",
-            ["probe_output_invalid"] = "签名能力检查结果无效",
-            ["probe_request_invalid"] = "签名能力检查请求无效",
-            ["probe_request_cleanup_failed"] = "签名能力检查清理失败",
-            ["probe_token_unavailable"] = "签名令牌不可用",
-            ["probe_process_failed"] = "签名能力检查进程失败",
-            ["probe_failed"] = "签名能力检查失败",
-            ["management_unavailable"] = "管理通道不可用",
-            ["service_unavailable"] = "本机签名服务不可用",
-            ["agent_unavailable"] = "签名代理未连接",
-            ["agent_session_invalid"] = "签名代理会话无效",
-            ["heartbeat_missing"] = "尚未收到代理状态",
-            ["heartbeat_invalid"] = "代理状态与当前会话不一致",
-            ["heartbeat_stale"] = "代理状态已过期",
+            ["not_configured"] = "ReasonNotConfigured",
+            ["process_missing"] = "ReasonProcessMissing",
+            ["process_session_mismatch"] = "ReasonProcessSessionMismatch",
+            ["process_probe_failed"] = "ReasonProcessProbeFailed",
+            ["token_missing"] = "ReasonTokenMissing",
+            ["token_identifier_mismatch"] = "ReasonTokenIdentifierMismatch",
+            ["certificate_missing"] = "ReasonCertificateMissing",
+            ["certificate_identifier_mismatch"] = "ReasonCertificateIdentifierMismatch",
+            ["not_yet_valid"] = "ReasonNotYetValid",
+            ["expired"] = "ReasonExpired",
+            ["private_key_ambiguous"] = "ReasonPrivateKeyAmbiguous",
+            ["certificate_serial_ambiguous"] = "ReasonCertificateSerialAmbiguous",
+            ["unsupported_purpose"] = "ReasonUnsupportedPurpose",
+            ["catalog_stale"] = "ReasonCatalogStale",
+            ["private_key_missing"] = "ReasonPrivateKeyMissing",
+            ["private_key_identifier_mismatch"] = "ReasonPrivateKeyIdentifierMismatch",
+            ["probe_output_invalid"] = "ReasonProbeOutputInvalid",
+            ["probe_request_invalid"] = "ReasonProbeRequestInvalid",
+            ["probe_request_cleanup_failed"] = "ReasonProbeRequestCleanupFailed",
+            ["probe_token_unavailable"] = "ReasonProbeTokenUnavailable",
+            ["probe_process_failed"] = "ReasonProbeProcessFailed",
+            ["probe_failed"] = "ReasonProbeFailed",
+            ["management_unavailable"] = "ReasonManagementUnavailable",
+            ["service_unavailable"] = "ReasonServiceUnavailable",
+            ["agent_unavailable"] = "ReasonAgentUnavailable",
+            ["agent_session_invalid"] = "ReasonAgentSessionInvalid",
+            ["heartbeat_missing"] = "ReasonHeartbeatMissing",
+            ["heartbeat_invalid"] = "ReasonHeartbeatInvalid",
+            ["heartbeat_stale"] = "ReasonHeartbeatStale",
         };
 
     private readonly IAgentManagementClient _management;
@@ -144,7 +145,9 @@ public sealed class OverviewViewModel : INotifyPropertyChanged, IDisposable
 
     public bool IsLoggedIn => Snapshot is not null && IsLoginReady(Snapshot);
 
-    public string LoginButtonText => IsLoggedIn ? "退出" : "登录";
+    public string LoginButtonText => IsLoggedIn
+        ? UiCulture.Text("OverviewLogout")
+        : UiCulture.Text("OverviewLogin");
 
     public CurrentJobSnapshot? CurrentJob => Snapshot?.CurrentJob;
 
@@ -156,11 +159,11 @@ public sealed class OverviewViewModel : INotifyPropertyChanged, IDisposable
 
     public string SimplySignStatusText => Snapshot switch
     {
-        null => "尚未检查",
+        null => UiCulture.Text("OverallNotChecked"),
         { SimplySignProcessRunning: true, SimplySignProcessSessionId: not null } snapshot
             when snapshot.SimplySignProcessSessionId == snapshot.AgentSessionId =>
-                $"进程诊断：运行中（会话 {snapshot.AgentSessionId}）",
-        _ => "进程诊断：未运行",
+                UiCulture.Format("OverviewProcessRunning", snapshot.AgentSessionId),
+        _ => UiCulture.Text("OverviewProcessNotRunning"),
     };
 
     public string SimplySignStatusIcon => Snapshot is
@@ -187,12 +190,12 @@ public sealed class OverviewViewModel : INotifyPropertyChanged, IDisposable
             StringComparison.Ordinal);
 
     public string QueueStatusText => Snapshot is null
-        ? "队列尚未检查"
-        : $"排队 {Snapshot.QueuedJobCount} · 执行中 {Snapshot.ActiveJobCount}";
+        ? UiCulture.Text("OverviewQueueNotChecked")
+        : UiCulture.Format("OverviewQueueStatus", Snapshot.QueuedJobCount, Snapshot.ActiveJobCount);
 
     public string CurrentJobText => Snapshot?.CurrentJob is { } job
-        ? $"{JobKindText(job.Kind)} · {JobStageText(job.Stage)} · 已运行 {job.ElapsedSeconds} 秒"
-        : "当前没有签名任务";
+        ? UiCulture.Format("OverviewCurrentJob", JobKindText(job.Kind), JobStageText(job.Stage), job.ElapsedSeconds)
+        : UiCulture.Text("OverviewNoCurrentJob");
 
     public IReadOnlyList<string> ReasonMessages =>
         Status?.Reasons
@@ -202,7 +205,7 @@ public sealed class OverviewViewModel : INotifyPropertyChanged, IDisposable
             .ToArray() ?? [];
 
     public string CorrelationText => Status?.CorrelationId is { } correlation
-        ? $"关联编号：{correlation:D}"
+        ? UiCulture.Format("CorrelationFormat", correlation.ToString("D", UiCulture.Current))
         : string.Empty;
 
     public bool HasDiagnostics => ReasonMessages.Count > 0 || CorrelationText.Length > 0;
@@ -505,26 +508,30 @@ public sealed class OverviewViewModel : INotifyPropertyChanged, IDisposable
         snapshot.SimplySignProcessRunning &&
         snapshot.SimplySignProcessSessionId != snapshot.AgentSessionId;
 
-    private string CapabilityText(bool ready) => Snapshot is null ? "尚未检查" : ready ? "已就绪" : "不可用";
+    private string CapabilityText(bool ready) => Snapshot is null
+        ? UiCulture.Text("OverallNotChecked")
+        : ready ? UiCulture.Text("SessionReady") : UiCulture.Text("StatusUnavailable");
 
     private string CapabilityIcon(bool ready) => Snapshot is null ? "○" : ready ? "✓" : "×";
 
     private static string MapReason(string reason) =>
-        ReasonText.TryGetValue(reason, out var text) ? text : "内部状态不可用";
+        ReasonResourceKeys.TryGetValue(reason, out var key)
+            ? UiCulture.Text(key)
+            : UiCulture.Text("ReasonInternalUnavailable");
 
     private static string JobKindText(string kind) => kind switch
     {
-        "authenticode" => "代码签名",
-        "pdf" => "PDF 文档签名",
-        _ => "签名任务",
+        "authenticode" => UiCulture.Text("AuthenticodeTitle"),
+        "pdf" => UiCulture.Text("PdfSigningTitle"),
+        _ => UiCulture.Text("JobKindGeneric"),
     };
 
     private static string JobStageText(string stage) => stage switch
     {
-        "waiting_for_agent" => "等待签名代理",
-        "signing" => "正在签名",
-        "verifying" => "正在验证",
-        _ => "处理中",
+        "waiting_for_agent" => UiCulture.Text("JobStageWaitingForAgent"),
+        "signing" => UiCulture.Text("JobStageSigning"),
+        "verifying" => UiCulture.Text("JobStageVerifying"),
+        _ => UiCulture.Text("JobStageProcessing"),
     };
 
     private sealed class DelegateCommand(Action execute) : ICommand

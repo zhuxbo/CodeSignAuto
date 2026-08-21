@@ -14,6 +14,23 @@ public sealed class ActivationViewModelTests
     private const string Uri = "otpauth://totp/Certum:user%40example.test?secret=JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP&algorithm=SHA256&digits=6&period=30&issuer=Certum";
 
     [Fact]
+    public void Activation_cards_use_English_resources_and_current_culture_dates()
+    {
+        using var culture = new UiTestCultureScope("en-US");
+        var summary = Summary("Code Signing", "52A1B4C9", true, false, true, null);
+        var backend = new BackendFake
+        {
+            Snapshot = Snapshot(active: false, certificates: [summary]),
+        };
+        using var vm = new ActivationViewModel(backend, backend, backend);
+
+        var card = Assert.Single(vm.Certificates);
+        Assert.Equal("Code signing available", card.StatusText);
+        Assert.Equal("Serial number: 52A1B4C9", card.LogicalRows[1]);
+        Assert.Contains(summary.NotBeforeUtc.ToLocalTime().ToString("g", System.Globalization.CultureInfo.GetCultureInfo("en-US")), card.ValidityText, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Activation_shows_all_discovered_certificates_in_three_lines()
     {
         var backend = new BackendFake

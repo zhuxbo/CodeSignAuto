@@ -30,11 +30,13 @@ public sealed record UiTestLaunchOptions(
     UiTestState State,
     string PipeName,
     string Nonce,
-    int ProcessId)
+    int ProcessId,
+    string CultureName = "zh-CN")
 {
     public const string ModeEnvironmentVariable = "SIMPLYSIGN_UI_TEST_MODE";
     public const string PipeEnvironmentVariable = "SIMPLYSIGN_UI_TEST_PIPE";
     public const string NonceEnvironmentVariable = "SIMPLYSIGN_UI_TEST_NONCE";
+    public const string CultureEnvironmentVariable = "SIMPLYSIGN_UI_TEST_CULTURE";
     private const string PipePrefix = "SSA.UI.";
 
     public static UiTestLaunchResult Parse(
@@ -49,13 +51,15 @@ public sealed record UiTestLaunchOptions(
             processId <= 0 ||
             !TryGetExact(environment, ModeEnvironmentVariable, out var mode) || mode != "1" ||
             !TryGetExact(environment, PipeEnvironmentVariable, out var pipeName) || !IsPrivatePipeName(pipeName) ||
-            !TryGetExact(environment, NonceEnvironmentVariable, out var nonce) || !IsHex(nonce, 64))
+            !TryGetExact(environment, NonceEnvironmentVariable, out var nonce) || !IsHex(nonce, 64) ||
+            !TryGetExact(environment, CultureEnvironmentVariable, out var cultureName) ||
+            cultureName is not "zh-CN" and not "en-US")
         {
             return UiTestLaunchResult.Rejected;
         }
 
         return new UiTestLaunchResult(
-            new UiTestLaunchOptions(state!, pipeName!, nonce!, processId),
+            new UiTestLaunchOptions(state!, pipeName!, nonce!, processId, cultureName!),
             null);
     }
 

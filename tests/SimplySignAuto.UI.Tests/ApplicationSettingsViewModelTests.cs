@@ -41,17 +41,25 @@ public sealed class ApplicationSettingsViewModelTests : IDisposable
     }
 
     [Fact]
-    public void English_runtime_exposes_complete_English_settings_copy()
+    public void English_runtime_uses_current_culture_for_complete_settings_copy()
     {
-        var viewModel = new ApplicationSettingsViewModel(
-            new UiPreferenceStore(Path.Combine(_directory, "ui.json")),
-            CultureInfo.GetCultureInfo("en-US"));
+        var originalUiCulture = CultureInfo.CurrentUICulture;
+        try
+        {
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("en-US");
+            var viewModel = new ApplicationSettingsViewModel(
+                new UiPreferenceStore(Path.Combine(_directory, "ui.json")));
 
-        Assert.Equal("Application settings", viewModel.PageTitle);
-        Assert.Equal("Interface language", viewModel.LanguageLabel);
-        Assert.Equal("Save", viewModel.SaveButtonText);
-        Assert.Equal(["Simplified Chinese", "English"],
-            viewModel.Languages.Select(option => option.DisplayName).ToArray());
+            Assert.Equal("Application settings", viewModel.PageTitle);
+            Assert.Equal("Interface language", viewModel.LanguageLabel);
+            Assert.Equal("Save", viewModel.SaveButtonText);
+            Assert.Equal(["Simplified Chinese", "English"],
+                viewModel.Languages.Select(option => option.DisplayName).ToArray());
+        }
+        finally
+        {
+            CultureInfo.CurrentUICulture = originalUiCulture;
+        }
     }
 
     public void Dispose()

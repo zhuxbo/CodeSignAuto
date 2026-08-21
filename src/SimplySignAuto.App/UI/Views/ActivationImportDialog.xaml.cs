@@ -1,4 +1,5 @@
 #if SIMPLYSIGN_WPF
+using SimplySignAuto.App.UI.Localization;
 using SimplySignAuto.App.UI.ViewModels;
 
 namespace SimplySignAuto.App.UI.Views;
@@ -97,13 +98,13 @@ public partial class ActivationImportDialog : System.Windows.Window
         SecretInput.IsEnabled = !saving;
         SaveButton.IsEnabled = !saving;
         SaveStatus.Text = saving
-            ? "正在保存激活内容，完成前不能关闭此窗口。"
-            : "内容仅用于当前用户受保护存储；成功、取消或失败都会清空输入。";
+            ? UiCulture.Text("ActivationSaving")
+            : UiCulture.Text("ActivationImportStorageNotice");
     }
 
     private void ShowSaveInProgress()
     {
-        SaveStatus.Text = "正在保存激活内容，完成前不能关闭此窗口。";
+        SaveStatus.Text = UiCulture.Text("ActivationSaving");
         CancelButton.Focus();
     }
 }

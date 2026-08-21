@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using SimplySignAuto.Agent.Ipc;
 using SimplySignAuto.App.Commands;
+using SimplySignAuto.App.UI.Localization;
 using SimplySignAuto.Protocol;
 
 namespace SimplySignAuto.App.UI.ViewModels;
@@ -57,11 +58,15 @@ public sealed class ServiceSettingsViewModel : INotifyPropertyChanged, IDisposab
         }
     }
 
-    public string? ProductVersionText => Settings is null ? null : $"版本 {Settings.ProductVersion}";
+    public string? ProductVersionText => Settings is null
+        ? null
+        : UiCulture.Format("VersionFormat", Settings.ProductVersion);
 
     public string? RetentionText => Settings is null
         ? null
-        : Settings.RetentionHours == 0 ? "永久保留" : $"{Settings.RetentionHours} 小时";
+        : Settings.RetentionHours == 0
+            ? UiCulture.Text("ServiceSettingsKeepForever")
+            : UiCulture.Format("ServiceSettingsHoursFormat", Settings.RetentionHours);
 
     public string? MaximumUploadText => Settings is null
         ? null

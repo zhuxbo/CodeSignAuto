@@ -1,6 +1,7 @@
 namespace SimplySignAuto.App.UI;
 
 using System.ComponentModel;
+using SimplySignAuto.App.UI.Localization;
 using SimplySignAuto.App.UI.Status;
 using SimplySignAuto.App.UI.ViewModels;
 
@@ -37,8 +38,8 @@ public sealed class TrayIconController : IDisposable
 {
     private static readonly IReadOnlyList<TrayMenuEntry> FixedEntries =
     [
-        new(TrayCommand.OpenConsole, "打开控制台"),
-        new(TrayCommand.Exit, "退出程序"),
+        new(TrayCommand.OpenConsole, UiCulture.Text("TrayOpenConsole")),
+        new(TrayCommand.Exit, UiCulture.Text("TrayExit")),
     ];
 
     private readonly ITrayIconPlatform _platform;
@@ -101,14 +102,17 @@ public sealed class TrayIconController : IDisposable
             case TrayCommand.CurrentStatus:
                 await InvokeUiAsync(
                     () => _window.ShowNotice(
-                        $"当前状态：{_viewModel.OverallStatusIcon} {_viewModel.OverallStatusText}"),
+                        UiCulture.Format(
+                            "TrayCurrentStatus",
+                            _viewModel.OverallStatusIcon,
+                            _viewModel.OverallStatusText)),
                     cancellationToken).ConfigureAwait(false);
                 break;
             case TrayCommand.Recheck:
                 if (_viewModel.Overview is null)
                 {
                     await InvokeUiAsync(
-                        () => _window.ShowNotice("状态检查将在后续任务接入"),
+                        () => _window.ShowNotice(UiCulture.Text("TrayStatusPending")),
                         cancellationToken).ConfigureAwait(false);
                 }
                 else
@@ -120,7 +124,7 @@ public sealed class TrayIconController : IDisposable
                 if (_viewModel.Overview is null)
                 {
                     await InvokeUiAsync(
-                        () => _window.ShowNotice("最近任务将在任务页接入"),
+                        () => _window.ShowNotice(UiCulture.Text("TrayRecentJobsPending")),
                         cancellationToken).ConfigureAwait(false);
                 }
                 else
@@ -206,7 +210,7 @@ public sealed class TrayIconController : IDisposable
         catch (Exception)
         {
             await InvokeUiAsync(
-                () => _window.ShowNotice("托盘命令执行失败，管理程序将继续运行。"),
+                () => _window.ShowNotice(UiCulture.Text("TrayCommandFailed")),
                 CancellationToken.None).ConfigureAwait(false);
         }
     }

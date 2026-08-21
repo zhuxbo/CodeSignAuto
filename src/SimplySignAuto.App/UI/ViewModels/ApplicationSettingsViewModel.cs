@@ -20,7 +20,7 @@ public sealed class ApplicationSettingsViewModel : INotifyPropertyChanged
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _displayCulture = displayCulture is null
-            ? UiCulture.ResolveDefault(CultureInfo.CurrentUICulture)
+            ? UiCulture.Current
             : UiCulture.ResolveSelection(displayCulture.Name);
         _selectedCultureName = _displayCulture.Name;
         Languages =

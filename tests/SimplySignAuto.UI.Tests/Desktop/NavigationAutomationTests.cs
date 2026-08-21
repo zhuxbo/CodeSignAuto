@@ -10,6 +10,56 @@ public sealed class NavigationAutomationTests
 {
     [WindowsDesktopFact]
     [Trait("Category", "Desktop")]
+    public async Task Chinese_and_English_render_all_six_pages_with_localized_navigation()
+    {
+        string[] pageKeys =
+        [
+            "NavigationOverview",
+            "NavigationQuickSign",
+            "NavigationJobs",
+            "NavigationActivation",
+            "NavigationServiceSettings",
+            "ApplicationSettingsTitle",
+        ];
+        string[] primaryActionKeys =
+        [
+            "OverviewLogout",
+            "QuickSignChooseFileAutomation",
+            "JobsRefreshAutomation",
+            "ActivationImportAutomation",
+            "ActionEdit",
+            "SaveButton",
+        ];
+        foreach (var cultureName in new[] { "zh-CN", "en-US" })
+        {
+            var culture = UiCulture.ResolveSelection(cultureName);
+            var expected = pageKeys.Select(key => UiCulture.GetString(key, culture)).ToArray();
+            var mainNavigation = UiCulture.GetString("MainNavigation", culture);
+            await using var app = await DesktopTestApp.StartAsync("ready", cultureName);
+
+            Assert.Equal(expected, app.NavigationNames(mainNavigation));
+            var windowBounds = app.MainWindow.Current.BoundingRectangle;
+            for (var index = 0; index < expected.Length; index++)
+            {
+                var name = expected[index];
+                app.SelectNavigation(name);
+                var title = app.WaitForElement(name, ControlType.Text, TimeSpan.FromSeconds(5));
+                var primaryAction = app.WaitForElement(
+                    UiCulture.GetString(primaryActionKeys[index], culture),
+                    ControlType.Button,
+                    TimeSpan.FromSeconds(5));
+                Assert.False(title.Current.IsOffscreen);
+                Assert.False(title.Current.BoundingRectangle.IsEmpty);
+                Assert.True(windowBounds.Contains(title.Current.BoundingRectangle));
+                Assert.False(primaryAction.Current.IsOffscreen);
+                Assert.False(primaryAction.Current.BoundingRectangle.IsEmpty);
+                Assert.True(windowBounds.Contains(primaryAction.Current.BoundingRectangle));
+            }
+        }
+    }
+
+    [WindowsDesktopFact]
+    [Trait("Category", "Desktop")]
     public async Task Six_pages_have_fixed_unique_names_and_real_selection_navigation()
     {
         await using var app = await DesktopTestApp.StartAsync("ready");
@@ -63,6 +113,9 @@ namespace SimplySignAuto.UI.Tests.Desktop;
 [Collection(DesktopUiAutomationCollection.Name)]
 public sealed class NavigationAutomationTests
 {
+    [Fact(Skip = "Requires real WPF UI Automation in a non-zero Windows session.")]
+    public void Chinese_and_English_render_all_six_pages_with_localized_navigation() { }
+
     [Fact(Skip = "Requires real WPF UI Automation in a non-zero Windows session.")]
     public void Six_pages_have_fixed_unique_names_and_real_selection_navigation() { }
 

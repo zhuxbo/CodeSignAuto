@@ -1,7 +1,8 @@
 <UserControl x:Class="SimplySignAuto.App.UI.Views.JobsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             AutomationProperties.Name="签名任务列表"
+             xmlns:localization="clr-namespace:SimplySignAuto.App.UI.Localization"
+             AutomationProperties.Name="{localization:UiString JobsAutomation}"
              Loaded="OnLoaded">
   <UserControl.Resources>
     <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
@@ -13,28 +14,28 @@
         <ColumnDefinition Width="Auto" />
       </Grid.ColumnDefinitions>
       <StackPanel>
-        <TextBlock Text="签名任务"
+        <TextBlock Text="{localization:UiString JobsTitle}"
                    FontSize="26"
                    FontWeight="SemiBold"
-                   AutomationProperties.Name="签名任务" />
-        <TextBlock Text="查看本机与 CI/API 提交的任务；活动任务优先显示。"
+                   AutomationProperties.Name="{localization:UiString JobsTitle}" />
+        <TextBlock Text="{localization:UiString JobsDescription}"
                    Margin="0,5,0,0"
                    Foreground="{DynamicResource TextSecondaryBrush}" />
       </StackPanel>
       <Button Grid.Column="1"
-              Content="刷新"
+              Content="{localization:UiString ActionRefresh}"
               Click="OnRefresh"
               VerticalAlignment="Bottom"
-              AutomationProperties.Name="刷新签名任务" />
+              AutomationProperties.Name="{localization:UiString JobsRefreshAutomation}" />
     </Grid>
 
     <Border Style="{DynamicResource StatusPanelStyle}"
             Margin="0,20,0,0"
-            AutomationProperties.Name="签名任务状态区">
+            AutomationProperties.Name="{localization:UiString JobsStatusArea}">
       <StackPanel>
-        <TextBlock Text="任务加载中…"
+        <TextBlock Text="{localization:UiString JobsLoading}"
                    Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}"
-                   AutomationProperties.Name="任务加载中" />
+                   AutomationProperties.Name="{localization:UiString JobsLoading}" />
         <TextBlock Text="{Binding ErrorCode}"
                    Foreground="{DynamicResource TextSecondaryBrush}"
                    AutomationProperties.Name="{Binding ErrorCode}" />
@@ -63,8 +64,8 @@
                     <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
                       <TextBlock Text="{Binding KindText}" />
                       <TextBlock Text=" · " />
-                      <TextBlock Text="{Binding ErrorCode, TargetNullValue=无错误}" />
-                      <TextBlock Text=" · 关联 " />
+                      <TextBlock Text="{Binding ErrorCode, TargetNullValue={localization:UiString StatusNoError}}" />
+                      <TextBlock Text="{localization:UiString JobsCorrelationSeparator}" />
                       <TextBlock Text="{Binding CorrelationId}" />
                     </StackPanel>
                   </StackPanel>
@@ -76,22 +77,22 @@
                              VerticalAlignment="Center"
                              AutomationProperties.Name="{Binding StateText}" />
                   <Button Grid.Column="4"
-                          Content="保存副本"
+                          Content="{localization:UiString JobsSaveCopy}"
                           Tag="{Binding JobId}"
                           IsEnabled="{Binding HasResult}"
                           Click="OnSaveResult"
-                          AutomationProperties.Name="保存签名结果副本" />
+                          AutomationProperties.Name="{localization:UiString JobsSaveCopyAutomation}" />
                 </Grid>
               </Border>
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
-        <Button Content="加载更多"
+        <Button Content="{localization:UiString JobsLoadMore}"
                 Margin="0,14,0,0"
                 HorizontalAlignment="Left"
                 IsEnabled="{Binding CanLoadMore}"
                 Click="OnLoadMore"
-                AutomationProperties.Name="加载更多签名任务" />
+                AutomationProperties.Name="{localization:UiString JobsLoadMoreAutomation}" />
       </StackPanel>
     </Border>
   </StackPanel>

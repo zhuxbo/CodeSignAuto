@@ -15,10 +15,7 @@ public static class UiCulture
     public static CultureInfo ResolveDefault(CultureInfo systemUiCulture)
     {
         ArgumentNullException.ThrowIfNull(systemUiCulture);
-        return ResolveSelection(
-            systemUiCulture.TwoLetterISOLanguageName.Equals("zh", StringComparison.OrdinalIgnoreCase)
-                ? ChineseName
-                : EnglishName);
+        return ResolveSelection(ChineseName);
     }
 
     public static CultureInfo ResolveSelection(string cultureName) => cultureName switch
@@ -37,6 +34,13 @@ public static class UiCulture
         CultureInfo.DefaultThreadCurrentCulture = selected;
         CultureInfo.DefaultThreadCurrentUICulture = selected;
     }
+
+    public static CultureInfo Current => ResolveSelection(CultureInfo.CurrentUICulture.Name);
+
+    public static string Text(string key) => GetString(key, Current);
+
+    public static string Format(string key, params object?[] args) =>
+        string.Format(Current, Text(key), args);
 
     public static string GetString(string key, CultureInfo culture)
     {

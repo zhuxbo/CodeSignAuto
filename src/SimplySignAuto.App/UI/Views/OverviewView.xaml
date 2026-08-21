@@ -1,7 +1,8 @@
 <UserControl x:Class="SimplySignAuto.App.UI.Views.OverviewView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             AutomationProperties.Name="签名服务概览">
+             xmlns:localization="clr-namespace:SimplySignAuto.App.UI.Localization"
+             AutomationProperties.Name="{localization:UiString OverviewAutomation}">
   <StackPanel Margin="{DynamicResource SpaceLarge}">
     <Grid>
       <Grid.ColumnDefinitions>
@@ -9,11 +10,11 @@
         <ColumnDefinition Width="Auto" />
       </Grid.ColumnDefinitions>
       <StackPanel>
-        <TextBlock Text="概览"
+        <TextBlock Text="{localization:UiString OverviewTitle}"
                    FontSize="26"
                    FontWeight="SemiBold"
-                   AutomationProperties.Name="概览" />
-        <TextBlock Text="本机 SimplySign 与签名能力的实时状态"
+                   AutomationProperties.Name="{localization:UiString OverviewTitle}" />
+        <TextBlock Text="{localization:UiString OverviewDescription}"
                    Margin="0,5,0,0"
                    Foreground="{DynamicResource TextSecondaryBrush}" />
       </StackPanel>
@@ -57,13 +58,13 @@
 
       <Border Grid.Column="0"
               Style="{DynamicResource StatusPanelStyle}"
-              AutomationProperties.Name="SimplySign 状态面板">
+              AutomationProperties.Name="{localization:UiString SimplySignStatusPanel}">
         <StackPanel>
           <TextBlock Text="SimplySign" FontSize="16" FontWeight="SemiBold" />
           <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
             <TextBlock Text="{Binding SimplySignStatusIcon}"
                        Margin="0,0,7,0"
-                       AutomationProperties.Name="SimplySign 状态图标" />
+                       AutomationProperties.Name="{localization:UiString SimplySignStatusIcon}" />
             <TextBlock Text="{Binding SimplySignStatusText}"
                        TextWrapping="Wrap"
                        AutomationProperties.Name="{Binding SimplySignStatusText}" />
@@ -73,13 +74,13 @@
 
       <Border Grid.Column="2"
               Style="{DynamicResource StatusPanelStyle}"
-              AutomationProperties.Name="代码签名状态面板">
+              AutomationProperties.Name="{localization:UiString AuthenticodeStatusPanel}">
         <StackPanel>
-          <TextBlock Text="代码签名" FontSize="16" FontWeight="SemiBold" />
+          <TextBlock Text="{localization:UiString AuthenticodeTitle}" FontSize="16" FontWeight="SemiBold" />
           <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
             <TextBlock Text="{Binding AuthenticodeStatusIcon}"
                        Margin="0,0,7,0"
-                       AutomationProperties.Name="代码签名状态图标" />
+                       AutomationProperties.Name="{localization:UiString AuthenticodeStatusIcon}" />
             <TextBlock Text="{Binding AuthenticodeStatusText}"
                        TextWrapping="Wrap"
                        AutomationProperties.Name="{Binding AuthenticodeStatusText}" />
@@ -90,13 +91,13 @@
       <Border Grid.Column="4"
               Style="{DynamicResource StatusPanelStyle}"
               Visibility="{Binding PdfExtensionVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
-              AutomationProperties.Name="PDF 文档签名状态面板">
+              AutomationProperties.Name="{localization:UiString PdfStatusPanel}">
         <StackPanel>
-          <TextBlock Text="PDF 文档签名" FontSize="16" FontWeight="SemiBold" />
+          <TextBlock Text="{localization:UiString PdfSigningTitle}" FontSize="16" FontWeight="SemiBold" />
           <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
             <TextBlock Text="{Binding PdfStatusIcon}"
                        Margin="0,0,7,0"
-                       AutomationProperties.Name="PDF 文档签名状态图标" />
+                       AutomationProperties.Name="{localization:UiString PdfStatusIcon}" />
             <TextBlock Text="{Binding PdfStatusText}"
                        TextWrapping="Wrap"
                        AutomationProperties.Name="{Binding PdfStatusText}" />
@@ -131,7 +132,7 @@
           <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
         <StackPanel>
-          <TextBlock Text="当前任务" FontSize="16" FontWeight="SemiBold" />
+          <TextBlock Text="{localization:UiString CurrentJobTitle}" FontSize="16" FontWeight="SemiBold" />
           <TextBlock Text="{Binding QueueStatusText}"
                      Margin="0,9,0,0"
                      Foreground="{DynamicResource TextSecondaryBrush}" />
@@ -141,16 +142,16 @@
                      AutomationProperties.Name="{Binding CurrentJobText}" />
         </StackPanel>
         <Button Grid.Column="1"
-                Content="打开签名任务"
+                Content="{localization:UiString OpenJobs}"
                 Command="{Binding OpenJobsCommand}"
                 VerticalAlignment="Center"
-                AutomationProperties.Name="打开签名任务页面" />
+                AutomationProperties.Name="{localization:UiString OpenJobsAutomation}" />
       </Grid>
     </Border>
 
     <Border Style="{DynamicResource StatusPanelStyle}" Margin="0,14,0,0">
       <StackPanel>
-        <TextBlock Text="最近完成" FontSize="16" FontWeight="SemiBold" />
+        <TextBlock Text="{localization:UiString RecentCompleted}" FontSize="16" FontWeight="SemiBold" />
         <ItemsControl ItemsSource="{Binding RecentJobs}" Margin="0,8,0,0">
           <ItemsControl.ItemTemplate>
             <DataTemplate>
@@ -164,7 +165,7 @@
                 <TextBlock Text="{Binding Kind}" />
                 <TextBlock Grid.Column="1" Text="{Binding TerminalState}" />
                 <TextBlock Grid.Column="2"
-                           Text="{Binding ErrorCode, TargetNullValue=成功}"
+                           Text="{Binding ErrorCode, TargetNullValue={localization:UiString StatusSuccess}}"
                            Foreground="{DynamicResource TextSecondaryBrush}" />
                 <TextBlock Grid.Column="3"
                            Text="{Binding CompletedAtUtc}"

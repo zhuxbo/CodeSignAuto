@@ -15,9 +15,9 @@ public sealed class UiPreferenceStoreTests : IDisposable
     [Theory]
     [InlineData("zh-CN", "zh-CN")]
     [InlineData("zh-TW", "zh-CN")]
-    [InlineData("en-US", "en-US")]
-    [InlineData("fr-FR", "en-US")]
-    public async Task Missing_preference_uses_supported_system_language(
+    [InlineData("en-US", "zh-CN")]
+    [InlineData("fr-FR", "zh-CN")]
+    public async Task Missing_preference_defaults_to_Chinese(
         string systemCulture,
         string expected)
     {

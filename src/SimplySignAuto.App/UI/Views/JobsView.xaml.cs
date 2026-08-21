@@ -1,4 +1,5 @@
 #if SIMPLYSIGN_WPF
+using SimplySignAuto.App.UI.Localization;
 using SimplySignAuto.App.UI.ViewModels;
 
 namespace SimplySignAuto.App.UI.Views;
@@ -63,9 +64,10 @@ public partial class JobsView : System.Windows.Controls.UserControl
             FileName = item.DefaultSignedCopyName,
             AddExtension = true,
             OverwritePrompt = item.CanOverwriteResult,
-            Filter = item.KindText.StartsWith("PDF", StringComparison.Ordinal)
-                ? "PDF 文档|*.pdf"
-                : "签名软件|*.exe;*.dll;*.msi;*.sys;*.cat|所有文件|*.*",
+            Filter = item.IsPdf
+                ? UiCulture.Text("JobsPdfFilter")
+                : UiCulture.Text("JobsSoftwareFilter"),
+            Title = UiCulture.Text("JobsSaveDialogTitle"),
         };
         if (dialog.ShowDialog() != true)
         {

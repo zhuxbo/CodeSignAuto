@@ -1,4 +1,5 @@
 using SimplySignAuto.Protocol;
+using SimplySignAuto.App.UI.Localization;
 
 namespace SimplySignAuto.App.UI.Status;
 
@@ -160,14 +161,14 @@ public static class ReadinessStatusMapper
             : SimplySignSessionState.Unknown;
         return state switch
         {
-            SimplySignSessionState.Unknown => "未知",
-            SimplySignSessionState.Checking => "检查中",
-            SimplySignSessionState.Ready => "已就绪",
-            SimplySignSessionState.LoginRequired => "需要登录",
-            SimplySignSessionState.Loginning => "登录中",
-            SimplySignSessionState.WaitToken => "等待令牌",
-            SimplySignSessionState.Failed => "失败",
-            _ => "未知",
+            SimplySignSessionState.Unknown => UiCulture.Text("SessionUnknown"),
+            SimplySignSessionState.Checking => UiCulture.Text("SessionChecking"),
+            SimplySignSessionState.Ready => UiCulture.Text("SessionReady"),
+            SimplySignSessionState.LoginRequired => UiCulture.Text("SessionLoginRequired"),
+            SimplySignSessionState.Loginning => UiCulture.Text("SessionLoggingIn"),
+            SimplySignSessionState.WaitToken => UiCulture.Text("SessionWaitToken"),
+            SimplySignSessionState.Failed => UiCulture.Text("SessionFailed"),
+            _ => UiCulture.Text("SessionUnknown"),
         };
     }
 

@@ -9,6 +9,19 @@ namespace SimplySignAuto.UI.Tests;
 public sealed class JobsViewModelTests
 {
     [Fact]
+    public void Job_rows_use_the_selected_English_resources()
+    {
+        using var culture = new UiTestCultureScope("en-US");
+
+        var item = new JobListItemViewModel(Item(GuidFrom(1), "succeeded"));
+
+        Assert.Equal("Local", item.SourceText);
+        Assert.Equal("PDF document", item.KindText);
+        Assert.Equal("Completed", item.StateText);
+        Assert.True(item.IsPdf);
+    }
+
+    [Fact]
     public async Task Pages_are_coalesced_deduplicated_and_bounded()
     {
         var firstItems = Enumerable.Range(0, 100)

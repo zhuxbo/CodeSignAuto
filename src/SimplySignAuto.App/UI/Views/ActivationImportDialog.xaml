@@ -1,7 +1,8 @@
 <Window x:Class="SimplySignAuto.App.UI.Views.ActivationImportDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="导入 Certum 激活内容"
+        xmlns:localization="clr-namespace:SimplySignAuto.App.UI.Localization"
+        Title="{localization:UiString ActivationImportTitle}"
         Width="560"
         Height="260"
         ResizeMode="NoResize"
@@ -13,7 +14,7 @@
         PreviewKeyDown="OnPreviewKeyDown"
         Closing="OnClosing"
         Closed="OnClosed"
-        AutomationProperties.Name="导入 Certum 激活内容">
+        AutomationProperties.Name="{localization:UiString ActivationImportTitle}">
   <Grid Margin="24">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
@@ -21,7 +22,7 @@
       <RowDefinition Height="*" />
       <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
-    <TextBlock Text="Certum 激活内容"
+    <TextBlock Text="{localization:UiString ActivationImportContent}"
                FontSize="20"
                FontWeight="SemiBold" />
     <TextBox x:Name="SecretInput"
@@ -29,28 +30,28 @@
              Margin="0,14,0,0"
              Text="{Binding OtpauthInput, UpdateSourceTrigger=PropertyChanged}"
              SpellCheck.IsEnabled="False"
-             AutomationProperties.Name="Certum 激活内容"
-             AutomationProperties.HelpText="粘贴本次合成或真实激活内容；关闭后立即清空" />
+             AutomationProperties.Name="{localization:UiString ActivationImportContent}"
+             AutomationProperties.HelpText="{localization:UiString ActivationImportHelp}" />
     <TextBlock Grid.Row="2"
                x:Name="SaveStatus"
                Margin="0,10,0,0"
-               Text="内容仅用于当前用户受保护存储；成功、取消或失败都会清空输入。"
+               Text="{localization:UiString ActivationImportStorageNotice}"
                Foreground="{DynamicResource TextSecondaryBrush}"
                TextWrapping="Wrap"
-               AutomationProperties.Name="激活内容保存状态" />
+               AutomationProperties.Name="{localization:UiString ActivationImportStatus}" />
     <StackPanel Grid.Row="3"
                 Orientation="Horizontal"
                 HorizontalAlignment="Right">
       <Button x:Name="CancelButton"
-              Content="取消"
+              Content="{localization:UiString ActionCancel}"
               IsCancel="True"
               Click="OnCancel"
-              AutomationProperties.Name="取消导入激活内容" />
+              AutomationProperties.Name="{localization:UiString ActivationImportCancelAutomation}" />
       <Button x:Name="SaveButton"
-              Content="验证并保存"
+              Content="{localization:UiString ActivationValidateAndSave}"
               IsDefault="True"
               Click="OnSave"
-              AutomationProperties.Name="验证并保存 Certum 激活内容" />
+              AutomationProperties.Name="{localization:UiString ActivationValidateAndSaveAutomation}" />
     </StackPanel>
   </Grid>
 </Window>

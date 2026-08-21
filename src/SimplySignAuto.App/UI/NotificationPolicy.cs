@@ -1,4 +1,5 @@
 using SimplySignAuto.App.UI.Status;
+using SimplySignAuto.App.UI.Localization;
 using SimplySignAuto.Protocol;
 
 namespace SimplySignAuto.App.UI;
@@ -75,8 +76,8 @@ public sealed class NotificationPolicy
         _unavailableNotifiedAt[reason] = now;
         notifications.Add(new TrayNotification(
             TrayNotificationKind.ServiceUnavailable,
-            "SimplySignAuto 需要处理",
-            "签名服务当前不可用，请打开管理控制台查看状态。"));
+            UiCulture.Text("NotificationActionRequiredTitle"),
+            UiCulture.Text("NotificationActionRequiredMessage")));
     }
 
     private void EvaluateTerminalJobs(
@@ -107,15 +108,23 @@ public sealed class NotificationPolicy
             {
                 notifications.Add(new TrayNotification(
                     TrayNotificationKind.LocalJobSucceeded,
-                    "本机签名已完成",
-                    $"本机 {KindText(job.Kind)} 签名已完成（任务 {JobSuffix(job.JobId)}）。"));
+                    UiCulture.Text("NotificationLocalCompletedTitle"),
+                    UiCulture.Format(
+                        "NotificationLocalCompletedMessage",
+                        KindText(job.Kind),
+                        JobSuffix(job.JobId))));
             }
             else if (job.State == "failed")
             {
                 notifications.Add(new TrayNotification(
                     TrayNotificationKind.JobFailed,
-                    "签名任务失败",
-                    $"{SourceText(job.Source)} {KindText(job.Kind)} 签名失败：{job.ErrorCode}（任务 {JobSuffix(job.JobId)}）。"));
+                    UiCulture.Text("NotificationFailedTitle"),
+                    UiCulture.Format(
+                        "NotificationFailedMessage",
+                        SourceText(job.Source),
+                        KindText(job.Kind),
+                        job.ErrorCode,
+                        JobSuffix(job.JobId))));
             }
 
             _terminalSequence = terminalEvent.Sequence;
@@ -125,9 +134,12 @@ public sealed class NotificationPolicy
     private static bool IsTerminal(JobPageItem job) =>
         job.State is "succeeded" or "failed" or "expired" && job.CompletedAtUtc is not null;
 
-    private static string SourceText(string source) => source == "local" ? "本机" : "CI/API";
+    private static string SourceText(string source) =>
+        source == "local" ? UiCulture.Text("JobsSourceLocal") : "CI/API";
 
-    private static string KindText(string kind) => kind == "pdf" ? "PDF" : "软件";
+    private static string KindText(string kind) => kind == "pdf"
+        ? UiCulture.Text("NotificationKindPdf")
+        : UiCulture.Text("NotificationKindSoftware");
 
     private static string JobSuffix(Guid jobId) => jobId.ToString("N")[^8..].ToUpperInvariant();
 

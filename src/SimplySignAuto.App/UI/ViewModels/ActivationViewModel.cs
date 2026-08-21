@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using SimplySignAuto.Agent.Ipc;
+using SimplySignAuto.App.UI.Localization;
 using SimplySignAuto.App.UI.Status;
 using SimplySignAuto.Core.Otp;
 using SimplySignAuto.Core.Security;
@@ -114,8 +115,8 @@ public sealed class ActivationViewModel : INotifyPropertyChanged, IDisposable
     {
         null => null,
         "management_unavailable" =>
-            "签名代理尚未就绪。首次安装后请先重启 Windows；已重启时请等待服务启动后重试。",
-        "clipboard_unavailable" => "无法访问剪贴板。",
+            UiCulture.Text("ActivationAgentNotReady"),
+        "clipboard_unavailable" => UiCulture.Text("ActivationClipboardUnavailable"),
         _ => ErrorCode,
     };
 
@@ -141,7 +142,7 @@ public sealed class ActivationViewModel : INotifyPropertyChanged, IDisposable
 
     public IReadOnlyList<CertificateCardViewModel> Certificates => _certificates;
 
-    public string TotpInstruction => "用于其他机器人工登录；本机按需登录无需显示";
+    public string TotpInstruction => UiCulture.Text("ActivationManualLoginInstruction");
 
     public bool CanValidateLogin =>
         _management.LatestSnapshot is { ActiveJobCount: 0, CurrentJob: null };
@@ -149,12 +150,18 @@ public sealed class ActivationViewModel : INotifyPropertyChanged, IDisposable
     public bool CanClearOtp => CanValidateLogin;
 
     public string SessionText => _management.LatestSnapshot is { } snapshot
-        ? $"Agent 会话 {snapshot.AgentSessionId} · SimplySign {(snapshot.SimplySignProcessRunning ? "运行中" : "未运行")}"
-        : "会话状态不可用";
+        ? UiCulture.Format(
+            "ActivationSessionFormat",
+            snapshot.AgentSessionId,
+            UiCulture.Text(snapshot.SimplySignProcessRunning ? "ActivationRunning" : "ActivationNotRunning"))
+        : UiCulture.Text("ActivationSessionUnavailable");
 
     public string HeartbeatText => _management.LatestSnapshot is { } snapshot
-        ? $"心跳 {snapshot.HeartbeatAgeMilliseconds?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "未知"} ms · 探测 {snapshot.GeneratedAtUtc:yyyy-MM-dd HH:mm:ss} UTC"
-        : "心跳与探测时间不可用";
+        ? UiCulture.Format(
+            "ActivationHeartbeatFormat",
+            snapshot.HeartbeatAgeMilliseconds?.ToString("N0", UiCulture.Current) ?? UiCulture.Text("StatusUnknown"),
+            snapshot.GeneratedAtUtc.ToString("g", UiCulture.Current))
+        : UiCulture.Text("ActivationHeartbeatUnavailable");
 
     public string AuthenticodeCertificateText
     {
@@ -202,7 +209,12 @@ public sealed class ActivationViewModel : INotifyPropertyChanged, IDisposable
                 await ClearMatchingClipboardAsync(uri, operation.Token).ConfigureAwait(false);
                 await ApplyAsync(() =>
                 {
-                    DisplaySummary = $"{profile.Issuer} · {profile.Account} · {profile.Digits} 位 / {profile.Period} 秒";
+                    DisplaySummary = UiCulture.Format(
+                        "ActivationProfileSummary",
+                        profile.Issuer,
+                        profile.Account,
+                        profile.Digits,
+                        profile.Period);
                     ErrorCode = null;
                 }).ConfigureAwait(false);
                 return true;
@@ -425,7 +437,7 @@ public sealed class ActivationViewModel : INotifyPropertyChanged, IDisposable
                 {
                     ClearTotpDisplay();
                     OtpauthInput = string.Empty;
-                    DisplaySummary = "激活内容已清除，SimplySign 已退出。";
+                    DisplaySummary = UiCulture.Text("ActivationCleared");
                     ErrorCode = null;
                     _certificates = [];
                     PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Certificates)));
@@ -617,16 +629,21 @@ public sealed class ActivationViewModel : INotifyPropertyChanged, IDisposable
         if (snapshot is null ||
             !ReadinessStatusMapper.HasCurrentSession(snapshot.SessionGeneration, capability))
         {
-            return "未知";
+            return UiCulture.Text("StatusUnknown");
         }
 
         var session = capability!.Session!;
         var expiry = capability.CertificateNotAfterUtc is { } notAfter
-            ? notAfter.ToString("yyyy-MM-dd HH:mm:ss 'UTC'", System.Globalization.CultureInfo.InvariantCulture)
-            : "未知";
-        return $"{ReadinessStatusMapper.CapabilityStateText(snapshot.SessionGeneration, capability)} · {session.ReasonCode} · " +
-            $"Token …{capability.TokenSuffix ?? "无"} · 证书 …{capability.CertificateThumbprintSuffix ?? capability.CertificateSuffix ?? "无"} · " +
-            $"私钥 …{capability.PrivateKeySuffix ?? "无"} · 到期 {expiry}";
+            ? $"{notAfter.ToString("g", UiCulture.Current)} UTC"
+            : UiCulture.Text("StatusUnknown");
+        return UiCulture.Format(
+            "ActivationCapabilityFormat",
+            ReadinessStatusMapper.CapabilityStateText(snapshot.SessionGeneration, capability),
+            session.ReasonCode,
+            capability.TokenSuffix ?? UiCulture.Text("StatusNone"),
+            capability.CertificateThumbprintSuffix ?? capability.CertificateSuffix ?? UiCulture.Text("StatusNone"),
+            capability.PrivateKeySuffix ?? UiCulture.Text("StatusNone"),
+            expiry);
     }
 
     private void HandleSnapshotChanged(object? sender, EventArgs eventArgs) => _ = ApplyAsync(() =>
@@ -650,15 +667,15 @@ public sealed class ActivationViewModel : INotifyPropertyChanged, IDisposable
 
     private static CertificateCardViewModel ToCertificateCard(CertificateSummary summary)
     {
-        var validity = $"{summary.NotBeforeUtc.ToLocalTime():yyyy-MM-dd HH:mm:ss} — " +
-            $"{summary.NotAfterUtc.ToLocalTime():yyyy-MM-dd HH:mm:ss}";
+        var validity = $"{summary.NotBeforeUtc.ToLocalTime().ToString("g", UiCulture.Current)} — " +
+            summary.NotAfterUtc.ToLocalTime().ToString("g", UiCulture.Current);
         return new CertificateCardViewModel(
             summary,
             Array.AsReadOnly(
             [
                 $"CN: {summary.CommonName}",
-                $"序列号: {summary.SerialNumber}",
-                $"有效期: {validity}",
+                UiCulture.Format("ActivationDiagnosticsSerial", summary.SerialNumber),
+                UiCulture.Format("ActivationDiagnosticsValidity", validity),
             ]),
             validity,
             CertificateStatusText(summary));
@@ -668,16 +685,18 @@ public sealed class ActivationViewModel : INotifyPropertyChanged, IDisposable
         summary.UnavailableReason switch
         {
             null => summary.AuthenticodeUsable && summary.PdfUsable
-                ? "代码签名和 PDF 可用"
-                : summary.AuthenticodeUsable ? "代码签名可用" : "PDF 签名可用",
-            "not_yet_valid" => "尚未生效",
-            "expired" => "已过期",
-            "private_key_missing" => "缺少私钥",
-            "private_key_ambiguous" => "私钥不唯一",
-            "certificate_serial_ambiguous" => "序列号不唯一",
-            "unsupported_purpose" => "不支持签名用途",
-            "catalog_stale" => "目录已失效",
-            _ => "不可用",
+                ? UiCulture.Text("CertificateCodeAndPdfUsable")
+                : summary.AuthenticodeUsable
+                    ? UiCulture.Text("CertificateCodeUsable")
+                    : UiCulture.Text("CertificatePdfUsable"),
+            "not_yet_valid" => UiCulture.Text("CertificateNotYetValid"),
+            "expired" => UiCulture.Text("CertificateExpired"),
+            "private_key_missing" => UiCulture.Text("CertificatePrivateKeyMissing"),
+            "private_key_ambiguous" => UiCulture.Text("CertificatePrivateKeyAmbiguous"),
+            "certificate_serial_ambiguous" => UiCulture.Text("CertificateSerialAmbiguous"),
+            "unsupported_purpose" => UiCulture.Text("CertificateUnsupportedPurpose"),
+            "catalog_stale" => UiCulture.Text("CertificateCatalogStale"),
+            _ => UiCulture.Text("StatusUnavailable"),
         };
 
     private async Task ApplyAsync(Action action)

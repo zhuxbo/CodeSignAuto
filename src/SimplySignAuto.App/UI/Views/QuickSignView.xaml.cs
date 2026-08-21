@@ -21,6 +21,7 @@ public partial class QuickSignView : System.Windows.Controls.UserControl
             CheckPathExists = true,
             Multiselect = false,
             Filter = viewModel.FileDialogFilter,
+            Title = viewModel.FileDialogTitle,
         };
         if (dialog.ShowDialog() != true)
         {

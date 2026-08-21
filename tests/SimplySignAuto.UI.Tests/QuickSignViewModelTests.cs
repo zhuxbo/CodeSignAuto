@@ -10,6 +10,20 @@ namespace SimplySignAuto.UI.Tests;
 public sealed class QuickSignViewModelTests
 {
     [Fact]
+    public void Empty_selection_uses_the_selected_English_resources()
+    {
+        using var culture = new UiTestCultureScope("en-US");
+        using var viewModel = new QuickSignViewModel(
+            new RecordingLocalJobClient(),
+            new MutableManagementClient(Snapshot()),
+            _ => { });
+
+        Assert.Equal("Choose a file to sign", viewModel.SelectedFileDisplayText);
+        Assert.Equal("Nothing selected", viewModel.DetectedTypeText);
+        Assert.Contains("Supported signing files", viewModel.FileDialogFilter, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Empty_selection_prompts_for_a_signing_file()
     {
         using var viewModel = new QuickSignViewModel(

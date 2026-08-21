@@ -180,6 +180,8 @@ internal static class Program
                 Environment.GetEnvironmentVariable(UiTestLaunchOptions.PipeEnvironmentVariable),
             [UiTestLaunchOptions.NonceEnvironmentVariable] =
                 Environment.GetEnvironmentVariable(UiTestLaunchOptions.NonceEnvironmentVariable),
+            [UiTestLaunchOptions.CultureEnvironmentVariable] =
+                Environment.GetEnvironmentVariable(UiTestLaunchOptions.CultureEnvironmentVariable),
         };
 
     private static async Task<int> ExecuteUiTestAsync(
@@ -188,6 +190,7 @@ internal static class Program
     {
         try
         {
+            UiCulture.Apply(UiCulture.ResolveSelection(options.CultureName));
             return await new UiTestDesktopApplication().ExecuteAsync(options, cancellationToken)
                 .ConfigureAwait(false);
         }

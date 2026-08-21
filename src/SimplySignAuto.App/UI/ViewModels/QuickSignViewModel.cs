@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using SimplySignAuto.Agent.Ipc;
 using SimplySignAuto.Agent.LocalJobs;
+using SimplySignAuto.App.UI.Localization;
 using SimplySignAuto.Core.Jobs;
 using SimplySignAuto.Protocol;
 
@@ -108,14 +109,18 @@ public sealed class QuickSignViewModel : INotifyPropertyChanged, IDisposable
 
     public string DetectedTypeText => _selectedKind switch
     {
-        FileKind.Authenticode => "代码签名",
-        FileKind.Pdf => "PDF 文档签名",
-        _ => "尚未选择",
+        FileKind.Authenticode => UiCulture.Text("AuthenticodeTitle"),
+        FileKind.Pdf => UiCulture.Text("PdfSigningTitle"),
+        _ => UiCulture.Text("QuickSignNoSelection"),
     };
 
     public bool HasSelection => _selectedPath is not null;
 
-    public string SelectedFileDisplayText => HasSelection ? SelectedFileName : "请选择签名文件";
+    public bool IsPdfSelection => _selectedKind == FileKind.Pdf;
+
+    public string SelectedFileDisplayText => HasSelection
+        ? SelectedFileName
+        : UiCulture.Text("QuickSignSelectPrompt");
 
     public string SelectedFileDetailsText => HasSelection
         ? $"{DetectedTypeText} · {SelectedSizeText}"
@@ -158,7 +163,7 @@ public sealed class QuickSignViewModel : INotifyPropertyChanged, IDisposable
     }
 
     public string CopyProgressText => State == QuickSignState.Copying
-        ? $"复制进度 {CopyProgressPercent}%"
+        ? UiCulture.Format("QuickSignCopyProgress", CopyProgressPercent)
         : string.Empty;
 
     public bool IsCopying => State == QuickSignState.Copying;
@@ -181,7 +186,7 @@ public sealed class QuickSignViewModel : INotifyPropertyChanged, IDisposable
          _management.LatestSnapshot?.RecentJobs.Any(job =>
              job.JobId == jobId && job.TerminalState == "succeeded") == true);
 
-    public string ReadinessText => ReadinessFailure() ?? "可以提交到本机签名队列";
+    public string ReadinessText => ReadinessFailure() ?? UiCulture.Text("QuickSignReadyToSubmit");
 
     public bool PdfExtensionVisible => _management.LatestSnapshot?.Pdf is { Configured: true } pdf &&
         !string.Equals(
@@ -190,23 +195,25 @@ public sealed class QuickSignViewModel : INotifyPropertyChanged, IDisposable
             StringComparison.Ordinal);
 
     public string FileDialogFilter => PdfExtensionVisible
-        ? "支持的签名文件|*.exe;*.dll;*.msi;*.sys;*.cat;*.pdf|所有文件|*.*"
-        : "代码签名文件|*.exe;*.dll;*.msi;*.sys;*.cat|所有文件|*.*";
+        ? UiCulture.Text("QuickSignFilterAll")
+        : UiCulture.Text("QuickSignFilterCode");
+
+    public string FileDialogTitle => UiCulture.Text("QuickSignDialogTitle");
 
     public string StatusText => State switch
     {
-        QuickSignState.Validating => "正在验证所选文件",
+        QuickSignState.Validating => UiCulture.Text("QuickSignValidating"),
         QuickSignState.Copying => CopyProgressText,
-        QuickSignState.Finalizing => "正在完成本机提交",
-        QuickSignState.Accepted when HasSucceededAcceptedResult => "签名已完成，请在签名任务中保存",
-        QuickSignState.Accepted => "已提交，正在签名任务页中跟踪",
+        QuickSignState.Finalizing => UiCulture.Text("QuickSignFinalizing"),
+        QuickSignState.Accepted when HasSucceededAcceptedResult => UiCulture.Text("QuickSignCompleted"),
+        QuickSignState.Accepted => UiCulture.Text("QuickSignAccepted"),
         QuickSignState.Failed => MapError(ErrorCode),
-        QuickSignState.Canceled => "已取消；原文件未更改",
-        _ => HasSelection ? "文件已就绪" : "请选择要签名的文件",
+        QuickSignState.Canceled => UiCulture.Text("QuickSignCanceled"),
+        _ => HasSelection ? UiCulture.Text("QuickSignFileReady") : UiCulture.Text("QuickSignChoosePrompt"),
     };
 
     public string InlineStatusText => State == QuickSignState.Idle
-        ? HasSelection ? ReadinessFailure() ?? "文件已就绪" : string.Empty
+        ? HasSelection ? ReadinessFailure() ?? UiCulture.Text("QuickSignFileReady") : string.Empty
         : StatusText;
 
     public bool HasInlineStatus => InlineStatusText.Length > 0;
@@ -270,7 +277,7 @@ public sealed class QuickSignViewModel : INotifyPropertyChanged, IDisposable
                 _selectedKind = selection.Kind;
                 RefreshAvailableCertificates();
                 SelectedFileName = selection.Name;
-                SelectedSizeText = $"{selection.Size:N0} 字节";
+                SelectedSizeText = UiCulture.Format("BytesFormat", selection.Size);
                 AcceptedJobId = null;
                 ErrorCode = null;
                 CopyProgressPercent = 0;
@@ -515,7 +522,7 @@ public sealed class QuickSignViewModel : INotifyPropertyChanged, IDisposable
 
     private string? ReadinessFailure() => _selectedKind is { } kind
         ? ReadinessFailure(kind)
-        : "请选择要签名的文件";
+        : UiCulture.Text("QuickSignChoosePrompt");
 
     private string? ReadinessFailure(FileKind kind) =>
         ReadinessFailure(_management.LatestSnapshot, kind, SelectedCertificate);
@@ -527,30 +534,32 @@ public sealed class QuickSignViewModel : INotifyPropertyChanged, IDisposable
     {
         if (snapshot is null)
         {
-            return "签名代理状态未知";
+            return UiCulture.Text("QuickSignAgentUnknown");
         }
 
         if (!snapshot.ServiceAvailable || !snapshot.AgentConnected ||
             snapshot.AgentSessionId <= 0 || snapshot.HeartbeatSessionId != snapshot.AgentSessionId ||
             !snapshot.SimplySignProcessRunning || snapshot.SimplySignProcessSessionId != snapshot.AgentSessionId)
         {
-            return "本机签名服务未就绪";
+            return UiCulture.Text("QuickSignServiceNotReady");
         }
 
         if (snapshot.HeartbeatAgeMilliseconds is null or < 0)
         {
-            return "签名代理状态未知";
+            return UiCulture.Text("QuickSignAgentUnknown");
         }
 
         if (snapshot.HeartbeatAgeMilliseconds > 15_000)
         {
-            return "签名代理状态已过期";
+            return UiCulture.Text("QuickSignAgentStale");
         }
 
         var capability = kind == FileKind.Authenticode ? snapshot.Authenticode : snapshot.Pdf;
         if (!capability.Configured || !capability.Ready)
         {
-            return kind == FileKind.Authenticode ? "代码签名能力未就绪" : "PDF 签名能力未就绪";
+            return kind == FileKind.Authenticode
+                ? UiCulture.Text("QuickSignAuthenticodeNotReady")
+                : UiCulture.Text("QuickSignPdfNotReady");
         }
 
         var availableCertificates = snapshot.Certificates
@@ -562,13 +571,13 @@ public sealed class QuickSignViewModel : INotifyPropertyChanged, IDisposable
         if (availableCertificates.Length == 0)
         {
             return kind == FileKind.Authenticode
-                ? "没有可用的代码签名证书"
-                : "没有可用的 PDF 签名证书";
+                ? UiCulture.Text("QuickSignNoAuthenticodeCertificate")
+                : UiCulture.Text("QuickSignNoPdfCertificate");
         }
 
         if (selectedCertificate is null || !availableCertificates.Contains(selectedCertificate))
         {
-            return "请选择签名证书";
+            return UiCulture.Text("SelectSigningCertificate");
         }
 
         return null;
@@ -727,6 +736,7 @@ public sealed class QuickSignViewModel : INotifyPropertyChanged, IDisposable
     private void RaiseSelectionProperties()
     {
         OnPropertyChanged(nameof(DetectedTypeText));
+        OnPropertyChanged(nameof(IsPdfSelection));
         OnPropertyChanged(nameof(HasSelection));
         OnPropertyChanged(nameof(SelectedFileDisplayText));
         OnPropertyChanged(nameof(SelectedFileDetailsText));
@@ -804,13 +814,13 @@ public sealed class QuickSignViewModel : INotifyPropertyChanged, IDisposable
 
     private static string MapError(string? code) => code switch
     {
-        "file_signature_mismatch" => "文件内容与扩展名不匹配",
-        "unsupported_type" => "不支持此文件类型",
-        "file_too_large" => "文件超过 512 MiB 限制",
-        "local_source_empty" => "文件为空",
-        "local_capability_unavailable" => "所选签名能力未就绪",
-        "local_job_unavailable" => "本机签名服务不可用",
-        _ => "无法提交本机签名任务",
+        "file_signature_mismatch" => UiCulture.Text("ErrorFileSignatureMismatch"),
+        "unsupported_type" => UiCulture.Text("ErrorUnsupportedType"),
+        "file_too_large" => UiCulture.Text("ErrorFileTooLarge"),
+        "local_source_empty" => UiCulture.Text("ErrorLocalSourceEmpty"),
+        "local_capability_unavailable" => UiCulture.Text("ErrorLocalCapabilityUnavailable"),
+        "local_job_unavailable" => UiCulture.Text("ErrorLocalJobUnavailable"),
+        _ => UiCulture.Text("ErrorLocalJobSubmit"),
     };
 
     private static StringComparison PathComparison() =>

@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using SimplySignAuto.Agent.Ipc;
 using SimplySignAuto.Agent.LocalJobs;
+using SimplySignAuto.App.UI.Localization;
 using SimplySignAuto.Protocol;
 
 namespace SimplySignAuto.App.UI.ViewModels;
@@ -15,19 +16,20 @@ public sealed class JobListItemViewModel
     internal JobPageItem Item { get; }
 
     public Guid JobId => Item.JobId;
-    public string SourceText => Item.Source == "local" ? "本机" : "CI/API";
-    public string KindText => Item.Kind == "pdf" ? "PDF 文档" : "软件签名";
+    public string SourceText => Item.Source == "local" ? UiCulture.Text("JobsSourceLocal") : "CI/API";
+    public bool IsPdf => Item.Kind == "pdf";
+    public string KindText => IsPdf ? UiCulture.Text("JobsKindPdf") : UiCulture.Text("JobsKindSoftware");
     public string State => Item.State;
     public string StateText => Item.State switch
     {
-        "queued" => "排队中",
-        "waiting_for_agent" => "等待签名代理",
-        "signing" => "签名中",
-        "verifying" => "验证中",
-        "succeeded" => "已完成",
-        "failed" => "失败",
-        "expired" => "结果已清理",
-        _ => "未知",
+        "queued" => UiCulture.Text("JobsStateQueued"),
+        "waiting_for_agent" => UiCulture.Text("JobsStateWaiting"),
+        "signing" => UiCulture.Text("JobsStateSigning"),
+        "verifying" => UiCulture.Text("JobsStateVerifying"),
+        "succeeded" => UiCulture.Text("JobsStateSucceeded"),
+        "failed" => UiCulture.Text("JobsStateFailed"),
+        "expired" => UiCulture.Text("JobsStateExpired"),
+        _ => UiCulture.Text("StatusUnknown"),
     };
     public string StateIcon => Item.State switch
     {
