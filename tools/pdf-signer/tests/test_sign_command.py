@@ -771,7 +771,7 @@ def run_cli(*arguments: str) -> subprocess.CompletedProcess[str]:
 
 def test_cli_version_is_exact_and_other_shapes_are_rejected(tmp_path: Path) -> None:
     version = run_cli("--version")
-    assert (version.returncode, version.stdout, version.stderr) == (0, "0.1.1\n", "")
+    assert (version.returncode, version.stdout, version.stderr) == (0, "0.1.2\n", "")
 
     for arguments in [(), ("validate",), ("probe",), ("catalog",), ("sign", "--request")]:
         result = run_cli(*arguments)
