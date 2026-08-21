@@ -30,7 +30,7 @@ public sealed class InstallCommandTests
     }
 
     [Theory]
-    [InlineData(SetupPreflightFailure.NotWindowsServer2025, "windows_server_2025_required")]
+    [InlineData(SetupPreflightFailure.UnsupportedWindows, "os_unsupported")]
     [InlineData(SetupPreflightFailure.NotAdministrator, "administrator_required")]
     [InlineData(SetupPreflightFailure.DomainController, "domain_controller_unsupported")]
     [InlineData(SetupPreflightFailure.DesktopMissing, "simplysign_desktop_missing")]
@@ -2236,7 +2236,7 @@ public sealed class InstallCommandTests
     public enum SetupPreflightFailure
     {
         None,
-        NotWindowsServer2025,
+        UnsupportedWindows,
         NotAdministrator,
         DomainController,
         DesktopMissing,
@@ -2255,7 +2255,7 @@ public sealed class InstallCommandTests
             {
                 return Task.FromException<SetupPreflightResult>(new SetupException(Failure switch
                 {
-                    SetupPreflightFailure.NotWindowsServer2025 => "windows_server_2025_required",
+                    SetupPreflightFailure.UnsupportedWindows => "os_unsupported",
                     SetupPreflightFailure.NotAdministrator => "administrator_required",
                     SetupPreflightFailure.DomainController => "domain_controller_unsupported",
                     SetupPreflightFailure.DesktopMissing => "simplysign_desktop_missing",
@@ -3197,7 +3197,7 @@ public sealed class InstallCommandTests
         {
             Reads.Add("inspect");
             return Task.FromResult(new AgentUserProvisionInspection(
-                IsWindowsServer2025: true,
+                IsSupportedWindows: true,
                 IsAdministrator: true,
                 IsDomainController: false,
                 UserExists: true,

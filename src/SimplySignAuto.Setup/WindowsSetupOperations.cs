@@ -249,8 +249,15 @@ internal sealed class WindowsSetupProcessRunner(
             throw new SetupBootstrapperException("setup_media_invalid");
         }
 
-        return await invoker.RunAsync(powerShellPath, common, mappedProgress, cancellationToken)
+        var installExitCode = await invoker
+            .RunAsync(powerShellPath, common, mappedProgress, cancellationToken)
             .ConfigureAwait(false);
+        if (installExitCode != 0 && mappedProgress.FailureCode is { } failureCode)
+        {
+            throw new SetupBootstrapperException(failureCode);
+        }
+
+        return installExitCode;
     }
 
     private Task<int> RunPdfExtensionAsync(
@@ -278,8 +285,11 @@ internal sealed class WindowsSetupProcessRunner(
     {
         private int _lastPercent = 25;
 
+        public string? FailureCode { get; private set; }
+
         public void Report(string line)
         {
+            FailureCode ??= ReadFailureCode(line);
             var percent = line switch
             {
                 "phase=media code=ready" => 35,
@@ -301,6 +311,38 @@ internal sealed class WindowsSetupProcessRunner(
             _lastPercent = percent;
             progress?.Report(new SetupProgress(percent, Describe(percent)));
         }
+
+        private static string? ReadFailureCode(string line)
+        {
+            const string phasePrefix = "phase=";
+            const string separator = " code=";
+            if (!line.StartsWith(phasePrefix, StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            var separatorIndex = line.IndexOf(separator, phasePrefix.Length, StringComparison.Ordinal);
+            if (separatorIndex <= phasePrefix.Length ||
+                separatorIndex + separator.Length >= line.Length)
+            {
+                return null;
+            }
+
+            var phase = line[phasePrefix.Length..separatorIndex];
+            var code = line[(separatorIndex + separator.Length)..];
+            if (!IsStableCode(phase) || !IsStableCode(code) || code is "ready" or "install_required")
+            {
+                return null;
+            }
+
+            return code;
+        }
+
+        private static bool IsStableCode(string value) =>
+            value.Length is >= 1 and <= 64 &&
+            value[0] is >= 'a' and <= 'z' &&
+            value.Skip(1).All(character =>
+                character is >= 'a' and <= 'z' or >= '0' and <= '9' or '_');
 
         private static string Describe(int percent) => percent switch
         {

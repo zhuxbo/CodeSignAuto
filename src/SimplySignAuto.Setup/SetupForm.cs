@@ -107,7 +107,13 @@ internal sealed class SetupForm : Form
         catch (SetupBootstrapperException error)
         {
             ExitCode = 1;
-            _status.Text = error.Code;
+            _status.Text = "安装失败";
+            MessageBox.Show(
+                this,
+                error.Message,
+                Text,
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
         }
         catch
         {

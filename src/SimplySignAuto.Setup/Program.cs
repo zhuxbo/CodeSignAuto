@@ -23,7 +23,7 @@ internal static class Program
         }
         catch (SetupBootstrapperException error)
         {
-            MessageBox.Show(error.Code, "SimplySignAuto 安装", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(error.Message, "SimplySignAuto 安装", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return 2;
         }
 
@@ -49,7 +49,7 @@ internal static class Program
         }
         catch (SetupBootstrapperException error)
         {
-            MessageBox.Show(error.Code, "SimplySignAuto 安装", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(error.Message, "SimplySignAuto 安装", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return 1;
         }
         catch

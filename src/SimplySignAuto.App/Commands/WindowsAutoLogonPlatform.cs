@@ -765,7 +765,7 @@ public sealed class WindowsAutoLogonPlatform : IWindowsAutoLogonPlatform
             .Except(RequiredRights, StringComparer.Ordinal)
             .Any();
         return Task.FromResult(new AgentUserProvisionInspection(
-            IsWindowsServer2025(),
+            WindowsSupportPolicy.IsCurrentWindowsSupported(),
             IsAdministrator(),
             WindowsDomainRole.IsDomainController(),
             userExists,
@@ -1100,16 +1100,6 @@ public sealed class WindowsAutoLogonPlatform : IWindowsAutoLogonPlatform
     private static OwnedLsaSecretTransaction CreateLsaTransaction() => new(
         new WindowsLsaSecretStore(),
         new WindowsLsaOwnerReceiptStore());
-
-    private static bool IsWindowsServer2025()
-    {
-        using var key = Registry.LocalMachine.OpenSubKey(
-            @"SOFTWARE\Microsoft\Windows NT\CurrentVersion",
-            writable: false);
-        return (key?.GetValue("ProductName") as string)?.Contains(
-            "Windows Server 2025",
-            StringComparison.OrdinalIgnoreCase) == true;
-    }
 
     private static bool IsAdministrator()
     {

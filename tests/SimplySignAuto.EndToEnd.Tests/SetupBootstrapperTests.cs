@@ -22,6 +22,54 @@ public sealed class SetupBootstrapperTests
         Assert.Equal("setup_arguments_invalid", failure.Code);
     }
 
+    [Theory]
+    [InlineData("required_runtime_missing", ".NET 10", "https://dotnet.microsoft.com/en-us/download/dotnet/10.0/runtime")]
+    [InlineData("simplysign_desktop_missing", "SimplySign Desktop", "https://support.certum.eu/en/software/procertum-smartsign/")]
+    [InlineData("simplysign_pkcs11_missing", "SimplySignPKCS.dll", "修复或重新安装")]
+    [InlineData("os_unsupported", "不支持当前 Windows", "Windows Server 2019/2022/2025")]
+    [InlineData("desktop_experience_required", "Desktop Experience", "不支持 Server Core")]
+    [InlineData("architecture_unsupported", "x64", "64 位")]
+    [InlineData("elevation_required", "管理员", "重新运行")]
+    [InlineData("domain_controller_unsupported", "域控制器", "成员服务器")]
+    [InlineData("autologon_conflict", "自动登录", "不会覆盖")]
+    [InlineData("autologon_plaintext_password_present", "明文自动登录密码", "安全移除")]
+    public void Missing_prerequisites_have_actionable_localized_messages(
+        string code,
+        string expectedReason,
+        string expectedAction)
+    {
+        var failure = new SetupBootstrapperException(code);
+
+        Assert.Equal(code, failure.Code);
+        Assert.Contains(expectedReason, failure.Message, StringComparison.Ordinal);
+        Assert.Contains(expectedAction, failure.Message, StringComparison.Ordinal);
+        Assert.Contains($"错误代码：{code}", failure.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Unknown_setup_failure_is_actionable_without_exposing_an_exception()
+    {
+        var failure = new SetupBootstrapperException("setup_resource_conflict");
+
+        Assert.Contains("安装未完成", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("错误代码：setup_resource_conflict", failure.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("Exception", failure.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Product_failure_with_an_auxiliary_code_uses_the_primary_actionable_error()
+    {
+        var failure = new SetupBootstrapperException(
+            "simplysign_desktop_missing install_simplysign_desktop_required");
+
+        Assert.Equal("simplysign_desktop_missing", failure.Code);
+        Assert.Contains("SimplySign Desktop", failure.Message, StringComparison.Ordinal);
+        Assert.Contains(
+            "错误代码：simplysign_desktop_missing install_simplysign_desktop_required",
+            failure.Message,
+            StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Payload_metadata_is_strict_and_complete()
     {
@@ -387,6 +435,35 @@ public sealed class SetupBootstrapperTests
 
         Assert.Equal(0, exitCode);
         Assert.Equal([35, 40, 45, 50, 90, 92], reported.Select(item => item.Percent));
+    }
+
+    [Theory]
+    [InlineData("preflight", "simplysign_desktop_missing")]
+    [InlineData("preflight", "simplysign_pkcs11_missing")]
+    [InlineData("detection", "required_runtime_missing")]
+    public async Task PowerShell_runner_surfaces_the_prerequisite_failure_instead_of_exit_code_one(
+        string phase,
+        string code)
+    {
+        var invoker = new RecordingPowerShellInvoker(
+            [0, 1],
+            [
+                ["phase=media code=ready"],
+                ["phase=media code=ready", $"phase={phase} code={code}"],
+            ]);
+        var runner = new WindowsSetupProcessRunner(
+            "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+            invoker,
+            @"C:\Program Files");
+
+        var failure = await Assert.ThrowsAsync<SetupBootstrapperException>(() =>
+            runner.RunAsync(
+                SetupProductKind.Main,
+                "C:\\media",
+                progress: null,
+                CancellationToken.None));
+
+        Assert.Equal(code, failure.Code);
     }
 
     [WindowsAdministratorFact]

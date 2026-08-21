@@ -8,9 +8,54 @@ namespace SimplySignAuto.Setup;
 internal sealed class SetupBootstrapperException : Exception
 {
     public SetupBootstrapperException(string code)
-        : base(code) => Code = code;
+        : base(Describe(code)) => Code = ReadPrimaryCode(code);
 
     public string Code { get; }
+
+    private static string Describe(string code)
+    {
+        var description = ReadPrimaryCode(code) switch
+        {
+            "required_runtime_missing" =>
+                "缺少 SimplySignAuto 所需的 .NET 10 Windows x64 运行环境。请安装 " +
+                "ASP.NET Core Runtime 和 .NET Desktop Runtime 后重新运行安装程序。\n" +
+                "ASP.NET Core Runtime：https://dotnet.microsoft.com/en-us/download/dotnet/10.0\n" +
+                ".NET Desktop Runtime：https://dotnet.microsoft.com/en-us/download/dotnet/10.0/runtime",
+            "simplysign_desktop_missing" =>
+                "Certum SimplySign Desktop（Windows 64 位）未安装。请安装后重新运行安装程序。\n" +
+                "下载：https://support.certum.eu/en/software/procertum-smartsign/",
+            "simplysign_pkcs11_missing" =>
+                "未找到 C:\\Windows\\System32\\SimplySignPKCS.dll。请修复或重新安装 " +
+                "Certum SimplySign Desktop（Windows 64 位）。\n" +
+                "下载：https://support.certum.eu/en/software/procertum-smartsign/",
+            "os_unsupported" =>
+                "不支持当前 Windows 版本或版本组合。支持 x64 Windows 10 22H2、受支持的 " +
+                "Windows 10 LTSC/Windows 11，以及 Windows Server 2019/2022/2025 Desktop Experience。",
+            "desktop_experience_required" =>
+                "自动签名服务需要 Windows Server Desktop Experience，不支持 Server Core。",
+            "architecture_unsupported" =>
+                "SimplySignAuto 只支持 x64 Windows。请在 64 位操作系统中运行 64 位安装程序。",
+            "elevation_required" or "administrator_required" =>
+                "安装需要管理员权限。请右键安装程序并选择“以管理员身份运行”，然后重新运行。",
+            "domain_controller_unsupported" =>
+                "不支持在域控制器上安装。请改用工作组计算机、域成员客户端或成员服务器。",
+            "autologon_conflict" =>
+                "检测到已有自动登录配置。自动签名服务需要独占该配置，安装程序不会覆盖现有设置。" +
+                "请先安全关闭原自动登录配置，再重新运行安装程序。",
+            "autologon_plaintext_password_present" =>
+                "检测到注册表中的旧式明文自动登录密码。请使用原配置工具安全移除后再安装；" +
+                "安装程序不会读取或覆盖该密码。",
+            _ => "安装未完成。请检查系统要求并修正问题后重新运行安装程序。",
+        };
+
+        return $"{description}\n\n错误代码：{code}";
+    }
+
+    private static string ReadPrimaryCode(string code)
+    {
+        var separator = code.IndexOf(' ', StringComparison.Ordinal);
+        return separator > 0 ? code[..separator] : code;
+    }
 }
 
 internal enum SetupProductKind

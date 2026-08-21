@@ -1,12 +1,90 @@
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
+using SimplySignAuto.App.Commands;
 using Xunit;
 
 namespace SimplySignAuto.EndToEnd.Tests;
 
 public sealed class RuntimePrerequisiteContractTests
 {
+    public static TheoryData<
+        string,
+        byte,
+        uint,
+        int,
+        string,
+        bool,
+        bool,
+        string?> WindowsSupportCases => new()
+    {
+        { "windows-10-enterprise-2016-ltsb", 1, 125u, 14393, "Client", true, true, null },
+        { "windows-10-enterprise-2019-ltsc", 1, 125u, 17763, "Client", true, true, null },
+        { "windows-10-enterprise-ltsc-2021", 1, 125u, 19044, "Client", true, true, null },
+        { "windows-10-iot-enterprise-ltsc-2021", 1, 191u, 19044, "Client", true, true, null },
+        { "windows-10-home-22h2", 1, 101u, 19045, "Client", true, true, null },
+        { "windows-10-pro-22h2", 1, 48u, 19045, "Client", true, true, null },
+        { "windows-11-enterprise-23h2", 1, 4u, 22631, "Client", true, true, null },
+        { "windows-11-enterprise-24h2", 1, 4u, 26100, "Client", true, true, null },
+        { "windows-11-pro-25h2", 1, 48u, 26200, "Client", true, true, null },
+        { "windows-11-home-supported-build", 1, 101u, 28000, "Client", true, true, null },
+        { "windows-server-2019-datacenter", 3, 8u, 17763, "Server", true, true, null },
+        { "windows-server-2022-standard", 3, 7u, 20348, "Server", true, true, null },
+        { "windows-server-2025-datacenter", 3, 8u, 26100, "Server", true, true, null },
+        { "windows-10-pro-21h2", 1, 48u, 19044, "Client", true, false, "os_unsupported" },
+        { "windows-11-pro-21h2", 1, 48u, 22000, "Client", true, false, "os_unsupported" },
+        { "windows-11-pro-22h2", 1, 48u, 22621, "Client", true, false, "os_unsupported" },
+        { "server-with-client-sku", 3, 48u, 26100, "Server", true, false, "os_unsupported" },
+        { "client-with-server-sku", 1, 8u, 26100, "Client", true, false, "os_unsupported" },
+        { "client-product-with-server-installation", 1, 48u, 26100, "Server", true, false, "os_unsupported" },
+        { "server-core", 3, 8u, 26100, "Server Core", true, false, "desktop_experience_required" },
+        { "domain-controller-product-type", 2, 8u, 26100, "Server", true, false, "os_unsupported" },
+        { "unknown-client-sku", 1, 0u, 26100, "Client", true, false, "os_unsupported" },
+        { "unknown-server-build", 3, 8u, 26000, "Server", true, false, "os_unsupported" },
+        { "x86-operating-system", 1, 48u, 19045, "Client", false, false, "architecture_unsupported" },
+    };
+
+    [Theory]
+    [MemberData(nameof(WindowsSupportCases))]
+    public void Inner_windows_policy_matches_the_published_support_matrix(
+        string _,
+        byte productType,
+        uint operatingSystemSku,
+        int buildNumber,
+        string installationType,
+        bool is64BitOperatingSystem,
+        bool expectedSupported,
+        string? expectedFailureCode)
+    {
+        Assert.Equal(expectedSupported, expectedFailureCode is null);
+        var snapshot = new WindowsSupportSnapshot(
+            productType,
+            operatingSystemSku,
+            buildNumber,
+            installationType,
+            is64BitOperatingSystem);
+
+        Assert.Equal(expectedSupported, WindowsSupportPolicy.IsSupported(snapshot));
+    }
+
+    [Fact]
+    public void Native_windows_snapshot_reader_recognizes_the_supported_build_host()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var snapshot = WindowsSupportSnapshotReader.Read();
+
+        Assert.Equal(Environment.Is64BitOperatingSystem, snapshot.Is64BitOperatingSystem);
+        Assert.True(
+            WindowsSupportPolicy.IsSupported(snapshot),
+            $"Unsupported build host: ProductType={snapshot.ProductType}, " +
+            $"SKU={snapshot.OperatingSystemSku}, Build={snapshot.BuildNumber}, " +
+            $"InstallationType={snapshot.InstallationType}");
+    }
+
     [Fact]
     public void Runtime_manifest_is_an_exact_unpinned_major_roll_forward_policy()
     {
@@ -138,76 +216,34 @@ public sealed class RuntimePrerequisiteContractTests
     }
 
     [Theory]
-    [InlineData("Microsoft Windows 10 Enterprise 2016 LTSB", 1, 125u, "14393", "Client", 1)]
-    [InlineData("Microsoft Windows 10 Enterprise 2019 LTSC", 1, 125u, "17763", "Client", 1)]
-    [InlineData("Microsoft Windows 10 Enterprise LTSC 2021", 1, 125u, "19044", "Client", 1)]
-    [InlineData("Microsoft Windows 10 IoT Enterprise LTSC 2021", 1, 191u, "19044", "Client", 1)]
-    [InlineData("Microsoft Windows 11 Enterprise", 1, 4u, "22631", "Client", 1)]
-    [InlineData("Microsoft Windows 11 Enterprise", 1, 4u, "26100", "Client", 1)]
-    [InlineData("Microsoft Windows 11 Pro", 1, 48u, "26200", "Client", 1)]
-    [InlineData("Microsoft Windows 11 Home", 1, 101u, "28000", "Client", 1)]
-    [InlineData("Microsoft Windows Server 2019 数据中心版", 3, 8u, "17763", "Server", 3)]
-    [InlineData("Microsoft Windows Server 2022 标准版", 3, 7u, "20348", "Server", 3)]
-    public void Supported_windows_client_and_server_matrix_is_ready(
-        string caption,
-        int productType,
+    [MemberData(nameof(WindowsSupportCases))]
+    public void Published_prerequisite_checker_matches_the_shared_windows_support_matrix(
+        string _,
+        byte productType,
         uint operatingSystemSku,
-        string buildNumber,
+        int buildNumber,
         string installationType,
-        int domainRole)
+        bool is64BitOperatingSystem,
+        bool expectedSupported,
+        string? expectedFailureCode)
     {
         RequireWindows();
         using var fixture = ScriptFixture.Create(["10.0.10"], ["10.0.10"]);
-        fixture.Machine["caption"] = caption;
         fixture.Machine["productType"] = productType;
         fixture.Machine["operatingSystemSku"] = operatingSystemSku;
-        fixture.Machine["buildNumber"] = buildNumber;
+        fixture.Machine["buildNumber"] = buildNumber.ToString(System.Globalization.CultureInfo.InvariantCulture);
         fixture.Machine["installationType"] = installationType;
-        fixture.Machine["domainRole"] = domainRole;
+        fixture.Machine["is64BitOperatingSystem"] = is64BitOperatingSystem;
 
-        AssertSuccess(fixture.Run());
-    }
-
-    [Theory]
-    [InlineData("Microsoft Windows 10 Pro", 48u, "19045")]
-    [InlineData("Microsoft Windows 10 Pro", 48u, "19044")]
-    [InlineData("Microsoft Windows 11 Pro", 48u, "22000")]
-    [InlineData("Microsoft Windows 11 Pro", 48u, "22621")]
-    public void Unsupported_windows_client_builds_and_editions_are_rejected(
-        string caption,
-        uint operatingSystemSku,
-        string buildNumber)
-    {
-        RequireWindows();
-        using var fixture = ScriptFixture.Create([], []);
-        fixture.Machine["caption"] = caption;
-        fixture.Machine["productType"] = 1;
-        fixture.Machine["operatingSystemSku"] = operatingSystemSku;
-        fixture.Machine["buildNumber"] = buildNumber;
-        fixture.Machine["installationType"] = "Client";
-
-        AssertFailure(fixture.Run(), "preflight", "os_unsupported");
-    }
-
-    [Theory]
-    [InlineData("Microsoft Windows Server 2025 Datacenter", 3, 48u, "26100", "Server")]
-    [InlineData("Microsoft Windows 11 Enterprise", 1, 8u, "26100", "Client")]
-    public void Mismatched_client_and_server_skus_are_rejected(
-        string caption,
-        int productType,
-        uint operatingSystemSku,
-        string buildNumber,
-        string installationType)
-    {
-        RequireWindows();
-        using var fixture = ScriptFixture.Create([], []);
-        fixture.Machine["caption"] = caption;
-        fixture.Machine["productType"] = productType;
-        fixture.Machine["operatingSystemSku"] = operatingSystemSku;
-        fixture.Machine["buildNumber"] = buildNumber;
-        fixture.Machine["installationType"] = installationType;
-
-        AssertFailure(fixture.Run(), "preflight", "os_unsupported");
+        var result = fixture.Run();
+        if (expectedSupported)
+        {
+            AssertSuccess(result);
+        }
+        else
+        {
+            AssertFailure(result, "preflight", Assert.IsType<string>(expectedFailureCode));
+        }
     }
 
     [Theory]

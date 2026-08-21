@@ -23,7 +23,7 @@ public sealed record ProvisionAgentUserOptions(
     string UserName);
 
 public sealed record AgentUserProvisionInspection(
-    bool IsWindowsServer2025,
+    bool IsSupportedWindows,
     bool IsAdministrator,
     bool IsDomainController,
     bool UserExists,
@@ -593,9 +593,9 @@ public sealed class ProvisionAgentUserOrchestrator
 
     internal static void ValidateEnvironment(AgentUserProvisionInspection inspection)
     {
-        if (!inspection.IsWindowsServer2025)
+        if (!inspection.IsSupportedWindows)
         {
-            throw new ProvisionAgentUserException("windows_server_2025_required");
+            throw new ProvisionAgentUserException("os_unsupported");
         }
 
         if (!inspection.IsAdministrator)

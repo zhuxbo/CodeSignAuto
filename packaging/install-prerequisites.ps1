@@ -627,7 +627,8 @@ function Test-SupportedMachine {
             $iotEnterpriseLtscSkus = @(191, 207)
             $windows10 =
                 ($build -in @(14393, 17763) -and $operatingSystemSku -in $enterpriseLtscSkus) -or
-                ($build -eq 19044 -and $operatingSystemSku -in ($enterpriseLtscSkus + $iotEnterpriseLtscSkus))
+                ($build -eq 19044 -and $operatingSystemSku -in ($enterpriseLtscSkus + $iotEnterpriseLtscSkus)) -or
+                ($build -eq 19045)
 
             $enterpriseSkus = @(4, 27, 72, 84, 140, 141, 171, 172, 175)
             $windows11Skus = @(

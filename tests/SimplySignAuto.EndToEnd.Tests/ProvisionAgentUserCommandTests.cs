@@ -236,6 +236,7 @@ public sealed class ProvisionAgentUserCommandTests
     }
 
     [Theory]
+    [InlineData(ProvisionConflict.UnsupportedWindows, "os_unsupported")]
     [InlineData(ProvisionConflict.ExistingUser, "agent_user_exists")]
     [InlineData(ProvisionConflict.OtherAutoLogon, "autologon_conflict")]
     [InlineData(ProvisionConflict.DomainController, "domain_controller_unsupported")]
@@ -585,6 +586,7 @@ public sealed class ProvisionAgentUserCommandTests
     public enum ProvisionConflict
     {
         None,
+        UnsupportedWindows,
         ExistingUser,
         OtherAutoLogon,
         DomainController,
@@ -813,7 +815,7 @@ public sealed class ProvisionAgentUserCommandTests
         public bool SecretReceivedWithoutStringConversion { get; private set; }
 
         public static RecordingPlatform ExistingReady(bool dangerousRightsPresent = false) => new(new AgentUserProvisionInspection(
-            IsWindowsServer2025: true,
+            IsSupportedWindows: true,
             IsAdministrator: true,
             IsDomainController: false,
             UserExists: true,
@@ -824,7 +826,7 @@ public sealed class ProvisionAgentUserCommandTests
             DangerousRightsPresent: dangerousRightsPresent));
 
         public static RecordingPlatform Repairable() => new(new AgentUserProvisionInspection(
-            IsWindowsServer2025: true,
+            IsSupportedWindows: true,
             IsAdministrator: true,
             IsDomainController: false,
             UserExists: true,
@@ -838,7 +840,7 @@ public sealed class ProvisionAgentUserCommandTests
 
         public static RecordingPlatform Fresh(ProvisionConflict conflict = ProvisionConflict.None) => new(
             new AgentUserProvisionInspection(
-                IsWindowsServer2025: true,
+                IsSupportedWindows: conflict != ProvisionConflict.UnsupportedWindows,
                 IsAdministrator: conflict != ProvisionConflict.NotAdministrator,
                 IsDomainController: conflict == ProvisionConflict.DomainController,
                 UserExists: conflict == ProvisionConflict.ExistingUser,
