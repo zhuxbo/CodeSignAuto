@@ -14,6 +14,8 @@ $SbomCreatedUtc = '1980-01-01T00:00:00Z'
 $ReleaseNativeTypeBase64 = 'dXNpbmcgU3lzdGVtOyB1c2luZyBTeXN0ZW0uUnVudGltZS5JbnRlcm9wU2VydmljZXM7IHVzaW5nIE1pY3Jvc29mdC5XaW4zMi5TYWZlSGFuZGxlczsgbmFtZXNwYWNlIFNpbXBseVNpZ25BdXRvLlJlbGVhc2UgeyBbU3RydWN0TGF5b3V0KExheW91dEtpbmQuU2VxdWVudGlhbCldIHB1YmxpYyBzdHJ1Y3QgRmlsZUluZm9ybWF0aW9uIHsgcHVibGljIHVpbnQgRmlsZUF0dHJpYnV0ZXM7IHB1YmxpYyBTeXN0ZW0uUnVudGltZS5JbnRlcm9wU2VydmljZXMuQ29tVHlwZXMuRklMRVRJTUUgQ3JlYXRpb25UaW1lOyBwdWJsaWMgU3lzdGVtLlJ1bnRpbWUuSW50ZXJvcFNlcnZpY2VzLkNvbVR5cGVzLkZJTEVUSU1FIExhc3RBY2Nlc3NUaW1lOyBwdWJsaWMgU3lzdGVtLlJ1bnRpbWUuSW50ZXJvcFNlcnZpY2VzLkNvbVR5cGVzLkZJTEVUSU1FIExhc3RXcml0ZVRpbWU7IHB1YmxpYyB1aW50IFZvbHVtZVNlcmlhbE51bWJlcjsgcHVibGljIHVpbnQgRmlsZVNpemVIaWdoOyBwdWJsaWMgdWludCBGaWxlU2l6ZUxvdzsgcHVibGljIHVpbnQgbk51bWJlck9mTGlua3M7IHB1YmxpYyB1aW50IEZpbGVJbmRleEhpZ2g7IHB1YmxpYyB1aW50IEZpbGVJbmRleExvdzsgfSBwdWJsaWMgc3RhdGljIGNsYXNzIE5hdGl2ZU1ldGhvZHMgeyBbRGxsSW1wb3J0KCJrZXJuZWwzMi5kbGwiLCBTZXRMYXN0RXJyb3I9dHJ1ZSldIFtyZXR1cm46IE1hcnNoYWxBcyhVbm1hbmFnZWRUeXBlLkJvb2wpXSBwdWJsaWMgc3RhdGljIGV4dGVybiBib29sIEdldEZpbGVJbmZvcm1hdGlvbkJ5SGFuZGxlKFNhZmVGaWxlSGFuZGxlIGhhbmRsZSwgb3V0IEZpbGVJbmZvcm1hdGlvbiBpbmZvcm1hdGlvbik7IH0gfQ=='
 $SigningClientScript = Join-Path $PSScriptRoot 'sign-via-simplysign.ps1'
 . $SigningClientScript
+$PdfReleaseDecisionScript = Join-Path $PSScriptRoot 'get-pdf-release-decision.ps1'
+. $PdfReleaseDecisionScript
 
 function Fail-Release {
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
@@ -906,6 +908,10 @@ if (Test-Path -LiteralPath $BuildRoot) {
     Remove-Item -LiteralPath $BuildRoot -Recurse -Force
 }
 [System.IO.Directory]::CreateDirectory($BuildRoot) | Out-Null
+$pdfReleaseDecision = Get-PdfReleaseDecision -RepositoryRoot $RepoRoot -Version $Version
+Write-PdfReleaseDecision `
+    -Decision $pdfReleaseDecision `
+    -OutputPath (Join-Path $BuildRoot 'pdf-release-decision.json')
 
 Invoke-Checked -FilePath $Dotnet -WorkingDirectory $RepoRoot -ArgumentList @('restore', $Solution, '--locked-mode', '-m:1', '-nodeReuse:false')
 Invoke-ReleaseTestSuite -Dotnet $Dotnet -RepoRoot $RepoRoot -ResultsRoot (Join-Path $BuildRoot 'test-results')
@@ -971,6 +977,9 @@ if ($LASTEXITCODE -ne 0 -or
     Fail-Release 'release_pdf_helper_version_invalid'
 }
 $pdfHelperVersion = $pdfHelperVersionOutput[0]
+if ($pdfReleaseDecision.releasePdf -and $pdfHelperVersion -cne $Version) {
+    Fail-Release 'release_pdf_helper_version_mismatch'
+}
 
 $packageRoot = Join-Path $BuildRoot ("SimplySignAuto-$Version-win-x64")
 [System.IO.Directory]::CreateDirectory($packageRoot) | Out-Null
@@ -1073,76 +1082,81 @@ $setupArtifactPath = Publish-SetupArtifact `
     -SigningCertificateSerial $SigningCertificateSerial `
     -SigningTimeout $SigningTimeout
 
-$pdfHelperArtifactPath = Join-Path $BuildRoot 'SimplySignPdfSigner.exe'
-[System.IO.File]::Copy($builtPdfHelperPath, $pdfHelperArtifactPath, $false)
-$pdfHelperSignature = Invoke-ReleaseArtifactSign `
-    -Path $pdfHelperArtifactPath `
-    -SigningBaseUrl $SigningBaseUrl `
-    -SigningBearerToken $SigningBearerToken `
-    -SigningCertificateSerial $SigningCertificateSerial `
-    -IdempotencyPrefix 'release-pdf-helper' `
-    -SigningTimeout $SigningTimeout
-if ((Get-CertificateSha256 -RawData $pdfHelperSignature.SignerCertificate.RawData) -cne
-    $publisherCertificateSha256) {
-    Fail-Release 'release_pdf_helper_signature_invalid'
+$finalArtifactPaths = @($setupArtifactPath)
+$pdfSetupArtifactPath = $null
+if ($pdfReleaseDecision.releasePdf) {
+    $pdfHelperArtifactPath = Join-Path $BuildRoot 'SimplySignPdfSigner.exe'
+    [System.IO.File]::Copy($builtPdfHelperPath, $pdfHelperArtifactPath, $false)
+    $pdfHelperSignature = Invoke-ReleaseArtifactSign `
+        -Path $pdfHelperArtifactPath `
+        -SigningBaseUrl $SigningBaseUrl `
+        -SigningBearerToken $SigningBearerToken `
+        -SigningCertificateSerial $SigningCertificateSerial `
+        -IdempotencyPrefix 'release-pdf-helper' `
+        -SigningTimeout $SigningTimeout
+    if ((Get-CertificateSha256 -RawData $pdfHelperSignature.SignerCertificate.RawData) -cne
+        $publisherCertificateSha256) {
+        Fail-Release 'release_pdf_helper_signature_invalid'
+    }
+    $pdfHelperArtifact = Get-Item -LiteralPath $pdfHelperArtifactPath -Force
+    $pdfHelperSha256 = Get-LowerSha256 -Path $pdfHelperArtifactPath
+
+    $pdfPackageRoot = Join-Path $BuildRoot ("SimplySignAutoPdfSupport-$Version-win-x64")
+    [System.IO.Directory]::CreateDirectory($pdfPackageRoot) | Out-Null
+    [System.IO.File]::Copy(
+        $pdfHelperArtifactPath,
+        (Join-Path $pdfPackageRoot 'SimplySignPdfSigner.exe'),
+        $false)
+    [System.IO.File]::Copy(
+        (Join-Path $RepoRoot 'LICENSE'),
+        (Join-Path $pdfPackageRoot 'LICENSE.txt'),
+        $false)
+    [System.IO.File]::Copy(
+        (Join-Path $RepoRoot 'THIRD-PARTY-NOTICES.txt'),
+        (Join-Path $pdfPackageRoot 'THIRD-PARTY-NOTICES.txt'),
+        $false)
+    Write-PdfExtensionManifest `
+        -OutputPath (Join-Path $pdfPackageRoot 'extension.json') `
+        -ProductVersion $Version `
+        -HelperVersion $pdfHelperVersion `
+        -HelperLength $pdfHelperArtifact.Length `
+        -HelperSha256 $pdfHelperSha256 `
+        -PublisherCertificateSha256 $publisherCertificateSha256
+    Assert-ReleasePackageFileSet `
+        -Root $pdfPackageRoot `
+        -ExpectedFiles @(
+            'extension.json',
+            'LICENSE.txt',
+            'SimplySignPdfSigner.exe',
+            'THIRD-PARTY-NOTICES.txt')
+    $pdfPayloadZipPath = Join-Path $BuildRoot (
+        "SimplySignAutoPdfSupport-$Version-win-x64.internal.zip")
+    New-DeterministicZip -SourceRoot $pdfPackageRoot -DestinationPath $pdfPayloadZipPath
+    $pdfSetupMetadataPath = Join-Path $BuildRoot 'setup-pdf-metadata.json'
+    Write-SetupPayloadMetadata `
+        -PayloadPath $pdfPayloadZipPath `
+        -OutputPath $pdfSetupMetadataPath `
+        -ProductKind 'pdf-extension' `
+        -PublisherCertificateSha256 $publisherCertificateSha256
+
+    $pdfSetupArtifactPath = Publish-SetupArtifact `
+        -Dotnet $Dotnet `
+        -WorkingDirectory $ridSourceRoot `
+        -SetupProject $ridSetupProject `
+        -BuildRoot $BuildRoot `
+        -ReleaseRoot $ReleaseRoot `
+        -PublishName 'pdf' `
+        -ArtifactName ("SimplySignAutoPdfSetup-$Version-win-x64.exe") `
+        -PayloadPath $pdfPayloadZipPath `
+        -MetadataPath $pdfSetupMetadataPath `
+        -SigningBaseUrl $SigningBaseUrl `
+        -SigningBearerToken $SigningBearerToken `
+        -SigningCertificateSerial $SigningCertificateSerial `
+        -SigningTimeout $SigningTimeout
+    $finalArtifactPaths += $pdfSetupArtifactPath
 }
-$pdfHelperArtifact = Get-Item -LiteralPath $pdfHelperArtifactPath -Force
-$pdfHelperSha256 = Get-LowerSha256 -Path $pdfHelperArtifactPath
 
-$pdfPackageRoot = Join-Path $BuildRoot ("SimplySignAutoPdfSupport-$Version-win-x64")
-[System.IO.Directory]::CreateDirectory($pdfPackageRoot) | Out-Null
-[System.IO.File]::Copy(
-    $pdfHelperArtifactPath,
-    (Join-Path $pdfPackageRoot 'SimplySignPdfSigner.exe'),
-    $false)
-[System.IO.File]::Copy(
-    (Join-Path $RepoRoot 'LICENSE'),
-    (Join-Path $pdfPackageRoot 'LICENSE.txt'),
-    $false)
-[System.IO.File]::Copy(
-    (Join-Path $RepoRoot 'THIRD-PARTY-NOTICES.txt'),
-    (Join-Path $pdfPackageRoot 'THIRD-PARTY-NOTICES.txt'),
-    $false)
-Write-PdfExtensionManifest `
-    -OutputPath (Join-Path $pdfPackageRoot 'extension.json') `
-    -ProductVersion $Version `
-    -HelperVersion $pdfHelperVersion `
-    -HelperLength $pdfHelperArtifact.Length `
-    -HelperSha256 $pdfHelperSha256 `
-    -PublisherCertificateSha256 $publisherCertificateSha256
-Assert-ReleasePackageFileSet `
-    -Root $pdfPackageRoot `
-    -ExpectedFiles @(
-        'extension.json',
-        'LICENSE.txt',
-        'SimplySignPdfSigner.exe',
-        'THIRD-PARTY-NOTICES.txt')
-$pdfPayloadZipPath = Join-Path $BuildRoot (
-    "SimplySignAutoPdfSupport-$Version-win-x64.internal.zip")
-New-DeterministicZip -SourceRoot $pdfPackageRoot -DestinationPath $pdfPayloadZipPath
-$pdfSetupMetadataPath = Join-Path $BuildRoot 'setup-pdf-metadata.json'
-Write-SetupPayloadMetadata `
-    -PayloadPath $pdfPayloadZipPath `
-    -OutputPath $pdfSetupMetadataPath `
-    -ProductKind 'pdf-extension' `
-    -PublisherCertificateSha256 $publisherCertificateSha256
-
-$pdfSetupArtifactPath = Publish-SetupArtifact `
-    -Dotnet $Dotnet `
-    -WorkingDirectory $ridSourceRoot `
-    -SetupProject $ridSetupProject `
-    -BuildRoot $BuildRoot `
-    -ReleaseRoot $ReleaseRoot `
-    -PublishName 'pdf' `
-    -ArtifactName ("SimplySignAutoPdfSetup-$Version-win-x64.exe") `
-    -PayloadPath $pdfPayloadZipPath `
-    -MetadataPath $pdfSetupMetadataPath `
-    -SigningBaseUrl $SigningBaseUrl `
-    -SigningBearerToken $SigningBearerToken `
-    -SigningCertificateSerial $SigningCertificateSerial `
-    -SigningTimeout $SigningTimeout
-
-foreach ($finalArtifactPath in @($setupArtifactPath, $pdfSetupArtifactPath)) {
+foreach ($finalArtifactPath in $finalArtifactPaths) {
     $finalSignature = Get-AuthenticodeSignature -LiteralPath $finalArtifactPath
     if ($finalSignature.Status -ne [System.Management.Automation.SignatureStatus]::Valid -or
         $null -eq $finalSignature.SignerCertificate -or
@@ -1155,14 +1169,16 @@ foreach ($finalArtifactPath in @($setupArtifactPath, $pdfSetupArtifactPath)) {
     }
 }
 
-$expectedReleaseFiles = @(
-    [System.IO.Path]::GetFileName($setupArtifactPath)
-    [System.IO.Path]::GetFileName($pdfSetupArtifactPath)
-) | Sort-Object
+$expectedReleaseFiles = @($finalArtifactPaths | ForEach-Object {
+    [System.IO.Path]::GetFileName($_)
+}) | Sort-Object
 Assert-ReleasePackageFileSet -Root $ReleaseRoot -ExpectedFiles $expectedReleaseFiles
 
-[Console]::Out.WriteLine(
-    "release_ok version=$Version setup_sha256=$(Get-LowerSha256 -Path $setupArtifactPath) pdf_setup_sha256=$(Get-LowerSha256 -Path $pdfSetupArtifactPath)")
+$releaseSummary = "release_ok version=$Version setup_sha256=$(Get-LowerSha256 -Path $setupArtifactPath) pdf_release=$($pdfReleaseDecision.releasePdf.ToString().ToLowerInvariant()) reason=$($pdfReleaseDecision.reason)"
+if ($pdfReleaseDecision.releasePdf) {
+    $releaseSummary += " pdf_setup_sha256=$(Get-LowerSha256 -Path $pdfSetupArtifactPath)"
+}
+[Console]::Out.WriteLine($releaseSummary)
 }
 
 if ($MyInvocation.InvocationName -ne '.') {

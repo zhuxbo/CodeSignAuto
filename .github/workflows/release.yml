@@ -21,6 +21,7 @@ jobs:
     env:
       MAIN_SETUP: artifacts/release/SimplySignAutoSetup-${{ inputs.version }}-win-x64.exe
       PDF_SETUP: artifacts/release/SimplySignAutoPdfSetup-${{ inputs.version }}-win-x64.exe
+      PDF_DECISION: artifacts/build/${{ inputs.version }}/pdf-release-decision.json
 
     steps:
       - name: Checkout selected tag
@@ -86,7 +87,7 @@ jobs:
         shell: pwsh
         run: dotnet restore SimplySignAuto.sln --locked-mode -p:NuGetAudit=true -p:NuGetAuditMode=all -m:1 -nodeReuse:false
 
-      - name: Build and sign both installers
+      - name: Build and sign release installers
         shell: powershell
         env:
           SIMPLYSIGN_SIGNING_BASE_URL: ${{ vars.SIMPLYSIGN_SIGNING_BASE_URL }}
@@ -100,10 +101,20 @@ jobs:
           SIMPLYSIGN_SIGNING_CERTIFICATE_SERIAL: ${{ vars.SIMPLYSIGN_SIGNING_CERTIFICATE_SERIAL }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $expected = @(
-            [IO.Path]::GetFullPath($env:MAIN_SETUP),
-            [IO.Path]::GetFullPath($env:PDF_SETUP)
-          ) | Sort-Object
+          if (-not (Test-Path -LiteralPath $env:PDF_DECISION -PathType Leaf)) {
+            throw 'release_decision_missing'
+          }
+          $decision = Get-Content -LiteralPath $env:PDF_DECISION -Raw | ConvertFrom-Json
+          if ($decision.schemaVersion -ne 1 -or
+              $decision.version -cne '${{ inputs.version }}' -or
+              $decision.releasePdf -isnot [bool]) {
+            throw 'release_decision_invalid'
+          }
+          $expected = @([IO.Path]::GetFullPath($env:MAIN_SETUP))
+          if ($decision.releasePdf) {
+            $expected += [IO.Path]::GetFullPath($env:PDF_SETUP)
+          }
+          $expected = @($expected | Sort-Object)
           $actual = @(
             Get-ChildItem -LiteralPath artifacts/release -File -Force |
               ForEach-Object { $_.FullName } |
@@ -115,27 +126,32 @@ jobs:
           $expectedSerial = ($env:SIMPLYSIGN_SIGNING_CERTIFICATE_SERIAL -replace '[^0-9A-Fa-f]', '').TrimStart('0').ToUpperInvariant()
           foreach ($path in $expected) {
             $signature = Get-AuthenticodeSignature -LiteralPath $path
-            $actualSerial = $signature.SignerCertificate.SerialNumber.TrimStart('0').ToUpperInvariant()
             if ($signature.Status -ne 'Valid' -or
                 $null -eq $signature.SignerCertificate -or
-                $null -eq $signature.TimeStamperCertificate -or
-                $actualSerial -cne $expectedSerial) {
+                $null -eq $signature.TimeStamperCertificate) {
+              throw 'release_asset_signature_invalid'
+            }
+            $actualSerial = $signature.SignerCertificate.SerialNumber.TrimStart('0').ToUpperInvariant()
+            if ($actualSerial -cne $expectedSerial) {
               throw 'release_asset_signature_invalid'
             }
           }
 
       - name: Write release notes
         shell: pwsh
-        run: pwsh -NoLogo -NoProfile -File scripts/write-github-release-notes.ps1 -ReleaseRoot artifacts/release -Version "${{ inputs.version }}" -OutputPath "${{ runner.temp }}/release-notes.md"
+        run: pwsh -NoLogo -NoProfile -File scripts/write-github-release-notes.ps1 -ReleaseRoot artifacts/release -Version "${{ inputs.version }}" -DecisionPath "$env:PDF_DECISION" -OutputPath "${{ runner.temp }}/release-notes.md"
 
       - name: Create GitHub Release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          $assets = @($env:MAIN_SETUP)
+          if (Test-Path -LiteralPath $env:PDF_SETUP) {
+            $assets += $env:PDF_SETUP
+          }
           gh release create "v${{ inputs.version }}" `
-            "$env:MAIN_SETUP" `
-            "$env:PDF_SETUP" `
+            @assets `
             --verify-tag `
             --title "SimplySignAuto v${{ inputs.version }}" `
             --notes-file "${{ runner.temp }}/release-notes.md"

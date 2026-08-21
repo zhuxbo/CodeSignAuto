@@ -108,6 +108,7 @@ $requiredFiles = @(
     'THIRD-PARTY-NOTICES.txt',
     'docs/API.md',
     'scripts/build-release.ps1',
+    'scripts/get-pdf-release-decision.ps1',
     'scripts/pre-release-check.ps1',
     '.github/workflows/release.yml',
     'AGENTS.md',

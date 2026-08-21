@@ -146,7 +146,7 @@ public sealed class ReleasePackagingContractTests
     }
 
     [Fact]
-    public void GitHub_release_workflow_is_manual_tag_bound_and_publishes_only_two_installers()
+    public void GitHub_release_workflow_is_manual_tag_bound_and_publishes_one_or_two_installers()
     {
         var workflowPath = Path.Combine(
             FindRepositoryRoot(),
@@ -179,7 +179,7 @@ public sealed class ReleasePackagingContractTests
             StringComparison.Ordinal);
         Assert.Contains("gh release create", workflow, StringComparison.Ordinal);
         Assert.Contains("--verify-tag", workflow, StringComparison.Ordinal);
-        var buildStep = workflow.IndexOf("- name: Build and sign both installers", StringComparison.Ordinal);
+        var buildStep = workflow.IndexOf("- name: Build and sign release installers", StringComparison.Ordinal);
         var signingToken = workflow.IndexOf(
             "SIMPLYSIGN_SIGNING_BEARER_TOKEN: ${{ secrets.SIMPLYSIGN_SIGNING_BEARER_TOKEN }}",
             StringComparison.Ordinal);
@@ -193,7 +193,10 @@ public sealed class ReleasePackagingContractTests
             StringComparison.Ordinal);
         Assert.Equal(1, Count(workflow, "SimplySignAutoSetup-${{ inputs.version }}-win-x64.exe"));
         Assert.Equal(1, Count(workflow, "SimplySignAutoPdfSetup-${{ inputs.version }}-win-x64.exe"));
+        Assert.Equal(1, Count(workflow, "artifacts/build/${{ inputs.version }}/pdf-release-decision.json"));
         Assert.Equal(1, Count(workflow, "${{ secrets.SIMPLYSIGN_SIGNING_BEARER_TOKEN }}"));
+        Assert.Contains("$decision.releasePdf", workflow, StringComparison.Ordinal);
+        Assert.Contains("Test-Path -LiteralPath $env:PDF_SETUP", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("artifacts/release/*", workflow, StringComparison.Ordinal);
     }
 
@@ -208,27 +211,40 @@ public sealed class ReleasePackagingContractTests
 
         Assert.Contains("'LICENSE'", script, StringComparison.Ordinal);
         Assert.Contains("'THIRD-PARTY-NOTICES.txt'", script, StringComparison.Ordinal);
+        Assert.Contains("'scripts/get-pdf-release-decision.ps1'", script, StringComparison.Ordinal);
         Assert.Contains("release_history_message_forbidden", script, StringComparison.Ordinal);
         Assert.Contains("release_process_reference_forbidden", script, StringComparison.Ordinal);
     }
 
     [WindowsFact]
-    public void GitHub_release_notes_are_deterministic_and_describe_the_exact_two_artifacts()
+    public void GitHub_release_notes_are_deterministic_and_describe_two_artifacts_when_pdf_is_released()
     {
         var root = Path.Combine(Path.GetTempPath(), $"simplysign-release-notes-{Guid.NewGuid():N}");
         var releaseRoot = Path.Combine(root, "release");
         var outputPath = Path.Combine(root, "notes.md");
+        var decisionPath = Path.Combine(root, "decision.json");
         Directory.CreateDirectory(releaseRoot);
         var version = "1.2.3-test.4";
         var mainName = $"SimplySignAutoSetup-{version}-win-x64.exe";
         var pdfName = $"SimplySignAutoPdfSetup-{version}-win-x64.exe";
         File.WriteAllBytes(Path.Combine(releaseRoot, mainName), [1, 2, 3]);
         File.WriteAllBytes(Path.Combine(releaseRoot, pdfName), [4, 5, 6, 7]);
+        File.WriteAllText(
+            decisionPath,
+            "{\"schemaVersion\":1,\"version\":\"1.2.3-test.4\",\"releasePdf\":true," +
+            "\"reason\":\"pdf_inputs_changed\",\"baselineTag\":\"v1.2.2\"," +
+            "\"changedPaths\":[\"tools/pdf-signer/simplysign_pdf_signer.py\"]}",
+            new UTF8Encoding(false));
         try
         {
             var result = RunPowerShell(
                 Path.Combine(FindRepositoryRoot(), "scripts", "write-github-release-notes.ps1"),
-                ["-ReleaseRoot", releaseRoot, "-Version", version, "-OutputPath", outputPath],
+                [
+                    "-ReleaseRoot", releaseRoot,
+                    "-Version", version,
+                    "-DecisionPath", decisionPath,
+                    "-OutputPath", outputPath
+                ],
                 environment: null);
 
             Assert.True(
@@ -239,6 +255,52 @@ public sealed class ReleasePackagingContractTests
                 "## 安装包\r\n\r\n" +
                 $"- `{pdfName}` — 4 bytes — SHA-256 `{LowerSha256(Path.Combine(releaseRoot, pdfName))}`\r\n" +
                 $"- `{mainName}` — 3 bytes — SHA-256 `{LowerSha256(Path.Combine(releaseRoot, mainName))}`\r\n";
+            Assert.Equal(expected, File.ReadAllText(outputPath));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [WindowsFact]
+    public void GitHub_release_notes_describe_pdf_skip_and_accept_only_main_artifact()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"simplysign-release-notes-{Guid.NewGuid():N}");
+        var releaseRoot = Path.Combine(root, "release");
+        var outputPath = Path.Combine(root, "notes.md");
+        var decisionPath = Path.Combine(root, "decision.json");
+        Directory.CreateDirectory(releaseRoot);
+        var version = "1.2.4";
+        var mainName = $"SimplySignAutoSetup-{version}-win-x64.exe";
+        File.WriteAllBytes(Path.Combine(releaseRoot, mainName), [1, 2, 3]);
+        File.WriteAllText(
+            decisionPath,
+            "{\"schemaVersion\":1,\"version\":\"1.2.4\",\"releasePdf\":false," +
+            "\"reason\":\"pdf_inputs_unchanged\",\"baselineTag\":\"v1.2.3\"," +
+            "\"changedPaths\":[]}",
+            new UTF8Encoding(false));
+        try
+        {
+            var result = RunPowerShell(
+                Path.Combine(FindRepositoryRoot(), "scripts", "write-github-release-notes.ps1"),
+                [
+                    "-ReleaseRoot", releaseRoot,
+                    "-Version", version,
+                    "-DecisionPath", decisionPath,
+                    "-OutputPath", outputPath
+                ],
+                environment: null);
+
+            Assert.True(
+                result.ExitCode == 0,
+                $"powershell_exit_{result.ExitCode}: {result.StandardError}");
+            Assert.Equal(string.Empty, result.StandardError);
+            var expected =
+                "## 安装包\r\n\r\n" +
+                $"- `{mainName}` — 3 bytes — SHA-256 `{LowerSha256(Path.Combine(releaseRoot, mainName))}`\r\n" +
+                "\r\n" +
+                "PDF 扩展：相对 `v1.2.3` 没有有效输入变更，本版本未发布新的 PDF 安装包。\r\n";
             Assert.Equal(expected, File.ReadAllText(outputPath));
         }
         finally
@@ -303,7 +365,7 @@ public sealed class ReleasePackagingContractTests
     }
 
     [Fact]
-    public void Release_build_produces_two_signed_offline_setup_packages()
+    public void Release_build_always_produces_main_and_conditionally_produces_pdf_setup()
     {
         var script = ReadBuildScript();
         var helperBuild = script.IndexOf("'run', 'pyinstaller'", StringComparison.Ordinal);
@@ -332,6 +394,9 @@ public sealed class ReleasePackagingContractTests
         Assert.True(helperSign > helperValidation && helperHash > helperSign);
         Assert.True(manifest > helperHash && pdfArchive > manifest);
         Assert.True(pdfSetup > pdfArchive && releaseClosure > pdfSetup);
+        Assert.Contains("if ($pdfReleaseDecision.releasePdf)", script, StringComparison.Ordinal);
+        Assert.Contains("release_pdf_helper_version_mismatch", script, StringComparison.Ordinal);
+        Assert.Contains("pdf_release=$($pdfReleaseDecision.releasePdf.ToString().ToLowerInvariant())", script, StringComparison.Ordinal);
         Assert.Contains("SimplySignAutoSetup-$Version-win-x64.exe", script, StringComparison.Ordinal);
         Assert.Contains("SimplySignAutoPdfSetup-$Version-win-x64.exe", script, StringComparison.Ordinal);
         Assert.Contains("function Publish-SetupArtifact", script, StringComparison.Ordinal);

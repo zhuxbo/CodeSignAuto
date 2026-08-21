@@ -14,7 +14,8 @@ description: 在 SimplySignAuto 仓库中进行新会话上手、Windows 构建�
 - `SimplySignAuto.exe` 同时承载 LocalSystem Service、签名用户 Agent 和管理员 WPF 控制台，但三种身份与会话必须隔离。
 - 主安装包默认只提供完整代码签名；PDF helper 由独立 PDF 扩展安装包安装，未安装时主界面隐藏 PDF 功能。
 - 产品只监听 HTTP。需要 HTTPS 时由用户配置反向代理；不要恢复 TLS/PFX 产品设置或“证明已删除功能不存在”的镜像测试。
-- 公共发布只允许两个签名安装包：主程序 Setup 与 PDF 扩展 Setup。
+- 公共发布始终只有主程序 Setup，并在 PDF 有效输入相对上一主程序版本变化时
+  额外包含同版本 PDF 扩展 Setup；PDF 版本允许断档。
 
 ## 环境与安全
 
@@ -56,8 +57,11 @@ description: 在 SimplySignAuto 仓库中进行新会话上手、Windows 构建�
 
 构建结束必须证明：
 
-- `artifacts/release` 精确只有两个 Setup EXE。
-- 两个安装包 Authenticode 有效、发布者与参考签名一致，并有有效时间戳。
+- `artifacts/release` 精确只有主程序 Setup，以及判定需要发布时的 PDF Setup，
+  共 1 或 2 个 EXE；判定记录位于当前版本 build 目录。
+- 所有生成的安装包 Authenticode 有效、发布者与参考签名一致，并有有效时间戳。
+- PDF 判定依赖完整 Git 历史，且有效输入路径的工作树必须干净；有效输入未变化时仍通过
+  helper 测试与冻结验证，但不得签名、打包或上传 PDF。需要发布时 helper 版本必须等于主程序版本。
 - 主安装包不会混入 PDF helper；PDF 扩展安装包包含并校验 helper。
 - 构建、签名、发布是不同状态；没有真实签名证据时不得称“可发布”。
 
