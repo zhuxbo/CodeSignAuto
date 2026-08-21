@@ -145,7 +145,7 @@ public sealed class OverviewViewModel : INotifyPropertyChanged, IDisposable
 
     public bool IsLoggedIn => Snapshot is not null && IsLoginReady(Snapshot);
 
-    public string LoginButtonText => IsLoggedIn
+    public string LoginButtonText => HasCurrentSimplySignProcess
         ? UiCulture.Text("OverviewLogout")
         : UiCulture.Text("OverviewLogin");
 
@@ -330,7 +330,7 @@ public sealed class OverviewViewModel : INotifyPropertyChanged, IDisposable
     public async Task<bool> LogoutAsync(CancellationToken cancellationToken)
     {
         ThrowIfDisposed();
-        if (!IsLoggedIn || !CanRelogin)
+        if (!HasCurrentSimplySignProcess || !CanRelogin)
         {
             return false;
         }
@@ -341,14 +341,14 @@ public sealed class OverviewViewModel : INotifyPropertyChanged, IDisposable
             await _operationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                if (!await ReadCanReloginAsync().ConfigureAwait(false) || !IsLoggedIn)
+                if (!await ReadCanReloginAsync().ConfigureAwait(false) || !HasCurrentSimplySignProcess)
                 {
                     return false;
                 }
 
                 var loggedOut = await _management.LogoutAsync(cancellationToken).ConfigureAwait(false);
                 await ApplySnapshotAsync(loggedOut).ConfigureAwait(false);
-                return !IsLoginReady(loggedOut);
+                return !HasCurrentSimplySignProcess;
             }
             catch (ManagementUnavailableException unavailable)
             {
@@ -494,7 +494,7 @@ public sealed class OverviewViewModel : INotifyPropertyChanged, IDisposable
     {
         try
         {
-            if (IsLoggedIn)
+            if (HasCurrentSimplySignProcess)
             {
                 await LogoutAsync(CancellationToken.None).ConfigureAwait(false);
             }
@@ -513,6 +513,12 @@ public sealed class OverviewViewModel : INotifyPropertyChanged, IDisposable
     {
         ((AsyncDelegateCommand)LoginCommand).RaiseCanExecuteChanged();
     }
+
+    private bool HasCurrentSimplySignProcess => Snapshot is
+    {
+        SimplySignProcessRunning: true,
+        SimplySignProcessSessionId: not null
+    } snapshot && snapshot.SimplySignProcessSessionId == snapshot.AgentSessionId;
 
     private static bool IsLoginReady(ManagementSnapshot snapshot) =>
         snapshot.SimplySignProcessRunning &&

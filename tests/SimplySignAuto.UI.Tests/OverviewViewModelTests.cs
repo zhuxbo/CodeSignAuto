@@ -190,6 +190,27 @@ public sealed class OverviewViewModelTests
     }
 
     [Fact]
+    public async Task Current_session_process_uses_logout_even_when_signing_capability_is_unavailable()
+    {
+        var running = LoginRequiredSnapshot(
+            Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+            processSessionId: 7);
+        var loggedOut = LoginRequiredSnapshot(Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"));
+        var client = new QueueManagementClient(running) { LogoutResult = loggedOut };
+        using var viewModel = new OverviewViewModel(client, new AlwaysConfirm(), () => { });
+        await viewModel.RefreshAsync(default);
+
+        Assert.False(viewModel.IsLoggedIn);
+        Assert.Equal("退出", viewModel.LoginButtonText);
+        viewModel.LoginCommand.Execute(null);
+        await client.LogoutObserved.Task.WaitAsync(TimeSpan.FromSeconds(1));
+
+        Assert.Equal(1, client.LogoutCalls);
+        Assert.Equal(0, client.ReloginCalls);
+        Assert.Equal("登录", viewModel.LoginButtonText);
+    }
+
+    [Fact]
     public async Task Confirmed_relogin_with_no_active_job_calls_management_once_and_applies_new_probe_snapshot()
     {
         var before = Snapshot(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
