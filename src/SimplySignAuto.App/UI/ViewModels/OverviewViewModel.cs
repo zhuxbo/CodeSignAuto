@@ -380,7 +380,23 @@ public sealed class OverviewViewModel : INotifyPropertyChanged, IDisposable
     private void HandleSnapshotChanged(object? sender, EventArgs eventArgs)
     {
         var latest = _management.LatestSnapshot;
-        _ = ApplySnapshotAsync(latest);
+        _ = latest is null
+            ? RefreshAfterSessionChangeAsync()
+            : ApplySnapshotAsync(latest);
+    }
+
+    private async Task RefreshAfterSessionChangeAsync()
+    {
+        try
+        {
+            await RefreshAsync(_lifetime.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
+        {
+        }
+        catch (ObjectDisposedException) when (Volatile.Read(ref _disposed) != 0)
+        {
+        }
     }
 
     private Task ApplySnapshotAsync(ManagementSnapshot? snapshot)

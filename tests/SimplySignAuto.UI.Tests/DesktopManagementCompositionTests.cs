@@ -169,6 +169,33 @@ public sealed class DesktopManagementCompositionTests
     }
 
     [Fact]
+    public async Task Manual_session_attachment_refreshes_unknown_state_before_idle_exit()
+    {
+        using var fixture = new ConfigurationFixture();
+        using var bridge = new AgentManagementBridge();
+        var localJobs = new ImmediateLocalJobClient();
+        var session = new FixedManagementSession(Snapshot(active: 0));
+        var lifetime = new RecordingLifetime();
+        using var shell = DesktopShellComposition.Create(
+            new LocalSourceRunner(bridge, localJobs),
+            new FixedActiveJobStateSource(ActiveJobState.Unknown),
+            new RecordingWindow(),
+            lifetime,
+            InlineTestDispatcher.Instance,
+            fixture.Configuration,
+            InstallationMode.Manual,
+            manualSettings: null);
+
+        using var lease = bridge.Attach(session, localJobs);
+        var result = await shell.RequestExitAsync(default);
+
+        Assert.Equal(1, session.RefreshCalls);
+        Assert.NotNull(shell.Overview!.Snapshot);
+        Assert.Equal(ExitRequestResult.Exiting, result);
+        Assert.Equal(1, lifetime.StopCalls);
+    }
+
+    [Fact]
     public async Task Manual_exit_refuses_an_accepted_local_job_after_selecting_another_file_with_stale_snapshot()
     {
         using var fixture = new ConfigurationFixture();
@@ -450,6 +477,21 @@ public sealed class DesktopManagementCompositionTests
             ReloginCalls++;
             return Task.FromResult(refreshSnapshot);
         }
+    }
+
+    private sealed class FixedManagementSession(ManagementSnapshot snapshot) : IAgentManagementSession
+    {
+        public int RefreshCalls { get; private set; }
+
+        public Task<ManagementSnapshot> RefreshAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            RefreshCalls++;
+            return Task.FromResult(snapshot);
+        }
+
+        public Task<ManagementSnapshot> ReloginAsync(CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
     }
 
     private sealed class FixedActiveJobStateSource(ActiveJobState state) : IActiveJobStateSource
