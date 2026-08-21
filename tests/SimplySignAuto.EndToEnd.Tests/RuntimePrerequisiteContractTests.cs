@@ -174,6 +174,24 @@ public sealed class RuntimePrerequisiteContractTests
     }
 
     [Fact]
+    public void Media_only_verification_does_not_require_an_install_mode()
+    {
+        RequireWindows();
+        using var fixture = ScriptFixture.Create(["10.0.10"], ["10.0.10"]);
+
+        var result = fixture.Run(verifyMediaOnly: true);
+
+        Assert.True(
+            result.ExitCode == 0,
+            $"Expected exit 0, got {result.ExitCode}. Output={result.AllOutput} Trace={result.Trace}");
+        Assert.Contains("phase=media code=ready", result.OutputLines);
+        Assert.Contains("media_verified", result.Trace, StringComparison.Ordinal);
+        Assert.DoesNotContain("phase=complete code=ready", result.OutputLines);
+        AssertStableOutput(result);
+        AssertNoProductSetup(result);
+    }
+
+    [Fact]
     public void Contract_fixture_loads_overrides_only_in_its_temporary_script_copy()
     {
         RequireWindows();
@@ -461,7 +479,10 @@ public sealed class RuntimePrerequisiteContractTests
                 probe);
         }
 
-        public ScriptResult Run(string? manifestOverride = null, bool useDefaultManifestPath = false)
+        public ScriptResult Run(
+            string? manifestOverride = null,
+            bool useDefaultManifestPath = false,
+            bool verifyMediaOnly = false)
         {
             var scenarioPath = Path.Combine(_root, "scenario.json");
             var harnessPath = Path.Combine(_root, "install-prerequisites.contract.ps1");
@@ -503,8 +524,13 @@ public sealed class RuntimePrerequisiteContractTests
                 start.ArgumentList.Add("-ManifestPath");
                 start.ArgumentList.Add(manifestPath);
             }
+            if (verifyMediaOnly)
+            {
+                start.ArgumentList.Add("-ReleaseMediaRoot");
+                start.ArgumentList.Add(_root);
+                start.ArgumentList.Add("-VerifyMediaOnly");
+            }
             start.Environment["SSA_TEST_SECRET"] = "test-secret-marker";
-
             using var process = Process.Start(start) ?? throw new InvalidOperationException("PowerShell did not start.");
             var stdout = process.StandardOutput.ReadToEndAsync();
             var stderr = process.StandardError.ReadToEndAsync();
@@ -567,6 +593,11 @@ public sealed class RuntimePrerequisiteContractTests
                     if (-not (Test-StrictVersionOutput ([string]$probe.stdout))) {
                         Stop-PrerequisiteCheck 'probe' 'probe_output_invalid'
                     }
+                }
+
+                function Test-ReleaseMedia {
+                    param([Parameter(Mandatory = $true)][string]$Root)
+                    Write-ContractTrace 'media_verified'
                 }
 
                 Write-ContractTrace 'harness_loaded'

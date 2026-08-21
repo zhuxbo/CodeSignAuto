@@ -899,7 +899,8 @@ try {
     if ($VerifyMediaOnly -and [string]::IsNullOrWhiteSpace($ReleaseMediaRoot)) {
         Stop-PrerequisiteCheck 'media' 'media_missing'
     }
-    if (-not [string]::IsNullOrWhiteSpace($ReleaseMediaRoot) -and
+    if (-not $VerifyMediaOnly -and
+        -not [string]::IsNullOrWhiteSpace($ReleaseMediaRoot) -and
         [string]::IsNullOrWhiteSpace($InstallMode)) {
         Stop-PrerequisiteCheck 'media' 'install_mode_required'
     }
