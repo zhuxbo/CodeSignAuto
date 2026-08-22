@@ -32,7 +32,7 @@ from pkcs11.exceptions import (
 )
 from pyhanko.stamp import TextStampStyle
 
-VERSION = "0.1.2"
+VERSION = "0.1.3"
 MAX_REQUEST_BYTES = 64 * 1024
 MAX_IDENTIFIER_BYTES = 128
 MAX_CERTIFICATE_DER_BYTES = 64 * 1024
