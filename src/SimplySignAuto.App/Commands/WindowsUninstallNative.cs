@@ -1,8 +1,10 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
+using System.Security.AccessControl;
 using System.Security.Principal;
 using System.ServiceProcess;
 using Microsoft.Win32;
+using SimplySignAuto.Core.Security;
 using SimplySignAuto.Service;
 
 namespace SimplySignAuto.App.Commands;
@@ -194,6 +196,9 @@ internal sealed class WindowsUninstallNative : IWindowsUninstallNative
             "owned_resource_mismatch");
     }
 
+    public void VerifyManualActivationOwnership(RemoveOwnedManualActivation action) =>
+        WindowsManualActivationCredential.VerifyExact(action);
+
     public void RemoveFirewall(RemoveOwnedFirewallRule action)
     {
         try
@@ -226,6 +231,9 @@ internal sealed class WindowsUninstallNative : IWindowsUninstallNative
             "uninstall_state_uncertain",
             new SecurityIdentifier(action.SigningUserSid));
     }
+
+    public void RemoveManualActivation(RemoveOwnedManualActivation action) =>
+        WindowsManualActivationCredential.RemoveExact(action);
 
     public Task RemovePdfExtensionAsync(CancellationToken cancellationToken) =>
         new WindowsPdfExtensionOperations().UninstallAsync(cancellationToken);
@@ -556,6 +564,127 @@ internal sealed class WindowsUninstallNative : IWindowsUninstallNative
         if (!OperatingSystem.IsWindows())
         {
             throw new InstallException("windows_required");
+        }
+    }
+}
+
+internal static class WindowsManualActivationCredential
+{
+    private const string LocalSystemSid = "S-1-5-18";
+
+    public static void VerifyExact(RemoveOwnedManualActivation action)
+    {
+        EnsureValid(action);
+        var kind = NoFollowFile.InspectPathEntry(action.Path);
+        if (kind == NoFollowPathEntryKind.Missing)
+        {
+            return;
+        }
+
+        if (kind != NoFollowPathEntryKind.RegularFile)
+        {
+            throw new InstallException("owned_resource_mismatch");
+        }
+
+        try
+        {
+            using var handle = WindowsNoFollowSecurity.OpenReadFileHandleExclusive(action.Path);
+            VerifyHandle(handle, action.SigningUserSid);
+        }
+        catch (InstallException)
+        {
+            throw;
+        }
+        catch
+        {
+            throw new InstallException("owned_resource_mismatch");
+        }
+    }
+
+    public static void RemoveExact(RemoveOwnedManualActivation action)
+    {
+        try
+        {
+            EnsureValid(action);
+            if (NoFollowFile.InspectPathEntry(action.Path) == NoFollowPathEntryKind.Missing)
+            {
+                return;
+            }
+
+            using (var handle = WindowsNoFollowSecurity.OpenRenameSourceHandle(action.Path))
+            {
+                VerifyHandle(handle, action.SigningUserSid);
+                WindowsHandleBoundFile.DeleteByHandle(handle);
+            }
+
+            if (NoFollowFile.InspectPathEntry(action.Path) != NoFollowPathEntryKind.Missing)
+            {
+                throw new InstallException("uninstall_state_uncertain");
+            }
+        }
+        catch (InstallException error) when (error.Code == "uninstall_state_uncertain")
+        {
+            throw;
+        }
+        catch
+        {
+            throw new InstallException("uninstall_state_uncertain");
+        }
+    }
+
+    private static void EnsureValid(RemoveOwnedManualActivation action)
+    {
+        if (!OperatingSystem.IsWindows() ||
+            !CanonicalWindowsSid.IsValid(action.SigningUserSid) ||
+            !Path.IsPathFullyQualified(action.Path) ||
+            !Path.IsPathFullyQualified(action.UserDataRoot) ||
+            !string.Equals(Path.GetFullPath(action.Path), action.Path, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(Path.GetFullPath(action.UserDataRoot), action.UserDataRoot, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(
+                action.Path,
+                Path.Combine(action.UserDataRoot, "otp.dat"),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InstallException("owned_resource_mismatch");
+        }
+    }
+
+    private static void VerifyHandle(
+        Microsoft.Win32.SafeHandles.SafeFileHandle handle,
+        string signingUserSid)
+    {
+        var snapshot = WindowsNoFollowSecurity.Read(handle);
+        var dacl = snapshot.Security.DiscretionaryAcl;
+        if ((snapshot.Attributes & FileAttributes.ReparsePoint) != 0 ||
+            snapshot.Security.Owner?.Value != signingUserSid ||
+            !snapshot.Security.ControlFlags.HasFlag(ControlFlags.DiscretionaryAclProtected) ||
+            dacl is not { Count: 2 } ||
+            !PlatformLocalFileIdentityProvider.Instance.TryGetIdentity(handle, out var identity) ||
+            identity.LinkCount != 1)
+        {
+            throw new InstallException("owned_resource_mismatch");
+        }
+
+        var expectedSids = new HashSet<string>(StringComparer.Ordinal)
+        {
+            LocalSystemSid,
+            signingUserSid,
+        };
+        foreach (GenericAce ace in dacl)
+        {
+            if (ace is not CommonAce common ||
+                common.AceQualifier != AceQualifier.AccessAllowed ||
+                common.AceFlags != AceFlags.None ||
+                common.AccessMask != (int)FileSystemRights.FullControl ||
+                !expectedSids.Remove(common.SecurityIdentifier.Value))
+            {
+                throw new InstallException("owned_resource_mismatch");
+            }
+        }
+
+        if (expectedSids.Count != 0)
+        {
+            throw new InstallException("owned_resource_mismatch");
         }
     }
 }

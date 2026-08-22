@@ -21,6 +21,11 @@ public sealed record RemoveOwnedWindowsService(
 
 public sealed record RemoveOwnedPdfExtension : UninstallAction;
 
+public sealed record RemoveOwnedManualActivation(
+    string Path,
+    string UserDataRoot,
+    string SigningUserSid) : UninstallAction;
+
 public sealed record RemoveOwnedDesktopShortcut(
     string Path,
     string TargetPath,
@@ -135,6 +140,10 @@ public sealed class ManualUninstallPlanner(IManualUninstallEnvironment environme
         UninstallAction[] actions =
         [
             new RemoveOwnedPdfExtension(),
+            new RemoveOwnedManualActivation(
+                Canonical(Path.Combine(receipt.UserDataRoot!, "otp.dat")),
+                receipt.UserDataRoot!,
+                receipt.SigningUserSid),
             new PurgeControlledData(
                 dataRoot,
                 receipt.UserDataRoot!,
@@ -765,6 +774,8 @@ internal interface IWindowsUninstallNative
 
     void VerifyDesktopShortcutOwnership(RemoveOwnedDesktopShortcut action);
 
+    void VerifyManualActivationOwnership(RemoveOwnedManualActivation action);
+
     void RemoveFirewall(RemoveOwnedFirewallRule action);
 
     Task EndAndRemoveTaskAsync(
@@ -792,6 +803,8 @@ internal interface IWindowsUninstallNative
     void RemoveProductRegistration(RemoveOwnedProductUninstall action);
 
     void RemoveDesktopShortcut(RemoveOwnedDesktopShortcut action);
+
+    void RemoveManualActivation(RemoveOwnedManualActivation action);
 
     Task RemovePdfExtensionAsync(CancellationToken cancellationToken);
 }
@@ -880,6 +893,9 @@ public sealed class WindowsManualUninstallActionExecutor
             {
                 case RemoveOwnedPdfExtension:
                     break;
+                case RemoveOwnedManualActivation activation:
+                    _native.VerifyManualActivationOwnership(activation);
+                    break;
                 case PurgeControlledData:
                     break;
                 case RemoveOwnedDesktopShortcut shortcut:
@@ -914,6 +930,9 @@ public sealed class WindowsManualUninstallActionExecutor
         {
             case RemoveOwnedPdfExtension:
                 await _native.RemovePdfExtensionAsync(cancellationToken).ConfigureAwait(false);
+                break;
+            case RemoveOwnedManualActivation activation:
+                _native.RemoveManualActivation(activation);
                 break;
             case PurgeControlledData purge:
                 if (_preparedPurgePlan is null || _preparedPurgeAction != purge)

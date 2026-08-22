@@ -254,9 +254,9 @@ product intact. Removing the base product first verifies and removes an owned
 PDF extension to avoid an orphan.
 
 Manual uninstall removes the application, shortcut, receipt, registration, and
-owned PDF extension. It preserves the current administrator's job history and
-signed results unless `uninstall --purge-data --confirm PURGE` is explicitly
-used.
+owned PDF extension. It also removes the DPAPI activation credential saved by
+this product for the current administrator, while preserving job history and
+signed results unless `uninstall --purge-data --confirm PURGE` is explicitly used.
 
 Service uninstall verifies the exact install instance, owner marker, SID,
 account, profile, AutoLogon/LSA fingerprint, task, Service, firewall, and ACLs

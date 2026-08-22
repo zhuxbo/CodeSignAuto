@@ -462,6 +462,7 @@ internal sealed class WindowsProtectedConfigurationOperations(Action? beforeHand
 
 internal static class WindowsHandleBoundFile
 {
+    private const int FileDispositionInfo = 4;
     private const int FileRenameInfoEx = 22;
     private const uint FileRenameFlagReplaceIfExists = 0x00000001;
     private const uint FileRenameFlagPosixSemantics = 0x00000002;
@@ -482,6 +483,29 @@ internal static class WindowsHandleBoundFile
         {
             Marshal.Copy(information, 0, buffer, information.Length);
             if (!SetFileInformationByHandle(source, FileRenameInfoEx, buffer, (uint)information.Length))
+            {
+                throw new Win32Exception(Marshal.GetLastWin32Error());
+            }
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
+    }
+
+    public static void DeleteByHandle(SafeFileHandle source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        if (!OperatingSystem.IsWindows())
+        {
+            throw new PlatformNotSupportedException();
+        }
+
+        var buffer = Marshal.AllocHGlobal(1);
+        try
+        {
+            Marshal.WriteByte(buffer, 1);
+            if (!SetFileInformationByHandle(source, FileDispositionInfo, buffer, 1))
             {
                 throw new Win32Exception(Marshal.GetLastWin32Error());
             }

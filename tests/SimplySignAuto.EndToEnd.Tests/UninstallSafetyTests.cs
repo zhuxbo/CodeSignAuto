@@ -2,6 +2,7 @@ using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using SimplySignAuto.Agent.Security;
 using SimplySignAuto.App;
 using SimplySignAuto.App.Commands;
 using SimplySignAuto.App.Tools;
@@ -378,7 +379,7 @@ public sealed class UninstallSafetyTests
     }
 
     [Fact]
-    public async Task Manual_default_uninstall_removes_only_owned_machine_resources_and_preserves_user_data()
+    public async Task Manual_default_uninstall_removes_activation_and_preserves_task_data()
     {
         var receipt = ManualReceipt();
         var plan = await new ManualUninstallPlanner(new RecordingManualUninstallEnvironment(receipt))
@@ -388,6 +389,13 @@ public sealed class UninstallSafetyTests
         Assert.Collection(
             plan.Actions,
             action => Assert.IsType<RemoveOwnedPdfExtension>(action),
+            action =>
+            {
+                var activation = Assert.IsType<RemoveOwnedManualActivation>(action);
+                Assert.Equal(Path.Combine(receipt.UserDataRoot!, "otp.dat"), activation.Path);
+                Assert.Equal(receipt.UserDataRoot, activation.UserDataRoot);
+                Assert.Equal(receipt.SigningUserSid, activation.SigningUserSid);
+            },
             action =>
             {
                 var purge = Assert.IsType<PurgeControlledData>(action);
@@ -417,6 +425,48 @@ public sealed class UninstallSafetyTests
         var purge = Assert.Single(plan.Actions.OfType<PurgeControlledData>());
         Assert.True(purge.IncludeAgentDirectory);
         Assert.Equal(receipt.UserDataRoot, purge.AgentDirectory);
+    }
+
+    [Fact]
+    public void Windows_manual_activation_removal_preserves_other_manual_data()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var root = Path.Combine(Path.GetTempPath(), "SimplySignAuto.ActivationUninstall", Guid.NewGuid().ToString("N"));
+        var otpPath = Path.Combine(root, "otp.dat");
+        var historyPath = Path.Combine(root, "jobs.db");
+        Directory.CreateDirectory(root);
+        try
+        {
+            using (var stream = WindowsCurrentUserProtectedFile.CreateNew(otpPath))
+            {
+                stream.WriteByte(0x01);
+            }
+            File.WriteAllText(historyPath, "history");
+            using var identity = WindowsIdentity.GetCurrent();
+            var action = new RemoveOwnedManualActivation(
+                otpPath,
+                root,
+                Assert.IsType<SecurityIdentifier>(identity.User).Value);
+            var native = new WindowsUninstallNative();
+
+            native.VerifyManualActivationOwnership(action);
+            native.RemoveManualActivation(action);
+            native.RemoveManualActivation(action);
+
+            Assert.False(File.Exists(otpPath));
+            Assert.Equal("history", File.ReadAllText(historyPath));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
     }
 
     [Theory]
@@ -2440,6 +2490,9 @@ public sealed class UninstallSafetyTests
         public void VerifyDesktopShortcutOwnership(RemoveOwnedDesktopShortcut action) =>
             FailIf("desktop-shortcut");
 
+        public void VerifyManualActivationOwnership(RemoveOwnedManualActivation action) =>
+            FailIf("manual-activation");
+
         public void RemoveFirewall(RemoveOwnedFirewallRule action) => Record("remove-firewall");
 
         public Task EndAndRemoveTaskAsync(
@@ -2487,6 +2540,9 @@ public sealed class UninstallSafetyTests
 
         public void RemoveDesktopShortcut(RemoveOwnedDesktopShortcut action) =>
             Record("remove-desktop-shortcut");
+
+        public void RemoveManualActivation(RemoveOwnedManualActivation action) =>
+            Record("remove-manual-activation");
 
         public Task RemovePdfExtensionAsync(CancellationToken cancellationToken)
         {
