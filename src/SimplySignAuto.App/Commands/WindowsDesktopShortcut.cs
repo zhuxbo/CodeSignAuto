@@ -41,6 +41,7 @@ internal static class WindowsDesktopShortcut
             File.Move(temporary.Path, action.Path);
             promoted = true;
             VerifyExact(action, signingUser, "desktop_shortcut_failed");
+            NotifyShell(action.Path, ShellChangeCreated);
         }
         catch (InstallException)
         {
@@ -131,6 +132,8 @@ internal static class WindowsDesktopShortcut
             {
                 throw new InstallException(errorCode);
             }
+
+            NotifyShell(action.Path, ShellChangeDeleted);
         }
         catch (InstallException)
         {
@@ -261,6 +264,21 @@ internal static class WindowsDesktopShortcut
             _ = Marshal.FinalReleaseComObject(value);
         }
     }
+
+    private static void NotifyShell(string path, uint change) =>
+        SHChangeNotify(change, ShellNotifyPathW | ShellNotifyFlushNoWait, path, nint.Zero);
+
+    private const uint ShellChangeCreated = 0x00000002;
+    private const uint ShellChangeDeleted = 0x00000004;
+    private const uint ShellNotifyPathW = 0x0005;
+    private const uint ShellNotifyFlushNoWait = 0x3000;
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    private static extern void SHChangeNotify(
+        uint eventId,
+        uint flags,
+        string item1,
+        nint item2);
 
     private sealed record ShortcutSnapshot(
         string TargetPath,
