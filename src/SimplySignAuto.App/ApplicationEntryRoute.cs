@@ -10,6 +10,7 @@ public enum ApplicationEntryKind
     ConfigureService,
     Install,
     Setup,
+    AutoLogonRemediation,
     ProvisionAgentUser,
     Uninstall,
     PurgeQuarantine,
@@ -40,6 +41,8 @@ public sealed record ApplicationEntryRoute(
             ["install", .. var tail] => new(ApplicationEntryKind.Install, tail, ShowInitially: false),
             ["setup", "--mode", var mode] when mode is "manual" or "service" =>
                 new(ApplicationEntryKind.Setup, ["--mode", mode], ShowInitially: false),
+            ["setup-disable-autologon"] =>
+                new(ApplicationEntryKind.AutoLogonRemediation, [], ShowInitially: false),
             ["provision-agent-user", .. var tail] =>
                 new(ApplicationEntryKind.ProvisionAgentUser, tail, ShowInitially: false),
             ["uninstall", .. var tail] => new(ApplicationEntryKind.Uninstall, tail, ShowInitially: false),

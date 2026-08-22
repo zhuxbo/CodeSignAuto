@@ -62,7 +62,7 @@ internal static class SetupFailurePolicy
         productKind == SetupProductKind.Main &&
         mode == SetupInstallationMode.Service &&
         canChangeMode &&
-        string.Equals(code, "autologon_conflict", StringComparison.Ordinal);
+        code is "autologon_conflict" or "autologon_plaintext_password_present";
 }
 
 internal static class SetupAutoLogonConflict
@@ -410,6 +410,12 @@ internal interface ISetupProcessRunner
         SetupInstallationMode? mode,
         IProgress<SetupProgress>? progress,
         CancellationToken cancellationToken);
+
+    Task DisableAutoLogonAsync(
+        SetupProductKind productKind,
+        string mediaRoot,
+        IProgress<SetupProgress>? progress,
+        CancellationToken cancellationToken);
 }
 
 internal interface ISetupProcessInvoker
@@ -482,6 +488,16 @@ internal sealed class SetupBootstrapperOperations(
             progress,
             cancellationToken);
 
+    public Task DisableAutoLogonAsync(
+        StagedSetupPayload staged,
+        IProgress<SetupProgress>? progress,
+        CancellationToken cancellationToken) =>
+        processRunner.DisableAutoLogonAsync(
+            staged.Metadata.ProductKind,
+            staged.MediaRoot,
+            progress,
+            cancellationToken);
+
     public Task CleanupAsync(string mediaRoot) => workspace.CleanupAsync(mediaRoot);
 }
 
@@ -495,11 +511,44 @@ internal interface ISetupBootstrapperOperations
         IProgress<SetupProgress>? progress,
         CancellationToken cancellationToken);
 
+    Task DisableAutoLogonAsync(
+        StagedSetupPayload staged,
+        IProgress<SetupProgress>? progress,
+        CancellationToken cancellationToken);
+
     Task CleanupAsync(string mediaRoot);
 }
 
 internal sealed class SetupBootstrapper(ISetupBootstrapperOperations operations)
 {
+    public async Task DisableAutoLogonAsync(
+        IProgress<SetupProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(operations);
+        StagedSetupPayload? staged = null;
+        var tracker = new MonotonicSetupProgress(progress);
+        try
+        {
+            staged = await operations.StageAsync(cancellationToken).ConfigureAwait(false);
+            tracker.Report(new SetupProgress(25, "ProgressMediaVerified"));
+            if (staged.Metadata.ProductKind != SetupProductKind.Main)
+            {
+                throw new SetupBootstrapperException("setup_product_invalid");
+            }
+
+            await operations.DisableAutoLogonAsync(staged, tracker, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            if (staged is not null)
+            {
+                await operations.CleanupAsync(staged.MediaRoot).ConfigureAwait(false);
+            }
+        }
+    }
+
     public async Task<int> RunAsync(
         SetupInstallationMode? mode,
         IProgress<SetupProgress>? progress,

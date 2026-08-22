@@ -27,6 +27,8 @@
   <data name="StatusInstallComplete" xml:space="preserve"><value>安装完成</value></data>
   <data name="StatusInstallFailed" xml:space="preserve"><value>安装失败</value></data>
   <data name="StatusInstallFailedCode" xml:space="preserve"><value>安装失败（代码 {0}）</value></data>
+  <data name="StatusDisablingAutoLogon" xml:space="preserve"><value>正在安全禁用系统自动登录…</value></data>
+  <data name="StatusRetryingInstallation" xml:space="preserve"><value>自动登录已安全禁用，正在重新检查并继续安装…</value></data>
   <data name="ProgressMediaVerified" xml:space="preserve"><value>安装介质已验证</value></data>
   <data name="ProgressPublisherMediaVerified" xml:space="preserve"><value>发布介质已验证</value></data>
   <data name="ProgressRuntimeManifestVerified" xml:space="preserve"><value>运行时清单已验证</value></data>
@@ -37,6 +39,8 @@
   <data name="ProgressProductInitializationComplete" xml:space="preserve"><value>产品初始化完成</value></data>
   <data name="ProgressProductInstallComplete" xml:space="preserve"><value>产品安装完成</value></data>
   <data name="ProgressInstallComplete" xml:space="preserve"><value>安装完成</value></data>
+  <data name="ProgressAutoLogonCleanupStarting" xml:space="preserve"><value>正在禁用系统自动登录</value></data>
+  <data name="ProgressAutoLogonCleanupComplete" xml:space="preserve"><value>系统自动登录已安全禁用</value></data>
   <data name="ErrorRequiredRuntimeMissing" xml:space="preserve"><value>缺少 SimplySignAuto 所需的 .NET 10 Windows x64 运行环境。请安装 ASP.NET Core Runtime 和 .NET Desktop Runtime 后重新运行安装程序。
 ASP.NET Core Runtime：https://dotnet.microsoft.com/en-us/download/dotnet/10.0
 .NET Desktop Runtime：https://dotnet.microsoft.com/en-us/download/dotnet/10.0/runtime</value></data>
@@ -49,9 +53,20 @@ ASP.NET Core Runtime：https://dotnet.microsoft.com/en-us/download/dotnet/10.0
   <data name="ErrorArchitectureUnsupported" xml:space="preserve"><value>SimplySignAuto 只支持 x64 Windows。请在 64 位操作系统中运行 64 位安装程序。</value></data>
   <data name="ErrorAdministratorRequired" xml:space="preserve"><value>安装需要管理员权限。请右键安装程序并选择“以管理员身份运行”，然后重新运行。</value></data>
   <data name="ErrorDomainControllerUnsupported" xml:space="preserve"><value>不支持在域控制器上安装。请改用工作组计算机、域成员客户端或成员服务器。</value></data>
-  <data name="ErrorAutoLogonConflict" xml:space="preserve"><value>检测到账户 {0} 已配置自动登录。自动签名服务需要独占该配置，安装程序不会覆盖现有设置。请先使用原配置工具安全关闭自动登录，或返回选择手工签名模式。</value></data>
+  <data name="ErrorAutoLogonConflict" xml:space="preserve"><value>检测到账户 {0} 已配置自动登录。自动签名服务需要独占该配置，安装程序不会覆盖现有设置。可由安装程序安全禁用自动登录并继续，或返回选择手工签名模式。</value></data>
   <data name="AutoLogonAccountUnknown" xml:space="preserve"><value>（未知账户）</value></data>
-  <data name="ErrorAutoLogonPlaintextPasswordPresent" xml:space="preserve"><value>检测到注册表中的旧式明文自动登录密码。请使用原配置工具安全移除后再安装；安装程序不会读取或覆盖该密码。</value></data>
+  <data name="ErrorAutoLogonPlaintextPasswordPresent" xml:space="preserve"><value>自动登录已关闭，但检测到系统仍保存自动登录凭据。可由安装程序安全移除后继续安装；安装程序不会显示、记录或使用密码内容。</value></data>
+  <data name="AutoLogonResolutionTitle" xml:space="preserve"><value>需要处理现有自动登录设置</value></data>
+  <data name="AutoLogonActiveDetail" xml:space="preserve"><value>检测到账户 {0} 的系统自动登录仍处于启用状态。自动签名服务不能与现有自动登录共用该配置。</value></data>
+  <data name="AutoLogonResidualDetail" xml:space="preserve"><value>系统自动登录当前已关闭，但系统中仍保存自动登录凭据。自动签名服务安装前需要先安全移除这些残留凭据。</value></data>
+  <data name="AutoLogonCleanupScope" xml:space="preserve"><value>安全禁用只会关闭系统自动登录并删除 Windows 保存的自动登录凭据；不会删除用户、不会更改 Windows 账户密码，也不会显示、记录或使用密码内容。</value></data>
+  <data name="AutoLogonDisableAndContinueButton" xml:space="preserve"><value>安全禁用并继续</value></data>
+  <data name="AutoLogonUseManualModeButton" xml:space="preserve"><value>改用手工签名模式</value></data>
+  <data name="AutoLogonCleanupAcknowledge" xml:space="preserve"><value>我已了解：此操作不可撤销，但不会更改 Windows 账户密码。</value></data>
+  <data name="ErrorAutoLogonCleanupOwnedState" xml:space="preserve"><value>检测到 SimplySignAuto 管理的自动登录或卸载状态。为避免破坏产品状态，安装程序不会清理。请先完成原版本卸载，或改用手工签名模式。</value></data>
+  <data name="ErrorAutoLogonCleanupStateUncertain" xml:space="preserve"><value>检测到系统自动登录状态异常，无法确认可安全处理。安装程序未做更改；请检查系统设置，或改用手工签名模式。</value></data>
+  <data name="ErrorAutoLogonCleanupBusy" xml:space="preserve"><value>SimplySignAuto 配置正在被其他进程修改。请等待该操作完成后稍后重试。</value></data>
+  <data name="ErrorAutoLogonCleanupFailed" xml:space="preserve"><value>安装程序无法安全禁用系统自动登录，并已停止继续安装。请检查系统设置后重试，或改用手工签名模式。</value></data>
   <data name="ErrorInstallMediaTargetExists" xml:space="preserve"><value>检测到已有的 SimplySignAuto 安装目录。若刚完成卸载，请重启 Windows 完成受保护的清理后再安装；安装程序不会覆盖来源不明的文件。</value></data>
   <data name="ErrorGeneric" xml:space="preserve"><value>安装未完成。请检查系统要求并修正问题后重新运行安装程序。</value></data>
   <data name="ErrorCodeFormat" xml:space="preserve"><value>错误代码：{0}</value></data>

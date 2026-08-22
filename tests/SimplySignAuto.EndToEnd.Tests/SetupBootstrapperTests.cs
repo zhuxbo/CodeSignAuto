@@ -32,7 +32,7 @@ public sealed class SetupBootstrapperTests
     [InlineData("elevation_required", "管理员", "重新运行")]
     [InlineData("domain_controller_unsupported", "域控制器", "成员服务器")]
     [InlineData("autologon_conflict", "自动登录", "不会覆盖")]
-    [InlineData("autologon_plaintext_password_present", "明文自动登录密码", "安全移除")]
+    [InlineData("autologon_plaintext_password_present", "仍保存自动登录凭据", "安全移除")]
     public void Missing_prerequisites_have_actionable_localized_messages(
         string code,
         string expectedReason,
@@ -71,8 +71,8 @@ public sealed class SetupBootstrapperTests
     [InlineData("autologon_conflict", "Service", true, true)]
     [InlineData("autologon_conflict", "Manual", true, false)]
     [InlineData("autologon_conflict", "Service", false, false)]
-    [InlineData("autologon_plaintext_password_present", "Service", true, false)]
-    public void Only_changeable_service_AutoLogon_conflicts_return_to_mode_selection(
+    [InlineData("autologon_plaintext_password_present", "Service", true, true)]
+    public void Changeable_service_AutoLogon_issues_return_to_mode_selection(
         string code,
         string modeName,
         bool canChange,
@@ -256,6 +256,21 @@ public sealed class SetupBootstrapperTests
 
         Assert.Equal(0, exitCode);
         Assert.Equal(["stage", "install:C:\\staged", "cleanup:C:\\staged"], operations.Events);
+    }
+
+    [Fact]
+    public async Task Bootstrapper_remediation_uses_verified_main_payload_and_always_cleans_it()
+    {
+        var operations = new RecordingSetupOperations(installExitCode: 0);
+        var bootstrapper = new SetupBootstrapper(operations);
+
+        await bootstrapper.DisableAutoLogonAsync(
+            progress: null,
+            CancellationToken.None);
+
+        Assert.Equal(
+            ["stage", "disable-autologon:C:\\staged", "cleanup:C:\\staged"],
+            operations.Events);
     }
 
     [Fact]
@@ -815,6 +830,16 @@ public sealed class SetupBootstrapperTests
             return Task.FromResult(installExitCode);
         }
 
+        public Task DisableAutoLogonAsync(
+            StagedSetupPayload staged,
+            IProgress<SetupProgress>? progress,
+            CancellationToken cancellationToken)
+        {
+            Assert.Equal(SetupProductKind.Main, staged.Metadata.ProductKind);
+            Events.Add("disable-autologon:" + staged.MediaRoot);
+            return Task.CompletedTask;
+        }
+
         public Task CleanupAsync(string mediaRoot)
         {
             Events.Add("cleanup:" + mediaRoot);
@@ -920,6 +945,17 @@ public sealed class SetupBootstrapperTests
             Assert.Equal(SetupProductKind.Main, productKind);
             events.Add("media");
             return Task.FromResult(installExitCode);
+        }
+
+        public Task DisableAutoLogonAsync(
+            SetupProductKind productKind,
+            string mediaRoot,
+            IProgress<SetupProgress>? progress,
+            CancellationToken cancellationToken)
+        {
+            Assert.Equal(SetupProductKind.Main, productKind);
+            events.Add("disable-autologon");
+            return Task.CompletedTask;
         }
     }
 

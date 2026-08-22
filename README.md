@@ -119,6 +119,13 @@ SignTool 缺失只关闭 Authenticode 能力；PDF 扩展未安装时不影响�
 已有 AutoLogon 等冲突。失败只回滚本轮 exact-owned 变更，无法确认回滚时返回
 `setup_state_uncertain`。
 
+服务模式检测到外部 AutoLogon 或已关闭 AutoLogon 的残留凭据时，安装器提供
+“安全禁用并继续”“改用手工签名模式”“取消”三个选择。确认安全禁用后，安装器
+只把 `AutoAdminLogon` 设为 `0`，删除 Windows 保存的 AutoLogon 凭据并回读验证，
+不会删除用户、修改账户密码或显示、记录、使用密码内容；随后重新执行完整安装前检查并
+继续安装。若检测到 SimplySignAuto 所有权/卸载状态、异常注册表类型或无法确认的
+状态，安装器不会清理，用户应先完成原版本卸载或改用手工签名模式。
+
 5. 仅服务模式默认监听 `http://0.0.0.0:7080`，只适用于受控内网、VPN 或可信
 反向代理；安装不自动打开防火墙。产品不提供内置 HTTPS 或证书管理。需要 HTTPS
 时，由部署者在产品外配置反向代理并将流量转发到此 HTTP 端口。
@@ -392,8 +399,10 @@ quarantine 已消失，再删除 `C:\Program Files\SimplySignAuto` 包目录。�
 - ready 503 但 live 200：确认签名用户已登录非 0 会话、计划任务在该用户下运行、系统时间同步、SimplySign Desktop 与目标 token/certificate/private key 可枚举，再看分能力 reason/status。
 - `installation_mode_change_requires_reinstall`：现有安装模式已经固定；卸载后
   重新运行 Setup，再选择另一模式。重复运行 Setup 不能迁移模式。
-- `autologon_conflict`：仅影响自动签名服务模式。使用原配置工具安全关闭已有
-  AutoLogon，或返回安装器改选手工签名模式；安装器不会读取或覆盖已有密码。
+- `autologon_conflict` / `autologon_plaintext_password_present`：仅影响自动签名
+  服务模式。在安装器中选择“安全禁用并继续”，确认只关闭系统 AutoLogon 和删除
+  Windows 保存的 AutoLogon 凭据；也可改选手工签名模式。该操作不会修改账户密码，
+  不会显示、记录或使用保存的密码内容。
 - `signtool_missing`：确认 agent JSON 指向 Windows SDK x64 SignTool，文件未被替换且签名用户可读。
 - `pdf_support_not_installed`：基础产品可继续使用 Authenticode；由管理员
   运行兼容清单版本的 PDF 扩展安装包，不要求与主程序版本相同。扩展安装包

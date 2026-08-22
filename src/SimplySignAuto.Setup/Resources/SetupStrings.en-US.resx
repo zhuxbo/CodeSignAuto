@@ -27,6 +27,8 @@
   <data name="StatusInstallComplete" xml:space="preserve"><value>Installation complete</value></data>
   <data name="StatusInstallFailed" xml:space="preserve"><value>Installation failed</value></data>
   <data name="StatusInstallFailedCode" xml:space="preserve"><value>Installation failed (code {0})</value></data>
+  <data name="StatusDisablingAutoLogon" xml:space="preserve"><value>Safely disabling system AutoLogon…</value></data>
+  <data name="StatusRetryingInstallation" xml:space="preserve"><value>AutoLogon was safely disabled. Rechecking and continuing installation…</value></data>
   <data name="ProgressMediaVerified" xml:space="preserve"><value>Installation media verified</value></data>
   <data name="ProgressPublisherMediaVerified" xml:space="preserve"><value>Publisher media verified</value></data>
   <data name="ProgressRuntimeManifestVerified" xml:space="preserve"><value>Runtime manifest verified</value></data>
@@ -37,6 +39,8 @@
   <data name="ProgressProductInitializationComplete" xml:space="preserve"><value>Product initialization complete</value></data>
   <data name="ProgressProductInstallComplete" xml:space="preserve"><value>Product installation complete</value></data>
   <data name="ProgressInstallComplete" xml:space="preserve"><value>Installation complete</value></data>
+  <data name="ProgressAutoLogonCleanupStarting" xml:space="preserve"><value>Disabling system AutoLogon</value></data>
+  <data name="ProgressAutoLogonCleanupComplete" xml:space="preserve"><value>System AutoLogon safely disabled</value></data>
   <data name="ErrorRequiredRuntimeMissing" xml:space="preserve"><value>The .NET 10 Windows x64 runtimes required by SimplySignAuto are missing. Install ASP.NET Core Runtime and .NET Desktop Runtime, then run Setup again.
 ASP.NET Core Runtime: https://dotnet.microsoft.com/en-us/download/dotnet/10.0
 .NET Desktop Runtime: https://dotnet.microsoft.com/en-us/download/dotnet/10.0/runtime</value></data>
@@ -49,9 +53,20 @@ Download: https://support.certum.eu/en/software/procertum-smartsign/</value></da
   <data name="ErrorArchitectureUnsupported" xml:space="preserve"><value>SimplySignAuto supports only x64 Windows. Run the 64-bit installer on a 64-bit operating system.</value></data>
   <data name="ErrorAdministratorRequired" xml:space="preserve"><value>Administrator privileges are required. Right-click Setup, select “Run as administrator”, and try again.</value></data>
   <data name="ErrorDomainControllerUnsupported" xml:space="preserve"><value>Installation on a domain controller is not supported. Use a workgroup computer, domain-member client, or member server.</value></data>
-  <data name="ErrorAutoLogonConflict" xml:space="preserve"><value>AutoLogon is already configured for account {0}. The automatic-signing service requires exclusive use of this configuration, and Setup will not overwrite it. Disable AutoLogon securely with its original configuration tool, or return and select Manual signing.</value></data>
+  <data name="ErrorAutoLogonConflict" xml:space="preserve"><value>AutoLogon is already configured for account {0}. The automatic-signing service requires exclusive use of this configuration, and Setup will not overwrite it. Setup can disable AutoLogon safely and continue, or you can return and select Manual signing.</value></data>
   <data name="AutoLogonAccountUnknown" xml:space="preserve"><value>(unknown account)</value></data>
-  <data name="ErrorAutoLogonPlaintextPasswordPresent" xml:space="preserve"><value>A legacy plaintext AutoLogon password is present in the registry. Use the original configuration tool to remove it securely before installation; Setup will not read or overwrite the password.</value></data>
+  <data name="ErrorAutoLogonPlaintextPasswordPresent" xml:space="preserve"><value>AutoLogon is disabled, but saved credentials remain on the system. Setup can remove them securely and continue; it will not display, log, or use the password contents.</value></data>
+  <data name="AutoLogonResolutionTitle" xml:space="preserve"><value>Existing AutoLogon settings require attention</value></data>
+  <data name="AutoLogonActiveDetail" xml:space="preserve"><value>System AutoLogon is still enabled for account {0}. The automatic-signing service cannot share this configuration with existing AutoLogon.</value></data>
+  <data name="AutoLogonResidualDetail" xml:space="preserve"><value>System AutoLogon is currently disabled, but saved credentials remain. They must be removed safely before installing the automatic-signing service.</value></data>
+  <data name="AutoLogonCleanupScope" xml:space="preserve"><value>Safe disable turns off system AutoLogon and removes only the saved Windows AutoLogon credentials. It does not delete a user, does not change the Windows account password, and does not display, log, or use the password contents.</value></data>
+  <data name="AutoLogonDisableAndContinueButton" xml:space="preserve"><value>Disable safely and continue</value></data>
+  <data name="AutoLogonUseManualModeButton" xml:space="preserve"><value>Use Manual signing</value></data>
+  <data name="AutoLogonCleanupAcknowledge" xml:space="preserve"><value>I understand: this cannot be undone, but it will not change the Windows account password.</value></data>
+  <data name="ErrorAutoLogonCleanupOwnedState" xml:space="preserve"><value>SimplySignAuto-managed AutoLogon or uninstall state was found. To avoid damaging product state, Setup will not remove it. Complete the original version's uninstall first, or use Manual signing.</value></data>
+  <data name="ErrorAutoLogonCleanupStateUncertain" xml:space="preserve"><value>The system AutoLogon state is unexpected and cannot be handled safely. Setup made no changes. Review the system settings, or use Manual signing.</value></data>
+  <data name="ErrorAutoLogonCleanupBusy" xml:space="preserve"><value>SimplySignAuto configuration is being modified by another process. Wait for that operation to finish, then try again.</value></data>
+  <data name="ErrorAutoLogonCleanupFailed" xml:space="preserve"><value>Setup could not safely disable system AutoLogon and stopped the installation. Review the system settings and try again, or use Manual signing.</value></data>
   <data name="ErrorInstallMediaTargetExists" xml:space="preserve"><value>An existing SimplySignAuto installation directory was found. If you just uninstalled the product, restart Windows to complete protected cleanup before installing again. Setup will not overwrite files of unknown ownership.</value></data>
   <data name="ErrorGeneric" xml:space="preserve"><value>Setup did not complete. Review the system requirements, correct the reported problem, and run Setup again.</value></data>
   <data name="ErrorCodeFormat" xml:space="preserve"><value>Error code: {0}</value></data>

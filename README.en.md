@@ -140,6 +140,16 @@ rejects same-name user and existing AutoLogon conflicts. Setup rolls back only
 exact-owned changes from the current attempt; uncertain rollback returns
 `setup_state_uncertain`.
 
+When Service mode detects external AutoLogon or saved credentials left after
+AutoLogon was disabled, Setup offers **Disable safely and continue**, **Use
+Manual signing**, and **Cancel**. After confirmation, safe disable only sets
+`AutoAdminLogon` to `0`, removes the saved Windows AutoLogon credentials, and
+verifies the result. It does not delete a user, change the account password, or
+display, log, or use password contents. Setup then repeats the complete preflight and
+continues. It refuses cleanup if SimplySignAuto ownership/uninstall state,
+unexpected registry types, or any uncertain state is present; finish the
+original uninstall or use Manual signing instead.
+
 Service mode listens on `http://0.0.0.0:7080` by default and does not open the
 firewall. Expose it only through a controlled LAN, VPN, or trusted reverse
 proxy.
@@ -274,9 +284,11 @@ Uninstall never removes or modifies Certum SimplySign Desktop,
 
 - `installation_mode_change_requires_reinstall`: the installed mode is fixed;
   uninstall, rerun Setup, and select the other mode.
-- `autologon_conflict`: this affects only Service mode. Disable existing
-  AutoLogon safely with its original configuration tool, or return and select
-  Manual signing. Setup does not read or overwrite the existing password.
+- `autologon_conflict` / `autologon_plaintext_password_present`: these affect
+  only Service mode. Choose **Disable safely and continue** in Setup to turn off
+  system AutoLogon and remove the saved Windows AutoLogon credentials, or use
+  Manual signing. The action does not change the account password and does not
+  display, log, or use saved password contents.
 - `signtool_missing`: install or configure Windows SDK x64 SignTool. PDF-only
   operation is unaffected.
 - `pdf_support_not_installed`: Authenticode remains available. Install the

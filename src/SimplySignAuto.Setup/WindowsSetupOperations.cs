@@ -228,6 +228,37 @@ internal sealed class WindowsSetupProcessRunner(
         };
     }
 
+    public async Task DisableAutoLogonAsync(
+        SetupProductKind productKind,
+        string mediaRoot,
+        IProgress<SetupProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        if (productKind != SetupProductKind.Main)
+        {
+            throw new SetupBootstrapperException("setup_product_invalid");
+        }
+
+        var root = Path.GetFullPath(mediaRoot);
+        var executable = Path.Combine(root, "SimplySignAuto.exe");
+        WindowsProtectedFile.Apply(executable);
+        var mappedProgress = new SetupStatusProgress(progress);
+        progress?.Report(new SetupProgress(55, "ProgressAutoLogonCleanupStarting"));
+        var exitCode = await invoker.RunAsync(
+                executable,
+                ["setup-disable-autologon"],
+                mappedProgress,
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (exitCode != 0)
+        {
+            throw new SetupBootstrapperException(
+                mappedProgress.FailureCode ?? "autologon_cleanup_failed");
+        }
+
+        progress?.Report(new SetupProgress(90, "ProgressAutoLogonCleanupComplete"));
+    }
+
     private async Task<int> RunMainAsync(
         string mediaRoot,
         SetupInstallationMode mode,
@@ -325,6 +356,16 @@ internal sealed class WindowsSetupProcessRunner(
 
         private static string? ReadFailureCode(string line)
         {
+            if (IsStableCode(line) && line is
+                "administrator_required" or
+                "autologon_cleanup_owned_state" or
+                "autologon_cleanup_state_uncertain" or
+                "autologon_cleanup_busy" or
+                "autologon_cleanup_failed")
+            {
+                return line;
+            }
+
             const string phasePrefix = "phase=";
             const string separator = " code=";
             if (!line.StartsWith(phasePrefix, StringComparison.Ordinal))

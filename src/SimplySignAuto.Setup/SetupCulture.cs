@@ -59,6 +59,10 @@ internal static class SetupCulture
             "domain_controller_unsupported" => "ErrorDomainControllerUnsupported",
             "autologon_conflict" => "ErrorAutoLogonConflict",
             "autologon_plaintext_password_present" => "ErrorAutoLogonPlaintextPasswordPresent",
+            "autologon_cleanup_owned_state" => "ErrorAutoLogonCleanupOwnedState",
+            "autologon_cleanup_state_uncertain" => "ErrorAutoLogonCleanupStateUncertain",
+            "autologon_cleanup_busy" => "ErrorAutoLogonCleanupBusy",
+            "autologon_cleanup_failed" => "ErrorAutoLogonCleanupFailed",
             "install_media_target_exists" => "ErrorInstallMediaTargetExists",
             _ => "ErrorGeneric",
         };

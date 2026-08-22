@@ -1,5 +1,6 @@
 using SimplySignAuto.App.Commands;
 using SimplySignAuto.App;
+using Microsoft.Win32;
 using Xunit;
 
 namespace SimplySignAuto.EndToEnd.Tests;
@@ -765,6 +766,11 @@ public sealed class ProvisionAgentUserCommandTests
             "|",
             Values.OrderBy(pair => pair.Key, StringComparer.Ordinal)
                 .Select(pair => $"{pair.Key}:{pair.Value.Kind}:{pair.Value.Value}"));
+
+        public IReadOnlyCollection<string> GetValueNames() => Values.Keys.ToArray();
+
+        public RegistryValueKind? ReadKind(string name) =>
+            Values.TryGetValue(name, out var value) ? value.Kind : null;
 
         public WinlogonStoredValue Read(string name) =>
             Values.TryGetValue(name, out var value) ? value : WinlogonStoredValue.Missing;

@@ -124,6 +124,12 @@ internal static class Program
                     Console.Out,
                     Console.Error,
                     cancellationToken);
+            case ApplicationEntryKind.AutoLogonRemediation:
+                return await DisableAutoLogonCommand.ExecuteAsync(
+                    route.Arguments,
+                    Console.Out,
+                    Console.Error,
+                    cancellationToken);
             case ApplicationEntryKind.ProvisionAgentUser:
                 return await ProvisionAgentUserCommand.ExecuteAsync(
                     route.Arguments,

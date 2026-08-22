@@ -199,43 +199,77 @@ internal sealed class SetupForm : Form
                     _ => throw new SetupBootstrapperException("setup_mode_invalid"),
                 }
                 : null;
-            ExitCode = await _bootstrapper.RunAsync(mode, progress, CancellationToken.None);
-            if (ExitCode == 0)
+            while (true)
             {
-                SetStatus("StatusInstallComplete");
-            }
-            else
-            {
-                SetStatus("StatusInstallFailedCode", ExitCode);
-            }
-        }
-        catch (SetupBootstrapperException error)
-        {
-            ExitCode = 1;
-            SetStatus("StatusInstallFailed");
-            var selectedMode = _mode.SelectedIndex == 1
-                ? SetupInstallationMode.Service
-                : SetupInstallationMode.Manual;
-            returnToModeSelection = SetupFailurePolicy.CanReturnToModeSelection(
-                _productKind,
-                selectedMode,
-                _canChangeMode,
-                error.Code);
-            MessageBox.Show(
-                this,
-                error.GetLocalizedMessage(
-                    _culture,
-                    error.Code == "autologon_conflict"
-                        ? SetupAutoLogonConflict.ReadAccountName()
-                        : null),
-                Text,
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Error);
-            if (returnToModeSelection)
-            {
-                ExitCode = 2;
-                _progress.Value = 0;
-                SetStatus("StatusReady");
+                try
+                {
+                    ExitCode = await _bootstrapper.RunAsync(mode, progress, CancellationToken.None);
+                    SetStatus(
+                        ExitCode == 0 ? "StatusInstallComplete" : "StatusInstallFailedCode",
+                        ExitCode == 0 ? [] : [ExitCode]);
+                    break;
+                }
+                catch (SetupBootstrapperException error) when (
+                    mode == SetupInstallationMode.Service &&
+                    SetupFailurePolicy.CanReturnToModeSelection(
+                        _productKind,
+                        SetupInstallationMode.Service,
+                        _canChangeMode,
+                        error.Code))
+                {
+                    using var resolution = new SetupAutoLogonResolutionDialog(
+                        _culture,
+                        error.Code,
+                        error.Code == "autologon_conflict"
+                            ? SetupAutoLogonConflict.ReadAccountName()
+                            : null);
+                    _ = resolution.ShowDialog(this);
+                    if (resolution.Resolution == SetupAutoLogonResolution.UseManualMode)
+                    {
+                        _mode.SelectedIndex = 0;
+                        mode = SetupInstallationMode.Manual;
+                        returnToModeSelection = true;
+                        ResetForModeSelection();
+                        break;
+                    }
+
+                    if (resolution.Resolution != SetupAutoLogonResolution.DisableAndContinue)
+                    {
+                        returnToModeSelection = true;
+                        ResetForModeSelection();
+                        break;
+                    }
+
+                    try
+                    {
+                        _progress.Value = 0;
+                        SetStatus("StatusDisablingAutoLogon");
+                        await _bootstrapper.DisableAutoLogonAsync(
+                            progress,
+                            CancellationToken.None);
+                        _progress.Value = 0;
+                        SetStatus("StatusRetryingInstallation");
+                    }
+                    catch (SetupBootstrapperException cleanupError)
+                    {
+                        ShowFailure(cleanupError);
+                        returnToModeSelection = true;
+                        ResetForModeSelection();
+                        break;
+                    }
+                    catch
+                    {
+                        ShowFailure(new SetupBootstrapperException("autologon_cleanup_failed"));
+                        returnToModeSelection = true;
+                        ResetForModeSelection();
+                        break;
+                    }
+                }
+                catch (SetupBootstrapperException error)
+                {
+                    ShowFailure(error);
+                    break;
+                }
             }
         }
         catch
@@ -260,6 +294,29 @@ internal sealed class SetupForm : Form
             AcceptButton = _install;
             ApplyCulture();
         }
+    }
+
+    private void ResetForModeSelection()
+    {
+        ExitCode = 2;
+        _progress.Value = 0;
+        SetStatus("StatusReady");
+    }
+
+    private void ShowFailure(SetupBootstrapperException error)
+    {
+        ExitCode = 1;
+        SetStatus("StatusInstallFailed");
+        MessageBox.Show(
+            this,
+            error.GetLocalizedMessage(
+                _culture,
+                error.Code == "autologon_conflict"
+                    ? SetupAutoLogonConflict.ReadAccountName()
+                    : null),
+            Text,
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Error);
     }
 
     private void ModeChanged(object? sender, EventArgs eventArgs)

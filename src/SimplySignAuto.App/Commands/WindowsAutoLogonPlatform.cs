@@ -454,6 +454,10 @@ internal sealed record WinlogonStoredValue(bool Present, object? Value, Registry
 
 internal interface IWinlogonValueStore
 {
+    IReadOnlyCollection<string> GetValueNames();
+
+    RegistryValueKind? ReadKind(string name);
+
     WinlogonStoredValue Read(string name);
 
     void Write(string name, WinlogonStoredValue value);
@@ -542,7 +546,7 @@ internal sealed class WinlogonMutationTransaction
                 _store.Read(LsaOwnerReceiptValueName).Value as string,
                 ownerMarker) ||
             ProductWinlogonValues.Any(name => _store.Read(name).Present) ||
-            _store.Read("DefaultPassword").Present ||
+            _store.GetValueNames().Contains("DefaultPassword", StringComparer.OrdinalIgnoreCase) ||
             string.Equals(_store.Read("AutoAdminLogon").Value as string, "1", StringComparison.Ordinal))
         {
             throw new ProvisionAgentUserException("autologon_conflict");
@@ -580,7 +584,7 @@ internal sealed class WinlogonMutationTransaction
             _store.Read("DefaultDomainName") != WinlogonStoredValue.String(domainName) ||
             _store.Read("AutoAdminLogon") != WinlogonStoredValue.String("1") ||
             _store.Read(OwnerValueName) != WinlogonStoredValue.String(ownerMarker) ||
-            _store.Read("DefaultPassword").Present ||
+            _store.GetValueNames().Contains("DefaultPassword", StringComparer.OrdinalIgnoreCase) ||
             !LsaSecretReceipt.IsForOwner(
                 _store.Read(LsaOwnerReceiptValueName).Value as string,
                 ownerMarker))
@@ -627,6 +631,13 @@ internal sealed class RegistryWinlogonValueStore : IWinlogonValueStore
 
     public RegistryWinlogonValueStore(RegistryKey key) =>
         _key = key ?? throw new ArgumentNullException(nameof(key));
+
+    public IReadOnlyCollection<string> GetValueNames() => _key.GetValueNames();
+
+    public RegistryValueKind? ReadKind(string name) =>
+        _key.GetValueNames().Contains(name, StringComparer.OrdinalIgnoreCase)
+            ? _key.GetValueKind(name)
+            : null;
 
     public WinlogonStoredValue Read(string name)
     {
@@ -771,7 +782,7 @@ public sealed class WindowsAutoLogonPlatform : IWindowsAutoLogonPlatform
             userExists,
             autoEnabled,
             autoEnabled ? account : null,
-            key?.GetValue("DefaultPassword") is not null,
+            RegistryValueExists(key, "DefaultPassword"),
             key?.GetValue(OwnerValueName) is not null ||
                 key?.GetValue(WinlogonMutationTransaction.LsaOwnerReceiptValueName) is not null ||
                 HasPriorState(key),
@@ -936,7 +947,7 @@ public sealed class WindowsAutoLogonPlatform : IWindowsAutoLogonPlatform
             configuredAccount,
             string.Equals(key?.GetValue("AutoAdminLogon") as string, "1", StringComparison.Ordinal),
             lsaSecretOwned,
-            key?.GetValue("DefaultPassword") is not null,
+            RegistryValueExists(key, "DefaultPassword"),
             taskExact,
             configuredOwner,
             profile.Exact,
@@ -1153,7 +1164,7 @@ public sealed class WindowsAutoLogonPlatform : IWindowsAutoLogonPlatform
             key.GetValue(UninstallAccountValueName) is not null ||
             key.GetValue(UninstallProfileValueName) is not null ||
             HasPriorState(key) ||
-            key.GetValue("DefaultPassword") is not null ||
+            RegistryValueExists(key, "DefaultPassword") ||
             new WindowsLsaOwnerReceiptStore().ReadReceipt() is not null ||
             WindowsLsaPrivateData.Exists(DefaultPasswordSecret))
         {
@@ -1320,7 +1331,7 @@ public sealed class WindowsAutoLogonPlatform : IWindowsAutoLogonPlatform
             !Path.IsPathFullyQualified(profile!) ||
             !string.Equals(Path.GetFullPath(profile!), profile, StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(key.GetValue("AutoAdminLogon") as string, "0", StringComparison.Ordinal) ||
-            key.GetValue("DefaultPassword") is not null ||
+            RegistryValueExists(key, "DefaultPassword") ||
             (requireLsaOwnership && !CreateLsaTransaction().IsOwned(ownerMarker)))
         {
             throw new InstallException("owned_resource_mismatch");
@@ -1382,7 +1393,7 @@ public sealed class WindowsAutoLogonPlatform : IWindowsAutoLogonPlatform
                     key.GetValue(UninstallAccountValueName) as string,
                     key.GetValue(UninstallProfileValueName) as string,
                     HasPriorState(key),
-                    key.GetValue("DefaultPassword") is not null,
+                    RegistryValueExists(key, "DefaultPassword"),
                     new WindowsLsaOwnerReceiptStore().ReadReceipt() is not null,
                     WindowsLsaPrivateData.Exists(DefaultPasswordSecret)));
         }
@@ -1486,7 +1497,7 @@ public sealed class WindowsAutoLogonPlatform : IWindowsAutoLogonPlatform
             string.IsNullOrWhiteSpace(user) ||
             string.IsNullOrWhiteSpace(domain) ||
             !string.Equals(key.GetValue("AutoAdminLogon") as string, "1", StringComparison.Ordinal) ||
-            key.GetValue("DefaultPassword") is not null)
+            RegistryValueExists(key, "DefaultPassword"))
         {
             throw new InstallException("owned_resource_mismatch");
         }
@@ -1586,6 +1597,9 @@ public sealed class WindowsAutoLogonPlatform : IWindowsAutoLogonPlatform
         PriorWinlogonValue User,
         PriorWinlogonValue Domain,
         PriorWinlogonValue AutoAdminLogon);
+
+    private static bool RegistryValueExists(RegistryKey? key, string name) =>
+        key?.GetValueNames().Contains(name, StringComparer.OrdinalIgnoreCase) == true;
 
     private static void EnsureWindows()
     {

@@ -140,10 +140,18 @@ public sealed class SetupLocalizationTests
     [InlineData("en-US", "domain_controller_unsupported", "domain controller", "member server", "Error code: ")]
     [InlineData("zh-CN", "autologon_conflict", "自动登录", "不会覆盖", "错误代码：")]
     [InlineData("en-US", "autologon_conflict", "AutoLogon", "will not overwrite", "Error code: ")]
-    [InlineData("zh-CN", "autologon_plaintext_password_present", "明文自动登录密码", "安全移除", "错误代码：")]
-    [InlineData("en-US", "autologon_plaintext_password_present", "plaintext AutoLogon password", "remove it securely", "Error code: ")]
+    [InlineData("zh-CN", "autologon_plaintext_password_present", "仍保存自动登录凭据", "安全移除", "错误代码：")]
+    [InlineData("en-US", "autologon_plaintext_password_present", "saved credentials remain", "remove them securely", "Error code: ")]
     [InlineData("zh-CN", "install_media_target_exists", "安装目录", "重启 Windows", "错误代码：")]
     [InlineData("en-US", "install_media_target_exists", "installation directory", "restart Windows", "Error code: ")]
+    [InlineData("zh-CN", "autologon_cleanup_owned_state", "SimplySignAuto", "不会清理", "错误代码：")]
+    [InlineData("en-US", "autologon_cleanup_owned_state", "SimplySignAuto", "will not remove", "Error code: ")]
+    [InlineData("zh-CN", "autologon_cleanup_state_uncertain", "状态异常", "手工签名模式", "错误代码：")]
+    [InlineData("en-US", "autologon_cleanup_state_uncertain", "unexpected", "Manual signing", "Error code: ")]
+    [InlineData("zh-CN", "autologon_cleanup_busy", "正在被其他进程修改", "稍后重试", "错误代码：")]
+    [InlineData("en-US", "autologon_cleanup_busy", "being modified", "try again", "Error code: ")]
+    [InlineData("zh-CN", "autologon_cleanup_failed", "安全禁用", "手工签名模式", "错误代码：")]
+    [InlineData("en-US", "autologon_cleanup_failed", "safely disable", "Manual signing", "Error code: ")]
     public void Stable_prerequisite_codes_have_actionable_messages_in_both_languages(
         string cultureName,
         string code,
@@ -228,6 +236,54 @@ public sealed class SetupLocalizationTests
         });
     }
 
+    [WindowsFact]
+    public void AutoLogon_resolution_dialog_distinguishes_active_and_residual_states()
+    {
+        RunInSta(() =>
+        {
+            using var active = new SetupAutoLogonResolutionDialog(
+                SetupCulture.ResolveSelection("zh-CN"),
+                "autologon_conflict",
+                @"SIGNING-SERVER\Administrator");
+            Assert.Contains(
+                @"SIGNING-SERVER\Administrator",
+                Find<Label>(active, "AutoLogonResolutionDetail").Text,
+                StringComparison.Ordinal);
+            Assert.Contains(
+                "不会更改 Windows 账户密码",
+                Find<Label>(active, "AutoLogonResolutionScope").Text,
+                StringComparison.Ordinal);
+            Assert.Equal(
+                "安全禁用并继续",
+                Find<Button>(active, "AutoLogonDisableAndContinue").Text);
+            var acknowledgement = Find<CheckBox>(active, "AutoLogonCleanupAcknowledge");
+            var disable = Find<Button>(active, "AutoLogonDisableAndContinue");
+            Assert.Contains("不可撤销", acknowledgement.Text, StringComparison.Ordinal);
+            Assert.False(disable.Enabled);
+            acknowledgement.Checked = true;
+            Assert.True(disable.Enabled);
+            Assert.Equal(
+                "改用手工签名模式",
+                Find<Button>(active, "AutoLogonUseManualMode").Text);
+
+            using var residual = new SetupAutoLogonResolutionDialog(
+                SetupCulture.ResolveSelection("en-US"),
+                "autologon_plaintext_password_present",
+                null);
+            Assert.Contains(
+                "saved credentials remain",
+                Find<Label>(residual, "AutoLogonResolutionDetail").Text,
+                StringComparison.OrdinalIgnoreCase);
+            Assert.Contains(
+                "does not change the Windows account password",
+                Find<Label>(residual, "AutoLogonResolutionScope").Text,
+                StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(
+                "Disable safely and continue",
+                Find<Button>(residual, "AutoLogonDisableAndContinue").Text);
+        });
+    }
+
     private static IReadOnlyDictionary<string, string> ReadResourceSet(
         ResourceManager manager,
         CultureInfo culture)
@@ -279,6 +335,11 @@ public sealed class SetupLocalizationTests
         public Task<int> InstallAsync(
             StagedSetupPayload staged,
             SetupInstallationMode? mode,
+            IProgress<SetupProgress>? progress,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task DisableAutoLogonAsync(
+            StagedSetupPayload staged,
             IProgress<SetupProgress>? progress,
             CancellationToken cancellationToken) => throw new NotSupportedException();
 
