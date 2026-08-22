@@ -2,310 +2,445 @@
 
 [中文（默认）](README.md) | [English](README.en.md)
 
+SimplySignAuto provides Authenticode signing, optional PDF/PAdES signing, local
+WPF manual signing, and unattended Windows Server signing through an HTTP API.
+
 ## Installation requirements
 
-- x64 Windows 10 22H2, a supported Windows 10 Enterprise/IoT Enterprise LTSC
-  release, Windows 11, or Windows Server 2019/2022/2025 Standard or Datacenter
-  with Desktop Experience. The system clock must be synchronized reliably.
-- Stable major version 10 or later of both .NET Windows Desktop Runtime and
-  ASP.NET Core Runtime. Setup never downloads a runtime and stops before product
-  mutation when either runtime is missing. The target computer does not need the
-  .NET SDK. Install both Windows x64 runtimes:
-  - [.NET 10 / ASP.NET Core Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/10.0): select the latest stable Windows x64 installer under `ASP.NET Core Runtime`;
-  - [WPF / .NET Desktop Runtime 10](https://dotnet.microsoft.com/en-us/download/dotnet/10.0/runtime): select the x64 installer under “Run desktop apps”.
-  Desktop Runtime already includes the base .NET Runtime. SimplySignAuto does
-  not use IIS and does not require the Hosting Bundle.
-- Certum SimplySign Desktop for Windows 64-bit and
-  `C:\Windows\System32\SimplySignPKCS.dll`. Download the Windows 64-bit
-  `proCertum SmartSign + SimplySign Desktop` installer from the
-  [official Certum page](https://support.certum.eu/en/software/procertum-smartsign/).
-  Setup checks both the application and the PKCS#11 module before mutation.
-- Windows SDK x64 `signtool.exe` is required for Authenticode. SignTool is not
-  required when only PDF signing is used.
-- Setup must run as an elevated administrator. Domain-member clients and member
-  servers are supported; domain controllers are rejected.
-- The SimplySign PKCS#11 module must load in the signing user's session and must
-  expose the target certificate and private key.
+### Supported systems
 
-The main product is a framework-dependent `win-x64` application. Python is not
-required on the target. PDF/PAdES is an optional offline extension distributed
-in a separate installer; without it, PDF controls remain hidden and the base
-Authenticode capability is unaffected.
+The target must be x64 and have a reliably synchronized system clock.
 
-## Two fixed installation modes
+- Windows 10 22H2;
+- supported Windows 10 Enterprise / IoT Enterprise LTSC editions;
+- Windows 11;
+- Windows Server 2019, 2022, or 2025 Standard/Datacenter Desktop Experience.
 
-You must select one mode during the first installation. All supported Windows
-clients and Windows Server editions default to Manual signing; select Automatic
-signing service when a server requires unattended signing. The mode is fixed
-after installation and inherited by upgrades. To switch modes, uninstall and
-reinstall the product.
+### Required components and downloads
 
-- **Manual signing** is intended for a Windows 10/11 administrator who opens the
-  app and submits local signing jobs on demand. It creates no Windows Service,
-  dedicated user, AutoLogon, or HTTP API. The application must remain running
-  until an active job finishes. The Jobs page retains history and protected
-  signed results, which can be saved again to a selected location.
-- **Automatic signing service** is intended for unattended Windows Server
-  signing. Setup creates a LocalSystem Service, a fixed low-privilege
-  `SimplySignAgent` user, protected AutoLogon, and a logon task. It exposes the
-  HTTP API and lets an administrator use the WPF console in their own desktop
-  session. Closing or exiting the console does not stop the Service, Agent, or
-  signing jobs.
+| Component | Download | Select |
+| --- | --- | --- |
+| ASP.NET Core Runtime 10 | [.NET 10 downloads](https://dotnet.microsoft.com/en-us/download/dotnet/10.0) | The latest stable Windows x64 installer under `ASP.NET Core Runtime` |
+| WPF / .NET Desktop Runtime 10 | [.NET Desktop Runtime 10](https://dotnet.microsoft.com/en-us/download/dotnet/10.0/runtime) | The x64 installer under “Run desktop apps” |
+| Certum SimplySign Desktop | [Certum downloads](https://support.certum.eu/en/software/procertum-smartsign/) | The Windows 64-bit `proCertum SmartSign + SimplySign Desktop` installer |
 
-The Setup UI and application UI support Chinese and English. Setup initially
-follows the Windows display language. With no saved preference, the application
-defaults to Chinese and can be changed in Application Settings.
+Before installation, confirm that:
 
-The service endpoint is HTTP only. When access crosses an untrusted network,
-the deployer must provide an external HTTPS reverse proxy, certificate renewal,
-hostname validation, and access control.
+- .NET Windows Desktop Runtime and ASP.NET Core Runtime are version 10 or a later major version;
+- `C:\Windows\System32\SimplySignPKCS.dll` exists;
+- the signing user can load the SimplySign PKCS#11 module and enumerate the target certificate and private key;
+- Windows SDK x64 `signtool.exe` is installed when Authenticode is required.
+
+Notes:
+
+- Setup does not download or install .NET. Missing runtimes or SimplySign Desktop are reported before system mutation.
+- The target does not need the .NET SDK, Python, IIS, or the Hosting Bundle.
+- Desktop Runtime already includes the base .NET Runtime.
+- PDF-only operation does not require SignTool.
+
+### Main application and PDF extension
+
+- The main application is a `win-x64` framework-dependent single file with full Authenticode support.
+- The PDF helper exists only in the independent PDF extension Setup and is never downloaded by the main application.
+- PDF controls remain hidden until the extension is installed.
+- The product listens on HTTP only and does not manage TLS certificates. Use an external reverse proxy for HTTPS.
+
+## Choose an installation mode
+
+The first installation requires one fixed mode. Manual signing is selected by default.
+
+| Item | Manual signing | Automatic signing service |
+| --- | --- | --- |
+| Intended use | Windows 10/11 or administrator-operated signing | Unattended Windows Server signing |
+| Signing runtime | Runs while the current administrator app is open | Background Service and dedicated signing user |
+| Windows Service | Not created | LocalSystem Service |
+| Dedicated user / AutoLogon | Not created | `SimplySignAgent` with protected AutoLogon |
+| HTTP API | Not exposed | Exposed |
+| Closing the console | Allowed after the active job completes | Does not stop background jobs |
+
+Mode rules:
+
+- Upgrades inherit the installed mode.
+- Switching modes requires uninstall and reinstall.
+- Rerunning Setup cannot migrate or repair the mode.
+
+Setup and the application support Chinese and English. Setup initially follows the
+Windows display language. The application defaults to Chinese when no preference
+has been saved and can be changed under Application Settings.
 
 ## Quick start
 
-1. Download `SimplySignAutoSetup-<version>-win-x64.exe` and verify its
-   Authenticode signature, timestamp, and expected publisher.
-2. Run Setup, select a language and fixed installation mode, and complete the
-   wizard.
-3. In Manual mode, open SimplySignAuto directly. In Service mode, restart
-   Windows when prompted and then open the public-desktop shortcut as
-   Administrator.
-4. Import the complete `otpauth://` activation content on the Activation page,
-   then confirm the target certificate and signing capability are ready on the
-   Overview page.
-5. Service mode only: copy the one-time API token from
-   `%ProgramData%\SimplySignAuto\install-token.txt` into the caller's secret
-   store, verify access, and delete the file. See [HTTP API](docs/API.md).
-6. Install `SimplySignAutoPdfSetup-<version>-win-x64.exe` only when PDF/PAdES is
-   required.
+1. Download `SimplySignAutoSetup-<version>-win-x64.exe`.
+2. Verify its Authenticode signature and timestamp.
+3. Run Setup and select the language and installation mode.
+4. In Manual mode, open SimplySignAuto after installation.
+5. In Service mode, restart when prompted, then open the public-desktop shortcut as Administrator.
+6. Import the complete `otpauth://` activation content on the Activation page.
+7. Confirm that the target certificate and required signing capability are ready on Overview.
+8. If PDF is required, install the PDF Setup included in the current Release; otherwise keep the latest compatible extension.
+
+Service mode also creates a one-time API token:
+
+1. Read `%ProgramData%\SimplySignAuto\install-token.txt`.
+2. Store the token in the caller's secret store immediately.
+3. Delete the file after API access is verified.
+4. The Service retains only the token SHA-256.
+
+See the complete [HTTP API documentation](docs/API.md).
 
 ## Verify release assets
 
-Every public release contains the signed main installer. A PDF installer is
-published at the same version only when the effective PDF helper, dependencies,
-shared Setup, toolchain, or license inputs changed since the previous main
-release. PDF version numbers may therefore have gaps. If a release has no new
-PDF installer, keep using the latest installed compatible PDF extension.
+Every public Release contains:
 
-Verify every installer present in the selected release:
+- `SimplySignAutoSetup-<version>-win-x64.exe`.
+
+When an effective PDF input changed since the previous main release, it also contains:
+
+- `SimplySignAutoPdfSetup-<version>-win-x64.exe`.
+
+PDF versions may therefore have gaps, for example from `0.1.0` directly to `0.1.3`.
+
+Verify installers in the current directory with PowerShell:
 
 ```powershell
 $setups = Get-ChildItem -LiteralPath . -File |
   Where-Object Name -Match '^SimplySignAuto(Pdf)?Setup-[0-9].*-win-x64\.exe$'
+
 foreach ($setup in $setups) {
   $signature = Get-AuthenticodeSignature -LiteralPath $setup.FullName
-  if ($signature.Status -ne 'Valid') { throw "release_signature_invalid: $setup" }
+  if ($signature.Status -ne 'Valid') {
+    throw "release_signature_invalid: $setup"
+  }
+  if ($null -eq $signature.TimeStamperCertificate) {
+    throw "release_timestamp_missing: $setup"
+  }
 }
 ```
 
-The main installer embeds a signed-catalog-closed payload with the application,
-SQLite native dependency, runtime policy, offline notes, SPDX SBOM,
-reproducibility report, MIT license, and complete third-party notices. The PDF
-installer embeds a strict `extension.json`, signed helper, and the same license
-documents. Each installer verifies its publisher, embedded media hashes, and
-member closure before product mutation. Do not manually extract or modify the
-embedded payload.
+Package boundaries:
 
-## First installation
+- The main Setup embeds the application, SQLite native dependency, configuration example, runtime policy, offline notes, SPDX SBOM, reproducibility report, MIT license, and third-party notices.
+- The PDF Setup embeds a strict `extension.json`, the signed helper, MIT license, and third-party notices.
+- Setup validates its publisher, embedded media hashes, and member closure before installation.
+- Users should not manually unpack the embedded media.
 
-Run the verified main installer:
+## Installation and upgrade
+
+### First installation
+
+After signature verification, run the main Setup:
 
 ```powershell
 & '.\SimplySignAutoSetup-0.1.0-win-x64.exe'
 ```
 
-Setup accepts no arguments and requests elevation through its application
-manifest. It first checks Windows, runtimes, administrator state, non-domain-
-controller state, SimplySign Desktop, and PKCS#11. The PDF helper is not a base
-prerequisite.
+Setup accepts no arguments and requests UAC through its application manifest. Its
+preflight checks cover:
 
-Manual mode installs protected program media, a protected per-administrator
-local job-data root, a public-desktop shortcut, an installation receipt, and the
-uninstall registration. It creates no Service, user, AutoLogon, scheduled task,
-or API token. `%ProgramData%\SimplySignAuto` contains only the administrator-
-readable `install.json` receipt, not service configuration, a job database, or a
-spool. Open the app after installation, import activation, and submit local jobs.
+- Windows version and architecture;
+- .NET runtimes;
+- administrator rights and a non-domain-controller host;
+- SimplySign Desktop and PKCS#11;
+- existing installation, directory, user, and AutoLogon conflicts.
 
-Service mode creates the `SimplySignAgent` user and profile, a random password
-stored only in LSA private data, protected AutoLogon, the exact
-AtLogOn/InteractiveToken Agent task, ProgramData, configuration, and the
-LocalSystem Service. Copy the one-time API token to a secret store, delete the
-temporary token file, and restart Windows so the nonzero signing-user session
-and Agent can start. Administrators do not need to enter or operate that user's
-desktop.
+The PDF helper is not a base-installation prerequisite.
 
-Both modes create the public-desktop SimplySignAuto shortcut. A missing SignTool
-disables only Authenticode. A missing PDF extension does not block the base
-product. Path, ACL, owner, or readback drift fails closed. Service mode also
-rejects same-name user and existing AutoLogon conflicts. Setup rolls back only
-exact-owned changes from the current attempt; uncertain rollback returns
-`setup_state_uncertain`.
+#### Manual signing mode
 
-When Service mode detects external AutoLogon or saved credentials left after
-AutoLogon was disabled, Setup offers **Disable safely and continue**, **Use
-Manual signing**, and **Cancel**. After confirmation, safe disable only sets
-`AutoAdminLogon` to `0`, removes the saved Windows AutoLogon credentials, and
-verifies the result. It does not delete a user, change the account password, or
-display, log, or use password contents. Setup then repeats the complete preflight and
-continues. It refuses cleanup if SimplySignAuto ownership/uninstall state,
-unexpected registry types, or any uncertain state is present; finish the
-original uninstall or use Manual signing instead.
+Installed resources:
 
-Service mode listens on `http://0.0.0.0:7080` by default and does not open the
-firewall. Expose it only through a controlled LAN, VPN, or trusted reverse
-proxy.
+- protected program media;
+- a local job-data directory for the current administrator;
+- a public-desktop shortcut;
+- an installation receipt and uninstall registration.
 
-When PDF/PAdES is required, verify and run the latest compatible independent PDF
-Setup. It validates the embedded helper length, SHA-256, Authenticode signature,
-and publisher before atomic installation. The app shows PDF controls after its
-next status refresh. Visible PDF appearances select a protected Windows system
-font that covers the complete text; no suitable font returns
-`pdf_appearance_font_missing`.
+This mode creates no Service, dedicated user, AutoLogon, scheduled task, or API
+token. `%ProgramData%\SimplySignAuto` contains only the administrator-readable
+`install.json` receipt.
 
-The same main Setup handles bounded in-place upgrades. It locks and inherits the
-installed mode. Manual upgrades replace only the product media and uninstall
-registration while preserving activation, settings, job history, and signed
-results. Service upgrades drain jobs before media replacement and preserve the
-API token, service configuration, job database, dedicated user, AutoLogon, and
-activation. Both modes verify the receipt, owner, ACLs, registration, and
-optional PDF extension before replacement. Mode migration, repair installation,
-and downgrade are unsupported.
+#### Automatic signing service mode
 
-## Activation, UI, and local jobs
+Installed resources:
 
-Import the complete `otpauth://` content on the WPF Activation page. Manual mode
-parses it in the current administrator process and stores it with that user's
-CurrentUser DPAPI. Service mode forwards it once through the mutually
-authenticated local management channel to the signing-user Agent, which stores
-it with that user's CurrentUser DPAPI. The Service does not persist or log the
-URI. The input and clipboard are cleared after success, and no response returns
-the secret.
+- a LocalSystem Service;
+- the low-privilege `SimplySignAgent` user;
+- a Windows profile;
+- a random password stored only in LSA private data;
+- protected AutoLogon;
+- an AtLogOn/InteractiveToken Agent task;
+- ProgramData, configuration, and a one-time API token.
 
-Importing activation does not log in to SimplySign. Use Login on the Overview
-page. Manual mode performs on-demand login for local jobs; Service mode can also
-perform on-demand login before an accepted HTTP request is persisted. Login
-rechecks the PKCS#11 token, certificate, and private key. Process presence alone
-is not signing readiness.
+Restart when prompted. The administrator does not need to enter or operate the
+signing user's desktop.
 
-Do not put activation content in command-line arguments, environment variables,
-logs, tickets, or screenshots. The low-level `configure-otp` command writes only
-the caller's CurrentUser DPAPI store and is reserved for explicit offline repair
-inside the actual signing-user context.
+The Service listens on `http://0.0.0.0:7080` by default. Setup does not open the
+firewall. Use it only on a controlled LAN, VPN, or behind a trusted reverse proxy.
 
-The WPF application allows one instance per administrator SID. Closing the
-window hides it to the tray. In Service mode, Exit closes only the control
-console. In Manual mode, Exit stops the in-process worker and is refused while a
-signing job is active.
+#### Existing AutoLogon conflicts
 
-On Quick Signing, select an administrator-readable
-`.exe`/`.dll`/`.msi`/`.sys`/`.cat` or `.pdf`, then select a certificate and
-parameters. The source remains read-only. A successful result is first retained
-in the protected job directory and can then be saved to a selected destination;
-overwrite requires explicit confirmation. The Jobs page retains history and
-allows a still-retained successful result to be saved again. Both modes use a
-persistent SQLite queue, one worker, recovery, and retention policies. Service-
-mode local and HTTP jobs share the same queue.
+When Service mode detects external AutoLogon or saved residual credentials, Setup offers:
+
+- Disable safely and continue;
+- Use Manual signing instead;
+- Cancel.
+
+Disable safely and continue only:
+
+- sets `AutoAdminLogon` to `0`;
+- removes saved Windows AutoLogon credentials;
+- verifies the result by reading it back;
+- repeats the full preflight.
+
+It does not delete a user, change an account password, or display, log, or use
+password contents. Setup refuses cleanup when ownership, uninstall state, registry
+types, or any other relevant state cannot be proven.
+
+### PDF extension
+
+When PDF/PAdES is required, run the independent Setup:
+
+```powershell
+& '.\SimplySignAutoPdfSetup-<version>-win-x64.exe'
+```
+
+Rules:
+
+- If the current Release has no PDF Setup, keep the latest compatible extension.
+- PDF versions do not need to be consecutive or equal to the main version.
+- The main application uses `schemaVersion` for compatibility; `productVersion` records the extension build source.
+- Setup verifies helper length, SHA-256, Authenticode, and publisher offline.
+- PDF controls appear after the next management-state refresh.
+- If no protected Windows system font covers all visible text, signing returns `pdf_appearance_font_missing`.
+
+### In-place upgrade
+
+The same main Setup handles clean installation and bounded in-place upgrade.
+
+Common rules:
+
+- lock and inherit the installed mode;
+- verify receipt, owner, ACLs, product registration, and PDF extension;
+- fail closed before replacement on unknown files, path drift, or identity mismatch;
+- do not support mode migration, repair installation, or downgrade.
+
+Manual upgrades preserve:
+
+- current-administrator settings and DPAPI activation;
+- job history, spool, and signed results;
+- a compatible PDF extension.
+
+Service upgrades drain jobs before replacement and preserve:
+
+- API token and Service configuration;
+- job database and spool;
+- dedicated user, AutoLogon, and DPAPI activation;
+- a compatible PDF extension.
+
+Do not manually overwrite Program Files after any of these errors:
+
+- `restart_required`;
+- `upgrade_drain_timeout`;
+- `upgrade_state_uncertain`.
+
+## Activation, login, and local signing
+
+### Import activation
+
+Administrator imports the complete `otpauth://` content on the WPF Activation page.
+
+- Manual mode parses and stores it with the current administrator's CurrentUser DPAPI.
+- Service mode forwards it over the mutually authenticated local management channel for storage by the dedicated signing-user Agent.
+- The Service does not persist or log the activation URI.
+- On success, the input and clipboard are cleared and no protocol response returns the secret.
+
+Importing is not logging in. Select Login on the Overview page afterward.
+
+### Login and readiness
+
+- Idle sessions do not perform background login or retry.
+- Manual mode logs in on demand for a local job.
+- Service mode can log in after HTTP preflight and before creating a job.
+- Login rechecks the PKCS#11 token, certificate, and private key.
+- Failed login leaves no new job or uploaded file.
+- A SimplySign Desktop process alone is not signing readiness.
+
+To replace activation:
+
+1. Confirm there is no active job.
+2. Select Clear on the Activation page and confirm.
+3. Wait for the current session to close and the certificate list to clear.
+4. Import the new complete activation content.
+
+This does not remove a Certum account or signing certificate.
+
+The low-level `configure-otp` command is only for explicit offline repair in the
+actual signing-user context:
+
+```powershell
+Get-Clipboard | .\SimplySignAuto.exe configure-otp
+Set-Clipboard -Value ''
+```
+
+Never put the activation URI in command-line arguments, environment variables,
+logs, tickets, or screenshots.
+
+### WPF, tray, and job history
+
+- One WPF instance is allowed per administrator SID; another launch activates it.
+- Closing the window hides it to the tray.
+- Exiting the Service-mode console does not stop the Service, Agent, or background jobs.
+- Manual mode refuses Exit while a job is active.
+- The Jobs page keeps history and successful results that remain inside retention.
+
+### Local quick signing
+
+Supported inputs:
+
+- `.exe`, `.dll`, `.msi`, `.sys`, and `.cat`;
+- `.pdf` when the PDF extension is installed.
+
+Signing flow:
+
+1. Select an administrator-readable source file, certificate, and parameters.
+2. The application copies the input into the protected spool for the current mode.
+3. One worker signs and verifies the file.
+4. A successful result is retained in the protected job directory.
+5. The console verifies size/hash before saving to the selected destination.
+
+The source remains read-only and overwriting requires explicit confirmation. In
+Service mode, local and HTTP jobs share the same persistent SQLite queue.
 
 ## HTTP API and external HTTPS
 
-The HTTP API exists only in Automatic signing service mode. The complete request
-schema, responses, stable errors, idempotency rules, and retry behavior are in
-[docs/API.md](docs/API.md).
+The HTTP API exists only in Automatic signing service mode. See
+[docs/API.md](docs/API.md) for the complete schemas, errors, idempotency, and retry rules.
 
-The default endpoint is intended only for a controlled LAN, VPN, or same-host or
-trusted reverse proxy. The product does not terminate TLS or manage server
-certificates. Clients must validate certificates and hostnames normally when an
-external reverse proxy provides HTTPS; do not use `curl -k`.
+Deployment boundaries:
 
-Anonymous liveness proves only that the Service and SQLite respond:
+- default address: `http://<server>:7080`;
+- direct use only on a controlled LAN, VPN, or behind a trusted reverse proxy;
+- the product does not terminate TLS or manage server certificates;
+- HTTPS clients must validate certificates and hostnames normally; do not use `curl -k`;
+- every `/v1` route except `GET /health/live` requires a Bearer token.
+
+Health checks:
 
 ```bash
 curl --fail-with-body "$BASE_URL/health/live"
-```
-
-Authenticated readiness requires the current Agent heartbeat and every
-configured signing capability to be ready:
-
-```bash
 curl --fail-with-body \
   -H "Authorization: Bearer $TOKEN" \
   "$BASE_URL/v1/health/ready"
 ```
 
-Except for liveness, every `/v1` route requires an exact
-`Authorization: Bearer <token>` header. Never place the token in the repository.
+- `live` proves only that the Service and SQLite respond.
+- `ready` checks the Agent session, heartbeat, SimplySign, token, certificate, and private key.
+- Process presence or `live` 200 is not signing readiness.
 
-## Retention, upgrade, and uninstall
+Asynchronous submission:
 
-Service-mode results default to 24 hours and are configurable from 0 to 168
-hours in Service Settings. Manual-mode results default to 168 hours and use the
-same range in Application Settings. `0` means permanent retention. The Jobs page
-shows retained history and successful results. Active jobs are never expired.
+```bash
+curl --fail-with-body \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Idempotency-Key: build-20260809-app-x64' \
+  -F 'file=@./app.exe;type=application/octet-stream' \
+  -F 'parameters={"kind":"authenticode","certificateSerialNumber":"52A1B4C9","digestAlgorithm":"sha256","appendSignature":false}' \
+  "$BASE_URL/v1/jobs"
+```
 
-API tokens exist only in Service mode and are rotated in Service Settings. A new
-token is shown once and must be copied and acknowledged before the dialog can
-close; the old token becomes invalid when the new configuration takes effect.
+Requests accept multipart uploads only, not server-local paths or remote URLs. The
+single-file limit is 512 MiB.
 
-Before upgrade, close the WPF console and verify the new Setup signature. Manual
-mode requires installed files to be replaceable and atomically rolls back media
-and registration on failure. Service mode performs bounded drain, stops the
-Agent task and Service, rechecks the offline queue, atomically replaces verified
-media, and restarts and verifies the runtime. Failure restores the old media and
-runtime when that can be proven. `restart_required`, `upgrade_drain_timeout`, or
-`upgrade_state_uncertain` must be handled as reported; never overwrite Program
-Files manually.
+## Retention, settings, and uninstall
 
-Uninstall from Windows Installed apps or run:
+### Result retention
+
+| Mode | Default | Configurable range |
+| --- | --- | --- |
+| Manual signing | 168 hours | 0–168 hours |
+| Automatic signing service | 24 hours | 0–168 hours |
+
+`0` means permanent retention. Active jobs are never expired.
+
+### API token rotation
+
+API tokens exist only in Service mode and can be rotated under Service Settings.
+
+- A new token is shown once.
+- It must be copied and acknowledged before the dialog can close.
+- The old token becomes invalid when the new configuration takes effect.
+
+### Uninstall
+
+Prefer Windows **Settings → Apps → Installed apps**, or run:
 
 ```powershell
 & 'C:\Program Files\SimplySignAuto\SimplySignAuto.exe' uninstall
 ```
 
-The PDF extension has its own uninstall entry. Removing it leaves the base
-product intact. Removing the base product first verifies and removes an owned
-PDF extension to avoid an orphan.
+The PDF extension has a separate uninstall entry. Removing it does not affect the
+main application. Removing the main application first verifies and removes an
+installed PDF extension.
 
-Manual uninstall removes the application, shortcut, receipt, registration, and
-owned PDF extension. It also removes the DPAPI activation credential saved by
-this product for the current administrator, while preserving job history and
-signed results unless `uninstall --purge-data --confirm PURGE` is explicitly used.
+Manual uninstall:
 
-Service uninstall verifies the exact install instance, owner marker, SID,
-account, profile, AutoLogon/LSA fingerprint, task, Service, firewall, and ACLs
-before mutation. It stops exact-owned runtime resources, logs off exact-SID
-sessions, disables only product-owned AutoLogon, removes the created user and
-profile, and quarantines ProgramData for restart cleanup. Follow the restart
-instruction and do not move or delete Program Files until the cleanup task and
-quarantine are gone.
+- removes the application, shortcut, receipt, and uninstall registration;
+- removes the DPAPI activation saved by this product for the current administrator;
+- preserves job history and signed results by default.
 
-Uninstall never removes or modifies Certum SimplySign Desktop,
-`SimplySignPKCS.dll`, Certum certificates, or an operator-managed reverse proxy.
+Only this explicit command removes the controlled data directory:
+
+```powershell
+& 'C:\Program Files\SimplySignAuto\SimplySignAuto.exe' uninstall --purge-data --confirm PURGE
+```
+
+Service uninstall:
+
+- verifies the install instance, owner, SID, account, profile, AutoLogon, task, Service, firewall, and ACLs before mutation;
+- removes only exact-owned Service, task, user, profile, AutoLogon, and controlled data;
+- requires the prompted restart and completion of the purge task and quarantine cleanup;
+- requires the Program Files package directory to remain in place until restart cleanup finishes.
+
+Uninstall never modifies Certum SimplySign Desktop, `SimplySignPKCS.dll`, Certum
+certificates, or an operator-managed reverse proxy.
 
 ## Troubleshooting
 
-- `installation_mode_change_requires_reinstall`: the installed mode is fixed;
-  uninstall, rerun Setup, and select the other mode.
-- `autologon_conflict` / `autologon_plaintext_password_present`: these affect
-  only Service mode. Choose **Disable safely and continue** in Setup to turn off
-  system AutoLogon and remove the saved Windows AutoLogon credentials, or use
-  Manual signing. The action does not change the account password and does not
-  display, log, or use saved password contents.
-- `signtool_missing`: install or configure Windows SDK x64 SignTool. PDF-only
-  operation is unaffected.
-- `pdf_support_not_installed`: Authenticode remains available. Install the
-  latest compatible PDF extension.
-- `pdf_helper_missing` or `pdf_helper_tampered`: stop PDF signing and preserve
-  the protected helper state for diagnosis; reinstall only from a verified
-  release.
-- `otp_*` or `clock_not_synchronized`: re-import activation from the WPF UI and
-  synchronize the clock. Do not copy DPAPI files between users.
-- Service `live` 503: check `SimplySignAuto.Service`, Event Log, the `jobs.db`
-  volume, and ProgramData ACLs. Do not delete the database as a repair.
-- Service `ready` 503 with `live` 200: verify the nonzero signing-user session,
-  Agent task, clock, SimplySign Desktop, token, certificate, and private key.
+| Symptom or code | Action |
+| --- | --- |
+| `live` 503 | Check `SimplySignAuto.Service`, Event Log, the `jobs.db` volume, and ProgramData ACLs. Do not delete the database. |
+| `ready` 503 with `live` 200 | Check the nonzero signing-user session, Agent task, clock, SimplySign Desktop, token, certificate, and private key. |
+| `installation_mode_change_requires_reinstall` | Uninstall, rerun Setup, and select the other mode. |
+| `autologon_conflict` / `autologon_plaintext_password_present` | Select **Disable safely and continue** in Service-mode Setup, or use Manual mode. |
+| `signtool_missing` | Install or configure Windows SDK x64 SignTool. PDF-only use is unaffected. |
+| `pdf_support_not_installed` | Install the latest compatible PDF extension. Authenticode remains available. |
+| `pdf_helper_missing` / `pdf_helper_tampered` | Stop PDF signing, preserve evidence, and reinstall from a verified Release. |
+| `otp_*` / `clock_not_synchronized` | Re-import activation in the console and synchronize the clock. Do not copy DPAPI files between users. |
+| Long-running `waiting_for_agent` | Restore readiness before creating more jobs with new idempotency keys. |
+| `result_corrupt` | Preserve the correlation ID, check storage and ACLs, and create a new job from the source. |
+
+## Secret exposure response
+
+If an API token, activation content, reverse-proxy key, or signing credential may be exposed:
+
+1. Isolate the caller and retain only non-secret time, host, correlation ID, and audit evidence.
+2. API token: rotate it under Service Settings and revoke old client copies.
+3. Activation: revoke or reset it through Certum, clear the old state in the console, and re-import.
+4. TLS private key: revoke and replace it through the reverse proxy or certificate system.
+5. If executables, the helper, PKCS#11, or ACLs may be altered, stop signing and restore from a verified release.
+
+Do not paste the secret into logs, tickets, command lines, or screenshots.
 
 ## Build release installers
 
-On a clean Windows x64 build machine, install .NET 10 SDK, Python 3.12, and `uv`:
+Build-machine requirements:
+
+- a clean, complete, non-shallow Git worktree;
+- Windows x64;
+- .NET 10 SDK;
+- Python 3.12;
+- `uv`.
+
+Basic flow:
 
 ```powershell
 .\scripts\pre-release-check.ps1
@@ -316,21 +451,35 @@ $env:SIMPLYSIGN_SIGNING_CERTIFICATE_SERIAL = '<certificate serial>'
 .\scripts\build-release.ps1 -Version 0.1.0
 ```
 
-The release check requires a complete, non-shallow, clean Git worktree. The
-build produces and remotely signs the main Setup. It publishes the PDF Setup at
-the same version only when the fail-closed Git decision proves an effective PDF
-input changed since the unique nearest previous SemVer tag. A first release also
-builds PDF Setup. Test, documentation, or release-helper changes outside the PDF
-construction closure still run helper quality gates but skip PDF signing and
-packaging.
+The release script runs:
 
-The scripts do not commit, push, tag, or publish a remote Release. Signing
-credentials are supplied at runtime and must never be recorded in the
-repository, logs, or command line.
+- Python tests, ruff, and frozen-dependency verification;
+- NuGet locked restore and .NET tests;
+- two matching framework-dependent publishes;
+- SPDX SBOM, catalog, closure, and signature verification;
+- remote signing of the main Setup;
+- same-version PDF build and signing when effective PDF inputs changed.
+
+Public output is exactly one main Setup plus one PDF Setup when required for this
+release. The scripts do not commit, push, tag, or create a GitHub Release.
+
+Credential-free local wrapper:
+
+```powershell
+.\scripts\build-local-signed-release.ps1 `
+  -Version <version> `
+  -SigningBaseUrl 'http://signing-host.internal:7080' `
+  -BearerTokenPath 'C:\BuildSecrets\simplysign-token.txt' `
+  -SigningReferencePath 'C:\BuildSecrets\SimplySignAuto-reference.exe' `
+  -DotnetRoot 'C:\Program Files\dotnet' `
+  -UvPath '<path-to-uv.exe>'
+```
+
+The Bearer token must enter release subprocesses only through a protected file or
+process environment. Never record it in the repository, command line, or logs.
 
 ## License
 
-SimplySignAuto is licensed under the [MIT License](LICENSE). Component copyright
-notices and complete dependency license texts are in
-[THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt). Every published installer
-embeds both documents.
+SimplySignAuto uses the [MIT License](LICENSE). Complete third-party copyright and
+license texts are in [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt). Both files
+are embedded in every released installer.
