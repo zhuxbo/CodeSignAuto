@@ -469,6 +469,83 @@ public sealed class UninstallSafetyTests
         }
     }
 
+    [WindowsAdministratorFact]
+    public void Windows_manual_activation_removal_refuses_unsafe_targets_without_deleting_them()
+    {
+        foreach (var mismatch in new[] { "reparse", "hardlink", "owner-acl" })
+        {
+            var root = Path.Combine(
+                Path.GetTempPath(),
+                "SimplySignAuto.ActivationUninstall",
+                Guid.NewGuid().ToString("N"));
+            var otpPath = Path.Combine(root, "otp.dat");
+            var externalPath = Path.Combine(
+                Path.GetTempPath(),
+                $"ssa-activation-external-{Guid.NewGuid():N}.dat");
+            Directory.CreateDirectory(root);
+            try
+            {
+                using var identity = WindowsIdentity.GetCurrent();
+                var signingUser = Assert.IsType<SecurityIdentifier>(identity.User);
+                if (mismatch == "reparse")
+                {
+                    File.WriteAllText(externalPath, "credential");
+                    File.CreateSymbolicLink(otpPath, externalPath);
+                }
+                else
+                {
+                    using (var stream = WindowsCurrentUserProtectedFile.CreateNew(otpPath))
+                    {
+                        stream.Write("credential"u8);
+                    }
+
+                    if (mismatch == "hardlink")
+                    {
+                        Assert.True(CreateHardLinkW(externalPath, otpPath, nint.Zero));
+                    }
+                    else
+                    {
+                        WindowsInstallAcl.ApplyFile(
+                            otpPath,
+                            InstallAclProfile.SigningUserRead,
+                            signingUser);
+                    }
+                }
+
+                var action = new RemoveOwnedManualActivation(otpPath, root, signingUser.Value);
+                var verify = Assert.Throws<InstallException>(
+                    () => WindowsManualActivationCredential.VerifyExact(action));
+                var remove = Assert.Throws<InstallException>(
+                    () => WindowsManualActivationCredential.RemoveExact(action));
+
+                Assert.Equal("owned_resource_mismatch", verify.Code);
+                Assert.Equal("uninstall_state_uncertain", remove.Code);
+                Assert.Equal("credential", File.ReadAllText(otpPath));
+                if (mismatch == "hardlink")
+                {
+                    Assert.Equal("credential", File.ReadAllText(externalPath));
+                }
+            }
+            finally
+            {
+                if (File.Exists(otpPath) || WindowsPathSafety.IsReparse(otpPath))
+                {
+                    File.Delete(otpPath);
+                }
+
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, recursive: false);
+                }
+
+                if (File.Exists(externalPath))
+                {
+                    File.Delete(externalPath);
+                }
+            }
+        }
+    }
+
     [Theory]
     [InlineData("S-1-5-21-1000-2000-3000-4000", FileAttributes.Directory, true)]
     [InlineData("S-1-5-32-544", FileAttributes.Directory, true)]

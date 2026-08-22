@@ -62,6 +62,22 @@ public sealed class SetupLocalizationTests
             File.WriteAllText(Path.Combine(root, "install.json"), """
                 {
                   "schemaVersion": 1,
+                  "mode": "manual",
+                  "installInstanceId": "0123456789abcdef0123456789abcdef",
+                  "signingUserSid": "S-1-5-21-1000-2000-3000-4000",
+                  "executablePath": "C:\\Program Files\\SimplySignAuto\\SimplySignAuto.exe"
+                }
+                """);
+            var manual = SetupInstallationDiscovery.Resolve(
+                SetupProductKind.Main,
+                root,
+                () => throw new InvalidOperationException("installed mode must win"));
+            Assert.Equal(SetupInstallationMode.Manual, manual!.Mode);
+            Assert.False(manual.CanChange);
+
+            File.WriteAllText(Path.Combine(root, "install.json"), """
+                {
+                  "schemaVersion": 1,
                   "mode": "service",
                   "installInstanceId": "0123456789abcdef0123456789abcdef",
                   "signingUserSid": "S-1-5-21-1000-2000-3000-4000",
