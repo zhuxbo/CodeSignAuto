@@ -21,6 +21,18 @@ public sealed class PdfReleaseDecisionTests
     }
 
     [WindowsFact]
+    public void Multiple_git_applications_use_the_first_resolved_command()
+    {
+        using var fixture = DecisionFixture.Create();
+        fixture.Commit("initial");
+
+        var decision = fixture.DecideWithSecondGitApplication("1.0.0");
+
+        Assert.True(decision.ReleasePdf);
+        Assert.Equal("first_release", decision.Reason);
+    }
+
+    [WindowsFact]
     public void Unchanged_pdf_inputs_skip_pdf_extension()
     {
         using var fixture = DecisionFixture.Create();
@@ -258,9 +270,38 @@ public sealed class PdfReleaseDecisionTests
 
         public void Tag(string tag) => Git("tag", tag);
 
-        public Decision Decide(string version)
+        public Decision Decide(string version) => ReadDecision(RunDecision(version));
+
+        public Decision DecideWithSecondGitApplication(string version)
         {
-            var result = RunDecision(version);
+            var located = RunProcess("where.exe", Root, "git.exe");
+            Assert.Equal(0, located.ExitCode);
+            var gitPath = located.StandardOutput
+                .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+                .First(File.Exists);
+            var shadowRoot = Path.Combine(
+                Path.GetTempPath(),
+                $"simplysign-pdf-git-shadow-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(shadowRoot);
+            try
+            {
+                File.Copy(gitPath, Path.Combine(shadowRoot, "git.exe"));
+                var originalPath = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
+                var path = string.Join(
+                    Path.PathSeparator,
+                    Path.GetDirectoryName(gitPath)!,
+                    shadowRoot,
+                    originalPath);
+                return ReadDecision(RunDecision(version, path));
+            }
+            finally
+            {
+                DeleteGitTree(shadowRoot);
+            }
+        }
+
+        private static Decision ReadDecision(ProcessResult result)
+        {
             Assert.True(
                 result.ExitCode == 0,
                 $"decision_exit_{result.ExitCode}: {result.StandardError}");
@@ -279,20 +320,27 @@ public sealed class PdfReleaseDecisionTests
                     .ToArray());
         }
 
-        public ProcessResult RunDecision(string version) => RunProcess(
-            "powershell.exe",
-            Root,
-            "-NoLogo",
-            "-NoProfile",
-            "-NonInteractive",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-File",
-            Path.Combine(FindRepositoryRoot(), "scripts", "get-pdf-release-decision.ps1"),
-            "-RepositoryRoot",
-            Root,
-            "-Version",
-            version);
+        public ProcessResult RunDecision(string version, string? path = null)
+        {
+            var environment = path is null
+                ? null
+                : new Dictionary<string, string> { ["PATH"] = path };
+            return RunProcess(
+                "powershell.exe",
+                Root,
+                environment,
+                "-NoLogo",
+                "-NoProfile",
+                "-NonInteractive",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                Path.Combine(FindRepositoryRoot(), "scripts", "get-pdf-release-decision.ps1"),
+                "-RepositoryRoot",
+                Root,
+                "-Version",
+                version);
+        }
 
         public void Dispose()
         {
@@ -333,6 +381,13 @@ public sealed class PdfReleaseDecisionTests
     private static ProcessResult RunProcess(
         string fileName,
         string workingDirectory,
+        params string[] arguments) =>
+        RunProcess(fileName, workingDirectory, environment: null, arguments);
+
+    private static ProcessResult RunProcess(
+        string fileName,
+        string workingDirectory,
+        IReadOnlyDictionary<string, string>? environment,
         params string[] arguments)
     {
         var startInfo = new ProcessStartInfo(fileName)
@@ -343,6 +398,13 @@ public sealed class PdfReleaseDecisionTests
             RedirectStandardError = true,
             CreateNoWindow = true
         };
+        if (environment is not null)
+        {
+            foreach (var (key, value) in environment)
+            {
+                startInfo.Environment[key] = value;
+            }
+        }
         foreach (var argument in arguments)
         {
             startInfo.ArgumentList.Add(argument);

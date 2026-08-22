@@ -79,7 +79,12 @@ function Get-PdfReleaseDecision {
         Fail-PdfReleaseDecision 'pdf_release_repository_invalid'
     }
 
-    $git = (Get-Command git.exe -CommandType Application -ErrorAction Stop).Path
+    $gitCommands = @(Get-Command git.exe -CommandType Application -ErrorAction Stop)
+    if ($gitCommands.Count -eq 0 -or
+        [string]::IsNullOrWhiteSpace([string]$gitCommands[0].Path)) {
+        Fail-PdfReleaseDecision 'pdf_release_git_failed'
+    }
+    $git = [string]$gitCommands[0].Path
     $insideWorkTree = Invoke-PdfReleaseGit `
         -Git $git `
         -Root $root `
