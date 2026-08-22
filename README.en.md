@@ -34,10 +34,11 @@ Authenticode capability is unaffected.
 
 ## Two fixed installation modes
 
-You must select one mode during the first installation. Windows clients default
-to Manual signing; Windows Server defaults to Automatic signing service. The
-mode is fixed after installation and inherited by upgrades. To switch modes,
-uninstall and reinstall the product.
+You must select one mode during the first installation. All supported Windows
+clients and Windows Server editions default to Manual signing; select Automatic
+signing service when a server requires unattended signing. The mode is fixed
+after installation and inherited by upgrades. To switch modes, uninstall and
+reinstall the product.
 
 - **Manual signing** is intended for a Windows 10/11 administrator who opens the
   app and submits local signing jobs on demand. It creates no Windows Service,

@@ -47,8 +47,7 @@ internal static class SetupModeSelection
 {
     public static SetupInstallationMode ResolveDefault(byte productType) => productType switch
     {
-        1 => SetupInstallationMode.Manual,
-        2 or 3 => SetupInstallationMode.Service,
+        1 or 2 or 3 => SetupInstallationMode.Manual,
         _ => throw new SetupBootstrapperException("os_unsupported"),
     };
 }

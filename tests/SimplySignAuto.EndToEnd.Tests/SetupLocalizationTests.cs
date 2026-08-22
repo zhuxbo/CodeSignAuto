@@ -36,9 +36,9 @@ public sealed class SetupLocalizationTests
 
     [Theory]
     [InlineData(1, "Manual")]
-    [InlineData(2, "Service")]
-    [InlineData(3, "Service")]
-    public void Fresh_client_defaults_to_manual_and_server_defaults_to_service(
+    [InlineData(2, "Manual")]
+    [InlineData(3, "Manual")]
+    public void Fresh_install_defaults_to_manual_on_client_and_server(
         byte productType,
         string expected)
     {
