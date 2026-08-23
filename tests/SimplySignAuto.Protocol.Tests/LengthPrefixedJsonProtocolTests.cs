@@ -23,6 +23,7 @@ public sealed class LengthPrefixedJsonProtocolTests
     [InlineData("certificate_not_found")]
     [InlineData("certificate_serial_ambiguous")]
     [InlineData("certificate_not_usable")]
+    [InlineData("pdf_appearance_font_missing")]
     public async Task Job_failed_round_trips_every_certificate_catalog_error_code(string errorCode)
     {
         var expected = new JobFailed(Guid.NewGuid(), Guid.NewGuid(), errorCode, "catalog failure");

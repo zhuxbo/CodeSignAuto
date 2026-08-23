@@ -1563,7 +1563,7 @@ public sealed class UninstallSafetyTests
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe"),
             command);
         Assert.Contains(
-            $"\"{installedExecutable}\" purge-quarantine --manifest \"{manifestPath}\"",
+            $"start \"\" /wait /b \"{installedExecutable}\" purge-quarantine --manifest \"{manifestPath}\"",
             arguments,
             StringComparison.Ordinal);
         Assert.Contains($"&& del /f /q \"{installedExecutable}\"", arguments, StringComparison.Ordinal);

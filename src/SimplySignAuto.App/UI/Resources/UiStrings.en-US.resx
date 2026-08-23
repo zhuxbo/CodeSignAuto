@@ -302,4 +302,19 @@
   <data name="NotificationKindSoftware" xml:space="preserve"><value>software</value></data>
   <data name="ConfirmRelogin" xml:space="preserve"><value>SimplySign is running in another Windows session. Continue by closing it there and logging in in the current session?</value></data>
   <data name="ConfirmClearActivation" xml:space="preserve"><value>This logs out of SimplySign and permanently deletes the saved TOTP activation data on this computer. Continue?</value></data>
+  <data name="UninstallTitle" xml:space="preserve"><value>Uninstall SimplySignAuto</value></data>
+  <data name="PdfUninstallTitle" xml:space="preserve"><value>Uninstall SimplySignAuto PDF Support</value></data>
+  <data name="ManualUninstallDescription" xml:space="preserve"><value>Safely removes SimplySignAuto and its owned system configuration. Job history and signed results will be preserved.</value></data>
+  <data name="ServiceUninstallDescription" xml:space="preserve"><value>Safely removes SimplySignAuto, its owned system configuration, and controlled data, including job history and signed results.</value></data>
+  <data name="PdfUninstallDescription" xml:space="preserve"><value>Removes the optional PDF signing component without affecting the main application or code signing.</value></data>
+  <data name="UninstallReady" xml:space="preserve"><value>Select Uninstall to begin. Do not shut down the computer during removal.</value></data>
+  <data name="UninstallAction" xml:space="preserve"><value>Uninstall</value></data>
+  <data name="UninstallRunning" xml:space="preserve"><value>Verifying the installation and safely removing the application…</value></data>
+  <data name="UninstallComplete" xml:space="preserve"><value>Uninstall completed. Job history and signed results were preserved.</value></data>
+  <data name="UninstallCompleteRestart" xml:space="preserve"><value>The main uninstall completed. Restart Windows to finish physical cleanup of program files and scheduled data.</value></data>
+  <data name="PdfUninstallComplete" xml:space="preserve"><value>PDF signing support was removed. The main application and code signing were not affected.</value></data>
+  <data name="UninstallErrorBusy" xml:space="preserve"><value>Another install or uninstall operation is in progress. Try again later.</value></data>
+  <data name="UninstallErrorState" xml:space="preserve"><value>The installation state changed and cannot be removed safely. Reinstall the current version, then try again.</value></data>
+  <data name="UninstallErrorGeneric" xml:space="preserve"><value>Uninstall did not complete. Restart Windows and try again. If it still fails, record the error code.</value></data>
+  <data name="UninstallErrorCode" xml:space="preserve"><value>Error code: {0}</value></data>
 </root>

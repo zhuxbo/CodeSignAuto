@@ -96,12 +96,48 @@ public sealed class DesktopApplicationCompositionTests
     }
 
     [Fact]
-    public void Desktop_entries_detach_from_the_console_while_cli_entries_keep_it()
+    public void Only_foreground_command_entries_attach_to_the_parent_console()
     {
-        Assert.True(Program.ShouldDetachConsole(ApplicationEntryRoute.Parse([])));
-        Assert.True(Program.ShouldDetachConsole(ApplicationEntryRoute.Parse(["agent", "--background"])));
-        Assert.False(Program.ShouldDetachConsole(ApplicationEntryRoute.Parse(["agent", "--console"])));
-        Assert.False(Program.ShouldDetachConsole(ApplicationEntryRoute.Parse(["--version"])));
+        Assert.False(Program.ShouldAttachParentConsole(ApplicationEntryRoute.Parse([])));
+        Assert.False(Program.ShouldAttachParentConsole(
+            ApplicationEntryRoute.Parse(["agent", "--background"])));
+        Assert.False(Program.ShouldAttachParentConsole(
+            ApplicationEntryRoute.Parse(["service"])));
+        Assert.False(Program.ShouldAttachParentConsole(
+            ApplicationEntryRoute.Parse(["uninstall", "--ui"])));
+        Assert.True(Program.ShouldAttachParentConsole(
+            ApplicationEntryRoute.Parse(["agent", "--console"])));
+        Assert.True(Program.ShouldAttachParentConsole(
+            ApplicationEntryRoute.Parse(["service", "--console"])));
+        Assert.True(Program.ShouldAttachParentConsole(
+            ApplicationEntryRoute.Parse(["--version"])));
+        Assert.True(Program.ShouldAttachParentConsole(
+            ApplicationEntryRoute.Parse(["uninstall"])));
+    }
+
+    [Fact]
+    public void Uninstall_without_a_console_uses_UI_but_redirected_or_console_calls_stay_noninteractive()
+    {
+        Assert.True(Program.ShouldUseGraphicalUninstall(
+            ApplicationEntryRoute.Parse(["uninstall"]),
+            standardIoAvailable: false));
+        Assert.False(Program.ShouldUseGraphicalUninstall(
+            ApplicationEntryRoute.Parse(["uninstall"]),
+            standardIoAvailable: true));
+        Assert.True(Program.ShouldUseGraphicalUninstall(
+            ApplicationEntryRoute.Parse(["uninstall", "--ui"]),
+            standardIoAvailable: true));
+        Assert.True(Program.ShouldUseGraphicalUninstall(
+            ApplicationEntryRoute.Parse(["pdf-extension", "uninstall"]),
+            standardIoAvailable: false));
+        Assert.False(Program.ShouldUseGraphicalUninstall(
+            ApplicationEntryRoute.Parse([
+                "uninstall", "--purge-data", "--confirm", "PURGE"]),
+            standardIoAvailable: false));
+        Assert.False(Program.ShouldUseGraphicalUninstall(
+            ApplicationEntryRoute.Parse([
+                "pdf-extension", "install", "--media-root", @"C:\setup\pdf"]),
+            standardIoAvailable: false));
     }
 
     [Fact]

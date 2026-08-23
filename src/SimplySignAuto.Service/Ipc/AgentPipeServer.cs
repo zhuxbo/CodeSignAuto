@@ -163,7 +163,8 @@ public sealed class AgentPipeServer :
 {
     public const string PipeName = "SimplySignAuto.Agent.v2";
     public static readonly TimeSpan HeartbeatTimeout = TimeSpan.FromSeconds(15);
-    public static readonly TimeSpan ControlTimeout = TimeSpan.FromSeconds(65);
+    // The Agent owns a 100s relogin budget; keep transport cancellation outside it.
+    public static readonly TimeSpan ControlTimeout = TimeSpan.FromSeconds(105);
 
     private readonly object _sync = new();
     private readonly string _signingUserSid;

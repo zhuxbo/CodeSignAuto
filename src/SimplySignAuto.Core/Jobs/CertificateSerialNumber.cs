@@ -10,12 +10,10 @@ public static class CertificateSerialNumber
             return false;
         }
 
-        var hasDigit = false;
         foreach (var character in value)
         {
             if (character is >= '0' and <= '9')
             {
-                hasDigit = true;
                 continue;
             }
 
@@ -24,11 +22,6 @@ public static class CertificateSerialNumber
                 continue;
             }
 
-            return false;
-        }
-
-        if (!hasDigit)
-        {
             return false;
         }
 

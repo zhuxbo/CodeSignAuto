@@ -497,7 +497,7 @@ public sealed class PdfSigner : IPdfSigner
             "private_key_missing" or "certificate_invalid" or "pkcs11_unavailable" or
             "pkcs11_session_lost" => exitCode == 10,
         "pdf_validation_failed" => exitCode == 30,
-        "input_modified" or "pdf_sign_failed" => exitCode == 20,
+        "input_modified" or "pdf_sign_failed" or "pdf_appearance_font_missing" => exitCode == 20,
         _ => exitCode is not null and not 0,
     };
 
@@ -510,6 +510,7 @@ public sealed class PdfSigner : IPdfSigner
         "input_modified" => "input_corrupt",
         "pdf_validation_failed" => "pdf_verify_failed",
         "pdf_sign_failed" => "pdf_sign_failed",
+        "pdf_appearance_font_missing" => "pdf_appearance_font_missing",
         _ => "internal_error",
     };
 

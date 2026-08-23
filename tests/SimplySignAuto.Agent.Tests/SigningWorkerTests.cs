@@ -431,6 +431,7 @@ public sealed class SigningWorkerTests
     [InlineData("authenticode_signature_enumeration_failed", "authenticode_verify_failed")]
     [InlineData("pkcs11_unavailable", "internal_error")]
     [InlineData("private_key_missing", "private_key_missing")]
+    [InlineData("pdf_appearance_font_missing", "pdf_appearance_font_missing")]
     public async Task Sanitizes_signer_error_to_protocol_allowlist(string signerCode, string expectedCode)
     {
         using var fixture = new Fixture();

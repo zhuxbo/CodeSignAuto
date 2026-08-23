@@ -269,6 +269,22 @@ public sealed class ManagementSnapshotTests
     }
 
     [Fact]
+    public void Snapshot_accepts_pdf_appearance_font_missing_as_a_terminal_error()
+    {
+        var recent = new[]
+        {
+            new RecentJobSnapshot(
+                Guid.Parse("00000000-0000-0000-0000-000000000001"),
+                "pdf",
+                "failed",
+                new DateTimeOffset(2026, 8, 8, 0, 0, 0, TimeSpan.Zero),
+                "pdf_appearance_font_missing"),
+        };
+
+        Assert.Equal("pdf_appearance_font_missing", Assert.Single(CreateSnapshot(recent).RecentJobs).ErrorCode);
+    }
+
+    [Fact]
     public void Unconfigured_capability_cannot_claim_token_certificate_key_or_readiness()
     {
         Assert.Throws<ArgumentException>(() => new CapabilitySnapshot(

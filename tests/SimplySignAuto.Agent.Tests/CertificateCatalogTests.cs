@@ -44,6 +44,24 @@ public sealed class CertificateCatalogTests : IDisposable
     }
 
     [Fact]
+    public async Task Refresh_accepts_a_valid_serial_containing_only_hexadecimal_letters()
+    {
+        var der = CreateCertificate(
+            "CN=Letters Only Serial",
+            [0xAB, 0xCD],
+            Now.AddDays(-1),
+            Now.AddDays(30),
+            codeSigning: true,
+            digitalSignature: true);
+        var catalog = CreateCatalog(new CatalogSource(CatalogJson(Record(der))));
+
+        var snapshot = await catalog.RefreshAsync(default);
+
+        Assert.Equal("ABCD", Assert.Single(snapshot.BySerialNumber).Key);
+        Assert.Equal("ABCD", Assert.Single(catalog.DisplaySummaries).SerialNumber);
+    }
+
+    [Fact]
     public async Task Missing_or_multiple_exact_cn_uses_stable_display_value_without_hiding_certificate()
     {
         var missing = CreateCertificate(

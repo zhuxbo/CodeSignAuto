@@ -10,6 +10,14 @@ namespace SimplySignAuto.Service.Tests;
 
 public sealed class AgentPipeIdentityTests
 {
+    [Fact]
+    public void Control_timeouts_cover_relogin_and_preserve_outer_transport_margin()
+    {
+        Assert.Equal(TimeSpan.FromSeconds(105), AgentPipeServer.ControlTimeout);
+        Assert.Equal(TimeSpan.FromSeconds(110), AdminControlPipeServer.ManagementDispatchTimeout);
+        Assert.True(AdminControlPipeServer.ManagementDispatchTimeout > AgentPipeServer.ControlTimeout);
+    }
+
     private const string AllowedSid = "S-1-5-21-1000";
 
     [Fact]

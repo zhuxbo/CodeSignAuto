@@ -241,7 +241,7 @@ curl --fail-with-body \
 - 证书：`certificate_catalog_unavailable`、`certificate_not_found`、`certificate_serial_ambiguous`、`certificate_not_usable`。
 - SimplySign：`otp_missing`、`clock_not_synchronized`、`simplysign_login_failed`、`token_missing`、`certificate_missing`、`private_key_missing`、`pkcs11_session_lost`。
 - Authenticode：`signtool_missing`、`invalid_signable_file`、`already_signed`、`authenticode_sign_failed`、`authenticode_verify_failed`。
-- PDF：`pdf_support_not_installed`、`pdf_helper_tampered`、`pdf_invalid`、`pdf_sign_failed`、`pdf_verify_failed`。
+- PDF：`pdf_support_not_installed`、`pdf_helper_tampered`、`pdf_invalid`、`pdf_sign_failed`、`pdf_appearance_font_missing`、`pdf_verify_failed`。
 - 服务：`spool_write_failed`、`input_corrupt`、`service_unavailable`、`internal_error`。
 
 入队前已能确认的 `certificate_not_found`、`certificate_serial_ambiguous` 和

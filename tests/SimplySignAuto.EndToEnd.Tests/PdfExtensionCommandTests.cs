@@ -189,6 +189,23 @@ public sealed class PdfExtensionCommandTests
         Assert.Equal("pdf_extension_elevation_failed", error.ToString().Trim());
     }
 
+    [WindowsFact]
+    public void Graphical_PDF_uninstall_elevation_preserves_the_UI_marker()
+    {
+        var launcher = new RecordingElevationLauncher(exitCode: 0);
+
+        var exitCode = PdfExtensionElevation.RelaunchElevatedAndWait(
+            @"C:\Program Files\SimplySignAuto\SimplySignAuto.exe",
+            ["uninstall"],
+            TextWriter.Null,
+            launcher,
+            graphical: true);
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal(["pdf-extension", "uninstall", "--ui"], launcher.Arguments);
+        Assert.Equal("runas", launcher.Verb);
+    }
+
     [WindowsAdministratorFact]
     public async Task Windows_installer_publishes_the_exact_tree_before_registration()
     {

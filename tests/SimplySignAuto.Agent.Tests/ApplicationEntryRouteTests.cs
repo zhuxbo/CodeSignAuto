@@ -51,4 +51,25 @@ public sealed class ApplicationEntryRouteTests
             ApplicationEntryKind.Invalid,
             ApplicationEntryRoute.Parse(["pdf-extension", "uninstall", "extra"]).Kind);
     }
+
+    [Fact]
+    public void Graphical_uninstall_marker_is_accepted_only_for_uninstall_entries()
+    {
+        var main = ApplicationEntryRoute.Parse(["uninstall", "--ui"]);
+        var pdf = ApplicationEntryRoute.Parse(["pdf-extension", "uninstall", "--ui"]);
+
+        Assert.Equal(ApplicationEntryKind.Uninstall, main.Kind);
+        Assert.Empty(main.Arguments);
+        Assert.True(main.ShowInitially);
+        Assert.Equal(ApplicationEntryKind.PdfExtension, pdf.Kind);
+        Assert.Equal(["uninstall"], pdf.Arguments);
+        Assert.True(pdf.ShowInitially);
+
+        Assert.Equal(
+            ApplicationEntryKind.Invalid,
+            ApplicationEntryRoute.Parse(["uninstall", "--ui", "extra"]).Kind);
+        Assert.Equal(
+            ApplicationEntryKind.Invalid,
+            ApplicationEntryRoute.Parse(["pdf-extension", "install", "--ui"]).Kind);
+    }
 }

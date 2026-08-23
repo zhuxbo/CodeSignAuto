@@ -373,8 +373,14 @@ API tokens exist only in Service mode and can be rotated under Service Settings.
 
 Prefer Windows **Settings → Apps → Installed apps**, or run:
 
+Windows Settings shows localized uninstall progress, results, and restart guidance without opening
+a command window. From PowerShell, use a wait-style invocation to keep stable output and error codes
+in the current terminal for administration and troubleshooting:
+
 ```powershell
-& 'C:\Program Files\SimplySignAuto\SimplySignAuto.exe' uninstall
+$process = Start-Process -FilePath 'C:\Program Files\SimplySignAuto\SimplySignAuto.exe' `
+  -ArgumentList 'uninstall' -NoNewWindow -Wait -PassThru
+$process.ExitCode
 ```
 
 The PDF extension has a separate uninstall entry. Removing it does not affect the
@@ -385,12 +391,16 @@ Manual uninstall:
 
 - removes the application, shortcut, receipt, and uninstall registration;
 - removes the DPAPI activation saved by this product for the current administrator;
-- preserves job history and signed results by default.
+- preserves job history and signed results by default;
+- requires a Windows restart to finish physical cleanup of the program files.
 
 Only this explicit command removes the controlled data directory:
 
 ```powershell
-& 'C:\Program Files\SimplySignAuto\SimplySignAuto.exe' uninstall --purge-data --confirm PURGE
+$process = Start-Process -FilePath 'C:\Program Files\SimplySignAuto\SimplySignAuto.exe' `
+  -ArgumentList 'uninstall', '--purge-data', '--confirm', 'PURGE' `
+  -NoNewWindow -Wait -PassThru
+$process.ExitCode
 ```
 
 Service uninstall:

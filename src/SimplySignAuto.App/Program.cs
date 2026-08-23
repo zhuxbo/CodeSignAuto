@@ -1,5 +1,3 @@
-using System.Runtime.InteropServices;
-using System.Runtime.Versioning;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
@@ -18,11 +16,26 @@ namespace SimplySignAuto.App;
 internal static class Program
 {
     [STAThread]
-    public static int Main(string[] args) => RunAsync(args).GetAwaiter().GetResult();
+    public static int Main(string[] args)
+    {
+        var route = ApplicationEntryRoute.Parse(args);
+        var standardIoAvailable = WindowsStandardIo.Prepare(
+            ShouldAttachParentConsole(route));
+        return RunAsync(route, standardIoAvailable).GetAwaiter().GetResult();
+    }
 
     internal static async Task<int> RunAsync(string[] args, CancellationToken cancellationToken = default)
     {
         var route = ApplicationEntryRoute.Parse(args);
+        return await RunAsync(route, standardIoAvailable: true, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private static async Task<int> RunAsync(
+        ApplicationEntryRoute route,
+        bool standardIoAvailable,
+        CancellationToken cancellationToken = default)
+    {
         switch (route.Kind)
         {
             case ApplicationEntryKind.Pkcs11Helper:
@@ -51,11 +64,6 @@ internal static class Program
                     return 1;
                 }
 
-                if (ShouldDetachConsole(route))
-                {
-                    DetachDesktopConsole();
-                }
-
                 using var diagnostics = DesktopDiagnosticLog.Open();
                 return await RunInstalledDesktopAsync(
                     route.ShowInitially,
@@ -74,11 +82,6 @@ internal static class Program
             {
                 if (route.Arguments is ["--background"])
                 {
-                    if (ShouldDetachConsole(route))
-                    {
-                        DetachConsole();
-                    }
-
                     using var diagnostics = DesktopDiagnosticLog.Open();
                     return await AgentCommand.ExecuteAsync(
                         route.Arguments,
@@ -137,28 +140,48 @@ internal static class Program
                     Console.Error,
                     cancellationToken);
             case ApplicationEntryKind.Uninstall:
+                var graphicalUninstall = ShouldUseGraphicalUninstall(
+                    route,
+                    standardIoAvailable);
                 if (!AdminDesktopElevation.IsElevated())
                 {
                     return UninstallElevation.RelaunchElevatedAndWait(
                         Environment.ProcessPath,
                         route.Arguments,
-                        Console.Error);
+                        Console.Error,
+                        graphical: graphicalUninstall);
                 }
 
+#if SIMPLYSIGN_WPF
+                if (graphicalUninstall)
+                {
+                    return GraphicalUninstallHost.RunMain(cancellationToken);
+                }
+#endif
                 return await UninstallCommand.ExecuteAsync(
                     route.Arguments,
                     Console.Out,
                     Console.Error,
                     cancellationToken);
             case ApplicationEntryKind.PdfExtension:
+                var graphicalPdfUninstall = ShouldUseGraphicalUninstall(
+                    route,
+                    standardIoAvailable);
                 if (!AdminDesktopElevation.IsElevated())
                 {
                     return PdfExtensionElevation.RelaunchElevatedAndWait(
                         Environment.ProcessPath,
                         route.Arguments,
-                        Console.Error);
+                        Console.Error,
+                        graphical: graphicalPdfUninstall);
                 }
 
+#if SIMPLYSIGN_WPF
+                if (graphicalPdfUninstall)
+                {
+                    return GraphicalUninstallHost.RunPdfExtension(cancellationToken);
+                }
+#endif
                 return await PdfExtensionCommand.ExecuteAsync(
                     route.Arguments,
                     Console.Out,
@@ -215,9 +238,37 @@ internal static class Program
         }
     }
 
-    internal static bool ShouldDetachConsole(ApplicationEntryRoute route) =>
-        route.Kind == ApplicationEntryKind.Desktop ||
-        route is { Kind: ApplicationEntryKind.AgentConsole, Arguments: ["--background"] };
+    internal static bool ShouldAttachParentConsole(ApplicationEntryRoute route)
+    {
+        ArgumentNullException.ThrowIfNull(route);
+        if (route.ShowInitially &&
+            (route.Kind == ApplicationEntryKind.Uninstall ||
+             route is { Kind: ApplicationEntryKind.PdfExtension, Arguments: ["uninstall"] }))
+        {
+            return false;
+        }
+
+        return route.Kind switch
+        {
+            ApplicationEntryKind.Desktop or ApplicationEntryKind.UiTest or
+                ApplicationEntryKind.Pkcs11Helper => false,
+            ApplicationEntryKind.AgentConsole => route.Arguments is not ["--background"],
+            ApplicationEntryKind.Service => route.Arguments.Contains(
+                "--console",
+                StringComparer.Ordinal),
+            _ => true,
+        };
+    }
+
+    internal static bool ShouldUseGraphicalUninstall(
+        ApplicationEntryRoute route,
+        bool standardIoAvailable)
+    {
+        ArgumentNullException.ThrowIfNull(route);
+        var defaultUninstall = route is { Kind: ApplicationEntryKind.Uninstall, Arguments.Length: 0 } ||
+            route is { Kind: ApplicationEntryKind.PdfExtension, Arguments: ["uninstall"] };
+        return defaultUninstall && (route.ShowInitially || !standardIoAvailable);
+    }
 
     internal static InstallationMode ResolveDesktopMode(InstallationReceipt? receipt) =>
         receipt is null
@@ -305,23 +356,6 @@ internal static class Program
             ? StringComparison.OrdinalIgnoreCase
             : StringComparison.Ordinal;
 
-    private static void DetachDesktopConsole() => DetachConsole();
-
-    private static void DetachConsole()
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            _ = FreeConsole();
-            Console.SetIn(TextReader.Null);
-            Console.SetOut(TextWriter.Null);
-            Console.SetError(TextWriter.Null);
-        }
-    }
-
-    [DllImport("kernel32.dll")]
-    [SupportedOSPlatform("windows")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool FreeConsole();
 }
 
 internal static class PdfExtensionElevation
@@ -330,14 +364,17 @@ internal static class PdfExtensionElevation
         string? executablePath,
         string[] arguments,
         TextWriter error,
-        IUninstallElevationLauncher? launcher = null)
+        IUninstallElevationLauncher? launcher = null,
+        bool graphical = false)
     {
         ArgumentNullException.ThrowIfNull(arguments);
         ArgumentNullException.ThrowIfNull(error);
-        var route = ApplicationEntryRoute.Parse(["pdf-extension", .. arguments]);
+        var routedArguments = graphical ? [.. arguments, "--ui"] : arguments;
+        var route = ApplicationEntryRoute.Parse(["pdf-extension", .. routedArguments]);
         if (string.IsNullOrWhiteSpace(executablePath) ||
             !Path.IsPathFullyQualified(executablePath) ||
             route.Kind != ApplicationEntryKind.PdfExtension ||
+            route.ShowInitially != graphical ||
             !route.Arguments.SequenceEqual(arguments, StringComparer.Ordinal))
         {
             error.WriteLine("pdf_extension_elevation_failed");
@@ -348,7 +385,7 @@ internal static class PdfExtensionElevation
         {
             return (launcher ?? new WindowsUninstallElevationLauncher()).LaunchAndWait(
                 Path.GetFullPath(executablePath),
-                ["pdf-extension", .. arguments],
+                ["pdf-extension", .. routedArguments],
                 "runas");
         }
         catch (Exception elevationError) when (
@@ -398,13 +435,16 @@ internal static class UninstallElevation
         string? executablePath,
         string[] arguments,
         TextWriter error,
-        IUninstallElevationLauncher? launcher = null)
+        IUninstallElevationLauncher? launcher = null,
+        bool graphical = false)
     {
         ArgumentNullException.ThrowIfNull(arguments);
         ArgumentNullException.ThrowIfNull(error);
         if (string.IsNullOrWhiteSpace(executablePath) ||
             !Path.IsPathFullyQualified(executablePath) ||
-            !UninstallCommand.TryParse(arguments, out _))
+            (graphical
+                ? arguments.Length != 0
+                : !UninstallCommand.TryParse(arguments, out _)))
         {
             error.WriteLine("uninstall_elevation_failed");
             return 1;
@@ -412,7 +452,9 @@ internal static class UninstallElevation
 
         try
         {
-            var elevatedArguments = new[] { "uninstall" }.Concat(arguments).ToArray();
+            var elevatedArguments = graphical
+                ? ["uninstall", "--ui"]
+                : new[] { "uninstall" }.Concat(arguments).ToArray();
             return (launcher ?? new WindowsUninstallElevationLauncher()).LaunchAndWait(
                 Path.GetFullPath(executablePath),
                 elevatedArguments,

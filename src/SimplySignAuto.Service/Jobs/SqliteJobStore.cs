@@ -12,6 +12,11 @@ public interface IJobStore
 {
     Task<Job> CreateAsync(Job job, string? apiPrincipal = null, string? idempotencyKey = null, CancellationToken cancellationToken = default);
 
+    Task<Job?> GetByIdempotencyKeyAsync(
+        string apiPrincipal,
+        string idempotencyKey,
+        CancellationToken cancellationToken = default) => Task.FromResult<Job?>(null);
+
     Task<Job?> GetAsync(Guid jobId, CancellationToken cancellationToken = default);
 
     Task CheckHealthAsync(CancellationToken cancellationToken = default) =>
@@ -306,6 +311,22 @@ public sealed class SqliteJobStore : IJobStore, ILocalUploadLeaseStore, IDisposa
 
             return existing;
         }
+    }
+
+    public async Task<Job?> GetByIdempotencyKeyAsync(
+        string apiPrincipal,
+        string idempotencyKey,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(apiPrincipal) || string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            throw new ArgumentException("Idempotency principal and key must be nonempty.");
+        }
+
+        var idempotencyHash = HashText($"{apiPrincipal}\n{idempotencyKey}");
+        await EnsureInitializedAsync(cancellationToken);
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        return await GetByIdempotencyHashAsync(connection, idempotencyHash, cancellationToken);
     }
 
     public async Task<Job?> GetAsync(Guid jobId, CancellationToken cancellationToken = default)

@@ -110,6 +110,38 @@ public sealed class QuickSignViewModelTests
     }
 
     [Fact]
+    public async Task Invalid_PDF_numeric_text_disables_submit_and_valid_text_uses_the_visible_values()
+    {
+        using var fixture = new Fixture();
+        var local = new RecordingLocalJobClient();
+        using var viewModel = new QuickSignViewModel(
+            local,
+            new MutableManagementClient(Snapshot(certificates:
+            [
+                Summary("Document", "6F09D233", authenticode: false, pdf: true),
+            ])),
+            _ => { });
+        await viewModel.SelectFileAsync(
+            fixture.Write("document.pdf", "%PDF-numeric-input"u8.ToArray()));
+
+        viewModel.PdfPage = "not-a-page";
+
+        Assert.False(viewModel.CanSubmit);
+
+        viewModel.PdfPage = "2";
+        viewModel.PdfLeft = "40.5";
+        viewModel.PdfBottom = "41.5";
+        viewModel.PdfRight = "200.5";
+        viewModel.PdfTop = "100.5";
+
+        Assert.True(viewModel.CanSubmit);
+        Assert.NotNull(await viewModel.SubmitAsync(default));
+        var parameters = Assert.IsType<PdfParameters>(local.Parameters);
+        Assert.Equal(2, parameters.Page);
+        Assert.Equal(new PdfBox(40.5, 41.5, 200.5, 100.5), parameters.Box);
+    }
+
+    [Fact]
     public async Task Quick_sign_requires_explicit_selection_when_multiple_are_usable()
     {
         using var fixture = new Fixture();
@@ -368,9 +400,11 @@ public sealed class QuickSignViewModelTests
     }
 
     [Theory]
-    [InlineData("failed")]
-    [InlineData("expired")]
-    public async Task Failed_or_expired_terminal_snapshot_releases_the_accepted_source(string terminalState)
+    [InlineData("failed", "internal_error")]
+    [InlineData("expired", "job_expired")]
+    public async Task Failed_or_expired_terminal_snapshot_updates_status_and_releases_the_accepted_source(
+        string terminalState,
+        string errorCode)
     {
         using var fixture = new Fixture();
         var source = fixture.Write("source.exe", "MZ-source"u8.ToArray());
@@ -390,11 +424,52 @@ public sealed class QuickSignViewModelTests
                 "authenticode",
                 terminalState,
                 new DateTimeOffset(2026, 8, 8, 0, 1, 0, TimeSpan.Zero),
-                "job_expired"),
+                errorCode),
         ]));
 
         Assert.Equal([local.JobId], local.ReleasedAcceptedSources);
         Assert.Null(viewModel.AcceptedJobId);
+        Assert.Equal(QuickSignState.Failed, viewModel.State);
+        Assert.Equal(errorCode, viewModel.ErrorCode);
+    }
+
+    [Fact]
+    public async Task Failed_terminal_feed_updates_status_and_releases_the_accepted_source()
+    {
+        using var fixture = new Fixture();
+        var local = new RecordingLocalJobClient();
+        var feed = new ControllableTerminalFeed();
+        using var viewModel = new QuickSignViewModel(
+            local,
+            new MutableManagementClient(Snapshot()),
+            _ => { },
+            dispatcher: null,
+            feed);
+        await viewModel.SelectFileAsync(fixture.Write("source.exe", "MZ-source"u8.ToArray()));
+        Assert.Equal(local.JobId, await viewModel.SubmitAsync(default));
+
+        feed.Publish(
+        [
+            new TerminalJobEventItem(
+                1,
+                new JobPageItem(
+                    local.JobId,
+                    "local",
+                    "authenticode",
+                    "failed",
+                    "source.exe",
+                    new DateTimeOffset(2026, 8, 8, 0, 0, 0, TimeSpan.Zero),
+                    new DateTimeOffset(2026, 8, 8, 0, 0, 30, TimeSpan.Zero),
+                    new DateTimeOffset(2026, 8, 8, 0, 1, 0, TimeSpan.Zero),
+                    "authenticode_sign_failed",
+                    Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                    false)),
+        ]);
+
+        Assert.Equal([local.JobId], local.ReleasedAcceptedSources);
+        Assert.Null(viewModel.AcceptedJobId);
+        Assert.Equal(QuickSignState.Failed, viewModel.State);
+        Assert.Equal("authenticode_sign_failed", viewModel.ErrorCode);
     }
 
     [Fact]
@@ -684,6 +759,25 @@ public sealed class QuickSignViewModelTests
         public void ReleaseSubmit() => _release.TrySetResult();
 
         public void ReleaseAcceptedSource(Guid jobId) => ReleasedAcceptedSources.Add(jobId);
+    }
+
+    private sealed class ControllableTerminalFeed : ITerminalJobFeed
+    {
+        public event EventHandler? ItemsChanged;
+
+        public IReadOnlyList<TerminalJobEventItem> Items { get; private set; } = [];
+
+        public bool HasCompletedInitialPoll => true;
+
+        public void Publish(IReadOnlyList<TerminalJobEventItem> items)
+        {
+            Items = items;
+            ItemsChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        public void Dispose()
+        {
+        }
     }
 
     private sealed class Fixture : IDisposable

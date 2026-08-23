@@ -748,7 +748,7 @@ public sealed class AgentManagementTests
     }
 
     [Fact]
-    public async Task Bridge_bounds_relogin_to_sixty_seconds_and_returns_only_stable_failure()
+    public async Task Bridge_applies_the_configured_relogin_deadline_and_returns_only_stable_failure()
     {
         var session = new FixedManagementSession(Snapshot()) { BlockRelogin = true };
         var bridge = new AgentManagementBridge(
@@ -762,6 +762,14 @@ public sealed class AgentManagementTests
         Assert.Equal("management_unavailable", error.Code);
         Assert.NotEqual(Guid.Empty, error.CorrelationId);
         Assert.Null(bridge.LatestSnapshot);
+    }
+
+    [Fact]
+    public void Bridge_accepts_the_full_relogin_budget()
+    {
+        using var bridge = new AgentManagementBridge(
+            refreshTimeout: TimeSpan.FromSeconds(15),
+            reloginTimeout: TimeSpan.FromSeconds(100));
     }
 
     [Fact]

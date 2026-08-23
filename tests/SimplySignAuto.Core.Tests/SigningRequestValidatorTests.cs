@@ -11,6 +11,8 @@ public sealed class SigningRequestValidatorTests
     [InlineData("0052A1B4C9", "52A1B4C9")]
     [InlineData("00001", "01")]
     [InlineData("00", "00")]
+    [InlineData("ABC", "0ABC")]
+    [InlineData("FACE", "FACE")]
     public void Certificate_serial_is_canonicalized(string input, string expected)
     {
         Assert.True(CertificateSerialNumber.TryNormalize(input, out var actual));
@@ -22,7 +24,6 @@ public sealed class SigningRequestValidatorTests
     [InlineData("0x52A1")]
     [InlineData("52-A1")]
     [InlineData("52:A1")]
-    [InlineData("ABC")]
     [InlineData("GG")]
     public void Invalid_certificate_serial_is_rejected(string input) =>
         Assert.False(CertificateSerialNumber.TryNormalize(input, out _));

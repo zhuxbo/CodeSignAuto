@@ -51,6 +51,8 @@ public sealed class SimplySignController : ISimplySignSessionDriver, IDisposable
     private static readonly TimeSpan CloseCommandTimeout = TimeSpan.FromSeconds(15);
     private static readonly TimeSpan CloseWaitTimeout = TimeSpan.FromSeconds(15);
     private static readonly TimeSpan ProbeInterval = TimeSpan.FromSeconds(1);
+    // The token is generated and submitted immediately inside this process; unlike a
+    // human-copied token, it has no external handoff or queueing delay. Keep this at 3s.
     private static readonly TimeSpan MinimumOtpLifetime = TimeSpan.FromSeconds(3);
 
     private readonly ISimplySignProbe _probe;

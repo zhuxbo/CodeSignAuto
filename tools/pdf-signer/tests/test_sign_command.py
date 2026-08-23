@@ -556,6 +556,21 @@ def test_sign_and_validation_failures_use_20_and_30_and_never_reuse_part(
     assert _failure_exit_code(sign_failed["failureCode"], "sign") == 20
     assert request.output_path.exists() is False
 
+    appearance_font_missing = sign_document(
+        request,
+        library_loader=library_loader,
+        sign_backend=lambda sign_request, active_session: (_ for _ in ()).throw(
+            RuntimeError("pdf_appearance_font_missing")
+        ),
+        validation_runner=lambda validation_request: {"ok": True, "failureCode": None},
+    )
+    assert appearance_font_missing == {
+        "ok": False,
+        "failureCode": "pdf_appearance_font_missing",
+    }
+    assert _failure_exit_code(appearance_font_missing["failureCode"], "sign") == 20
+    assert request.output_path.exists() is False
+
     validation_failed = sign_document(
         request,
         library_loader=library_loader,
@@ -771,7 +786,7 @@ def run_cli(*arguments: str) -> subprocess.CompletedProcess[str]:
 
 def test_cli_version_is_exact_and_other_shapes_are_rejected(tmp_path: Path) -> None:
     version = run_cli("--version")
-    assert (version.returncode, version.stdout, version.stderr) == (0, "0.1.0\n", "")
+    assert (version.returncode, version.stdout, version.stderr) == (0, "0.1.1\n", "")
 
     for arguments in [(), ("validate",), ("probe",), ("catalog",), ("sign", "--request")]:
         result = run_cli(*arguments)

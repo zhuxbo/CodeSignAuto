@@ -367,8 +367,13 @@ API token 只存在于服务模式，可在“服务设置”中轮换。
 
 优先从 Windows“设置 → 应用 → 已安装的应用”卸载，也可运行：
 
+从 Windows 设置启动卸载时会显示中英文卸载进度、结果和重启提示，不会弹出命令行窗口。
+从 PowerShell 启动时使用等待式调用，可在当前终端输出稳定结果和错误代码，便于管理员排障：
+
 ```powershell
-& 'C:\Program Files\SimplySignAuto\SimplySignAuto.exe' uninstall
+$process = Start-Process -FilePath 'C:\Program Files\SimplySignAuto\SimplySignAuto.exe' `
+  -ArgumentList 'uninstall' -NoNewWindow -Wait -PassThru
+$process.ExitCode
 ```
 
 PDF 扩展有独立卸载入口。卸载扩展不会影响主程序；卸载主程序时会先验证并移除
@@ -378,12 +383,16 @@ PDF 扩展有独立卸载入口。卸载扩展不会影响主程序；卸载主�
 
 - 删除程序、快捷方式、安装收据和卸载注册项；
 - 删除当前管理员由本产品保存的 DPAPI 激活凭证；
-- 默认保留任务历史和已签名结果。
+- 默认保留任务历史和已签名结果；
+- 成功后重启 Windows，完成程序文件的物理清理。
 
 只有显式运行以下命令才删除受控数据：
 
 ```powershell
-& 'C:\Program Files\SimplySignAuto\SimplySignAuto.exe' uninstall --purge-data --confirm PURGE
+$process = Start-Process -FilePath 'C:\Program Files\SimplySignAuto\SimplySignAuto.exe' `
+  -ArgumentList 'uninstall', '--purge-data', '--confirm', 'PURGE' `
+  -NoNewWindow -Wait -PassThru
+$process.ExitCode
 ```
 
 服务模式卸载：

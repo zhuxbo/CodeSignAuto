@@ -1044,6 +1044,29 @@ public sealed class InstallCommandTests
     }
 
     [Fact]
+    public void Graphical_uninstall_elevation_preserves_the_UI_marker()
+    {
+        var launcher = new RecordingUninstallElevationLauncher(0);
+        var executable = Path.GetFullPath(Path.Combine(
+            Path.GetTempPath(),
+            "Program Files",
+            "SimplySignAuto",
+            "SimplySignAuto.exe"));
+
+        var exitCode = UninstallElevation.RelaunchElevatedAndWait(
+            executable,
+            [],
+            TextWriter.Null,
+            launcher,
+            graphical: true);
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal(["uninstall", "--ui"], launcher.Arguments);
+        Assert.Equal("runas", launcher.Verb);
+        Assert.True(launcher.WaitForExit);
+    }
+
+    [Fact]
     public async Task Install_plan_creates_local_system_service_and_exact_interactive_sid_task()
     {
         using var fixture = new InstallFixture();

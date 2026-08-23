@@ -540,6 +540,68 @@ public sealed class JobEndpointsTests
     }
 
     [Fact]
+    public async Task Matching_idempotency_retry_reuses_the_job_when_the_agent_becomes_unavailable()
+    {
+        var dispatcher = new RecordingDispatcher();
+        var health = new MutableAgentHealthStatusSource(TestAgentHealth.Ready(CapabilityNow));
+        var preparation = new RecordingAdmissionPreparation(health, replacement: null);
+        await using var factory = await TestServiceFactory.StartAsync(services =>
+        {
+            services.AddSingleton<IJobDispatcher>(dispatcher);
+            services.AddSingleton<IAgentHealthStatusSource>(health);
+            services.AddSingleton<IAgentOnDemandLogin>(preparation);
+            services.AddSingleton<TimeProvider>(new FixedJobTimeProvider(CapabilityNow));
+        });
+        using var client = factory.CreateAuthenticatedClient();
+        using var firstRequest = TestUploads.PdfRequest();
+        firstRequest.Headers.Add("Idempotency-Key", "replay-while-unavailable");
+        using var secondRequest = TestUploads.PdfRequest();
+        secondRequest.Headers.Add("Idempotency-Key", "replay-while-unavailable");
+
+        using var firstResponse = await client.SendAsync(firstRequest);
+        health.CurrentHealth = null;
+        using var secondResponse = await client.SendAsync(secondRequest);
+        var first = await firstResponse.Content.ReadFromJsonAsync<CreateJobResponse>();
+        var second = await secondResponse.Content.ReadFromJsonAsync<CreateJobResponse>();
+
+        Assert.Equal(HttpStatusCode.Accepted, firstResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, secondResponse.StatusCode);
+        Assert.Equal(first!.JobId, second!.JobId);
+        Assert.Equal(0, preparation.CallCount);
+        Assert.Single(dispatcher.JobIds);
+        Assert.Single(factory.SpoolJobDirectories());
+    }
+
+    [Fact]
+    public async Task Conflicting_idempotency_retry_still_returns_409_when_the_agent_is_unavailable()
+    {
+        var health = new MutableAgentHealthStatusSource(TestAgentHealth.Ready(CapabilityNow));
+        var preparation = new RecordingAdmissionPreparation(health, replacement: null);
+        await using var factory = await TestServiceFactory.StartAsync(services =>
+        {
+            services.AddSingleton<IAgentHealthStatusSource>(health);
+            services.AddSingleton<IAgentOnDemandLogin>(preparation);
+            services.AddSingleton<TimeProvider>(new FixedJobTimeProvider(CapabilityNow));
+        });
+        using var client = factory.CreateAuthenticatedClient();
+        using var firstRequest = TestUploads.PdfRequest("%PDF-first");
+        firstRequest.Headers.Add("Idempotency-Key", "conflict-while-unavailable");
+        using var secondRequest = TestUploads.PdfRequest("%PDF-second");
+        secondRequest.Headers.Add("Idempotency-Key", "conflict-while-unavailable");
+
+        using var firstResponse = await client.SendAsync(firstRequest);
+        health.CurrentHealth = null;
+        using var secondResponse = await client.SendAsync(secondRequest);
+        var problem = await secondResponse.Content.ReadFromJsonAsync<ApiProblem>();
+
+        Assert.Equal(HttpStatusCode.Accepted, firstResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, secondResponse.StatusCode);
+        Assert.Equal("idempotency_conflict", problem!.Code);
+        Assert.Equal(0, preparation.CallCount);
+        Assert.Single(factory.SpoolJobDirectories());
+    }
+
+    [Fact]
     public async Task Pending_result_returns_409_and_expired_result_returns_410()
     {
         await using var factory = await TestServiceFactory.StartAsync();
@@ -1167,9 +1229,12 @@ internal sealed class RecordingAdmissionPreparation(
     MutableAgentHealthStatusSource health,
     AgentHealthSnapshot? replacement) : IAgentOnDemandLogin
 {
+    public int CallCount { get; private set; }
+
     public Task<bool> LoginAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        CallCount++;
         health.CurrentHealth = replacement;
         return Task.FromResult(replacement is not null);
     }

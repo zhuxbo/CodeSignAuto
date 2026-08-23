@@ -162,6 +162,7 @@ public sealed class PdfSignerTests
     [InlineData(10, "pkcs11_unavailable", "internal_error")]
     [InlineData(20, "input_modified", "input_corrupt")]
     [InlineData(20, "pdf_sign_failed", "pdf_sign_failed")]
+    [InlineData(20, "pdf_appearance_font_missing", "pdf_appearance_font_missing")]
     [InlineData(30, "pdf_validation_failed", "pdf_verify_failed")]
     [InlineData(20, "native_secret_failure", "internal_error")]
     public async Task Maps_only_stable_helper_failures(int exitCode, string helperCode, string expectedCode)

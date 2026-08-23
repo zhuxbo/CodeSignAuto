@@ -164,9 +164,12 @@ Do not use curl -k. Process presence alone is not readiness.
 Uninstall
 ---------
 
-Use Windows Settings > Apps > Installed apps > SimplySignAuto, or run:
+Use Windows Settings > Apps > Installed apps > SimplySignAuto, or run from
+PowerShell and wait for the GUI-subsystem process:
 
-   "C:\Program Files\SimplySignAuto\SimplySignAuto.exe" uninstall
+   $process = Start-Process -FilePath 'C:\Program Files\SimplySignAuto\SimplySignAuto.exe' `
+     -ArgumentList 'uninstall' -NoNewWindow -Wait -PassThru
+   $process.ExitCode
 
 PDF Support has its own Installed apps uninstall entry. Removing it leaves the
 base product intact. Removing the base product also removes an installed PDF
@@ -174,7 +177,8 @@ extension after the same exact-ownership checks.
 
 Manual uninstall removes the application, shortcut, receipt, registration and
 owned PDF extension. It preserves per-administrator history and signed results
-unless uninstall --purge-data --confirm PURGE is explicitly used.
+unless uninstall --purge-data --confirm PURGE is explicitly used. Restart
+Windows after success to finish physical cleanup of the program files.
 
 Service uninstall requests elevation when needed. Before any mutation it
 verifies the exact install instance, owner

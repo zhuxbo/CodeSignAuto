@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.ComponentModel;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using SimplySignAuto.Agent.Ipc;
@@ -46,6 +47,11 @@ public sealed class QuickSignViewModel : INotifyPropertyChanged, IDisposable
     private string? _acceptedTerminalState;
     private IReadOnlyList<CertificateSummary> _availableCertificates = [];
     private CertificateSummary? _selectedCertificate;
+    private string _pdfPage = "1";
+    private string _pdfLeft = "36";
+    private string _pdfBottom = "36";
+    private string _pdfRight = "180";
+    private string _pdfTop = "72";
 
     public QuickSignViewModel(
         ILocalJobClient localJobs,
@@ -154,6 +160,7 @@ public sealed class QuickSignViewModel : INotifyPropertyChanged, IDisposable
     public bool CanSubmit =>
         HasSelection &&
         SelectedCertificate is not null &&
+        ParametersValid() &&
         Volatile.Read(ref _submitting) == 0 &&
         State is QuickSignState.Idle or QuickSignState.Failed or QuickSignState.Canceled &&
         ReadinessFailure() is null;
@@ -239,15 +246,35 @@ public sealed class QuickSignViewModel : INotifyPropertyChanged, IDisposable
         _ => "○",
     };
 
-    public int PdfPage { get; set; } = 1;
+    public string PdfPage
+    {
+        get => _pdfPage;
+        set => SetPdfInput(ref _pdfPage, value);
+    }
 
-    public double PdfLeft { get; set; } = 36;
+    public string PdfLeft
+    {
+        get => _pdfLeft;
+        set => SetPdfInput(ref _pdfLeft, value);
+    }
 
-    public double PdfBottom { get; set; } = 36;
+    public string PdfBottom
+    {
+        get => _pdfBottom;
+        set => SetPdfInput(ref _pdfBottom, value);
+    }
 
-    public double PdfRight { get; set; } = 180;
+    public string PdfRight
+    {
+        get => _pdfRight;
+        set => SetPdfInput(ref _pdfRight, value);
+    }
 
-    public double PdfTop { get; set; } = 72;
+    public string PdfTop
+    {
+        get => _pdfTop;
+        set => SetPdfInput(ref _pdfTop, value);
+    }
 
     public string PdfReason { get; set; } = string.Empty;
 
@@ -504,6 +531,16 @@ public sealed class QuickSignViewModel : INotifyPropertyChanged, IDisposable
 
     private SigningParameters BuildParameters(FileKind kind, CertificateSummary certificate)
     {
+        if (kind == FileKind.Pdf)
+        {
+            if (TryBuildPdfParameters(certificate, out var pdf))
+            {
+                return pdf;
+            }
+
+            throw new LocalJobException("invalid_parameters");
+        }
+
         SigningParameters parameters = kind switch
         {
             FileKind.Authenticode =>
@@ -511,15 +548,6 @@ public sealed class QuickSignViewModel : INotifyPropertyChanged, IDisposable
                     certificate.SerialNumber,
                     "sha256",
                     false),
-            FileKind.Pdf =>
-                new PdfParameters(
-                    certificate.SerialNumber,
-                    "sha256",
-                    PdfPage,
-                    new PdfBox(PdfLeft, PdfBottom, PdfRight, PdfTop),
-                    "SimplySignAutoSignature",
-                    NullIfEmpty(PdfReason),
-                    NullIfEmpty(PdfLocation)),
             _ => throw new LocalJobException("local_capability_unavailable"),
         };
 
@@ -530,6 +558,48 @@ public sealed class QuickSignViewModel : INotifyPropertyChanged, IDisposable
         catch (ValidationException error)
         {
             throw new LocalJobException(error.Code);
+        }
+    }
+
+    private bool ParametersValid() =>
+        _selectedKind != FileKind.Pdf ||
+        TryBuildPdfParameters(SelectedCertificate!, out _);
+
+    private bool TryBuildPdfParameters(
+        CertificateSummary certificate,
+        out PdfParameters parameters)
+    {
+        parameters = null!;
+        if (!int.TryParse(PdfPage, NumberStyles.Integer, CultureInfo.InvariantCulture, out var page) ||
+            !double.TryParse(PdfLeft, NumberStyles.Float, CultureInfo.InvariantCulture, out var left) ||
+            !double.TryParse(PdfBottom, NumberStyles.Float, CultureInfo.InvariantCulture, out var bottom) ||
+            !double.TryParse(PdfRight, NumberStyles.Float, CultureInfo.InvariantCulture, out var right) ||
+            !double.TryParse(PdfTop, NumberStyles.Float, CultureInfo.InvariantCulture, out var top))
+        {
+            return false;
+        }
+
+        try
+        {
+            if (SigningParameters.Parse(
+                SigningParameters.SerializeCanonical(new PdfParameters(
+                    certificate.SerialNumber,
+                    "sha256",
+                    page,
+                    new PdfBox(left, bottom, right, top),
+                    "SimplySignAutoSignature",
+                    NullIfEmpty(PdfReason),
+                    NullIfEmpty(PdfLocation)))) is not PdfParameters parsed)
+            {
+                return false;
+            }
+
+            parameters = parsed;
+            return true;
+        }
+        catch (ValidationException)
+        {
+            return false;
         }
     }
 
@@ -605,9 +675,10 @@ public sealed class QuickSignViewModel : INotifyPropertyChanged, IDisposable
             RefreshAvailableCertificates();
             if (AcceptedJobId is { } acceptedJobId &&
                 snapshot?.RecentJobs.FirstOrDefault(
-                    job => job.JobId == acceptedJobId) is { TerminalState: "failed" or "expired" })
+                    job => job.JobId == acceptedJobId) is
+                    { TerminalState: "failed" or "expired" } terminal)
             {
-                ReleaseAcceptedSource();
+                ApplyAcceptedFailure(terminal.ErrorCode);
             }
 
             OnPropertyChanged(nameof(ReadinessText));
@@ -652,8 +723,15 @@ public sealed class QuickSignViewModel : INotifyPropertyChanged, IDisposable
         _acceptedTerminalState = terminal.Item.State;
         if (_acceptedTerminalState is "failed" or "expired")
         {
-            ReleaseAcceptedSource();
+            ApplyAcceptedFailure(terminal.Item.ErrorCode);
         }
+    }
+
+    private void ApplyAcceptedFailure(string? errorCode)
+    {
+        ErrorCode = errorCode ?? "internal_error";
+        State = QuickSignState.Failed;
+        ReleaseAcceptedSource();
     }
 
     private static TerminalJobEventItem? FindLatestTerminalItem(
@@ -845,6 +923,20 @@ public sealed class QuickSignViewModel : INotifyPropertyChanged, IDisposable
         field = value;
         OnPropertyChanged(propertyName);
         return true;
+    }
+
+    private void SetPdfInput(
+        ref string field,
+        string? value,
+        [CallerMemberName] string? propertyName = null)
+    {
+        if (!SetField(ref field, value ?? string.Empty, propertyName))
+        {
+            return;
+        }
+
+        OnPropertyChanged(nameof(CanSubmit));
+        RaiseCommandStates();
     }
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>

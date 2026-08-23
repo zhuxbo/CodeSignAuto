@@ -316,6 +316,10 @@ public static class JobEndpoints
                 return new(null, Problem(context, "invalid_parameters", StatusCodes.Status400BadRequest, "Idempotency-Key is invalid."));
             }
 
+            var isIdempotencyReplay = idempotencyKey is not null &&
+                await jobs.GetByIdempotencyKeyAsync("api", idempotencyKey, context.RequestAborted)
+                    .ConfigureAwait(false) is not null;
+
             var reader = new MultipartReader(boundary, context.Request.Body)
             {
                 HeadersCountLimit = MaxSectionHeadersCount,
@@ -338,7 +342,7 @@ public static class JobEndpoints
                 {
                     var parametersJson = await ReadMultipartParametersAsync(section.Body, context.RequestAborted);
                     parameters = SigningParameters.Parse(parametersJson);
-                    if (fileKind is not null &&
+                    if (!isIdempotencyReplay && fileKind is not null &&
                         ValidateAdmission(context, agentHealth, timeProvider, fileKind, parameters) is { } parametersProblem)
                     {
                         return new(null, parametersProblem);
@@ -350,12 +354,13 @@ public static class JobEndpoints
                         HeaderUtilities.RemoveQuotes(disposition.FileNameStar.HasValue ? disposition.FileNameStar : disposition.FileName).Value);
                     var extension = Path.GetExtension(originalName).ToLowerInvariant();
                     fileKind = SigningRequestValidator.ValidateExtension(originalName);
-                    if (ShouldAttemptAutomaticLogin(agentHealth, timeProvider, fileKind.Value))
+                    if (!isIdempotencyReplay && ShouldAttemptAutomaticLogin(agentHealth, timeProvider, fileKind.Value))
                     {
                         _ = await onDemandLogin.LoginAsync(context.RequestAborted).ConfigureAwait(false);
                     }
 
-                    if (ValidateAdmission(context, agentHealth, timeProvider, fileKind, parameters) is { } fileProblem)
+                    if (!isIdempotencyReplay &&
+                        ValidateAdmission(context, agentHealth, timeProvider, fileKind, parameters) is { } fileProblem)
                     {
                         return new(null, fileProblem);
                     }
@@ -397,7 +402,8 @@ public static class JobEndpoints
                 InputSha256 = written.Sha256,
                 ExpiresAt = retention.GetExpiresAt(timeProvider.GetUtcNow().ToUniversalTime()),
             };
-            if (ValidateAdmission(context, agentHealth, timeProvider, verifiedKind, parameters) is { } finalProblem)
+            if (!isIdempotencyReplay &&
+                ValidateAdmission(context, agentHealth, timeProvider, verifiedKind, parameters) is { } finalProblem)
             {
                 return new(null, finalProblem);
             }

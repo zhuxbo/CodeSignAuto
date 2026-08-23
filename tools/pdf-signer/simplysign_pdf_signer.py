@@ -32,7 +32,7 @@ from pkcs11.exceptions import (
 )
 from pyhanko.stamp import TextStampStyle
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 MAX_REQUEST_BYTES = 64 * 1024
 MAX_IDENTIFIER_BYTES = 128
 MAX_CERTIFICATE_DER_BYTES = 64 * 1024
@@ -946,6 +946,14 @@ def sign_document(
     except PKCS11Error:
         _safe_unlink(request.output_path)
         return {"ok": False, "failureCode": "pkcs11_unavailable"}
+    except RuntimeError as exc:
+        _safe_unlink(request.output_path)
+        if str(exc) == "pdf_appearance_font_missing":
+            return {"ok": False, "failureCode": "pdf_appearance_font_missing"}
+        return {
+            "ok": False,
+            "failureCode": "pdf_sign_failed" if signing_started else "pkcs11_unavailable",
+        }
     except Exception:
         _safe_unlink(request.output_path)
         return {

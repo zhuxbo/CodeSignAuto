@@ -129,7 +129,8 @@ public sealed class AdminControlPipeServer : IAdminControlRuntime
     internal static readonly TimeSpan IdentityTimeout = TimeSpan.FromSeconds(5);
     internal static readonly TimeSpan HelloTimeout = TimeSpan.FromSeconds(10);
     internal static readonly TimeSpan RequestReadTimeout = TimeSpan.FromSeconds(15);
-    internal static readonly TimeSpan ManagementDispatchTimeout = TimeSpan.FromSeconds(65);
+    // Preserve a second transport margin outside AgentPipeServer.ControlTimeout.
+    internal static readonly TimeSpan ManagementDispatchTimeout = TimeSpan.FromSeconds(110);
     internal static readonly TimeSpan LocalCreateDispatchTimeout = TimeSpan.FromSeconds(15);
     internal static readonly TimeSpan LocalCompleteDispatchTimeout = TimeSpan.FromMinutes(10);
     internal static readonly TimeSpan LocalResultDispatchTimeout = TimeSpan.FromSeconds(30);

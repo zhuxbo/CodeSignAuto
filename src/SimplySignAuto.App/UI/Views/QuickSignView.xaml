@@ -118,12 +118,12 @@
             <RowDefinition Height="Auto" />
           </Grid.RowDefinitions>
           <TextBlock Text="{localization:UiString PdfPage}" />
-          <TextBox Grid.Column="1" Text="{Binding PdfPage}" AutomationProperties.Name="{localization:UiString PdfPageAutomation}" />
+          <TextBox Grid.Column="1" Text="{Binding PdfPage, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="{localization:UiString PdfPageAutomation}" />
           <TextBlock Grid.Row="1" Text="{localization:UiString PdfSignatureBox}" Margin="0,11,0,0" />
-          <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding PdfLeft}" Margin="0,8,6,0" AutomationProperties.Name="{localization:UiString PdfLeftAutomation}" />
-          <TextBox Grid.Row="1" Grid.Column="2" Text="{Binding PdfBottom}" Margin="0,8,6,0" AutomationProperties.Name="{localization:UiString PdfBottomAutomation}" />
-          <TextBox Grid.Row="1" Grid.Column="3" Text="{Binding PdfRight}" Margin="0,8,6,0" AutomationProperties.Name="{localization:UiString PdfRightAutomation}" />
-          <TextBox Grid.Row="1" Grid.Column="4" Text="{Binding PdfTop}" Margin="0,8,0,0" AutomationProperties.Name="{localization:UiString PdfTopAutomation}" />
+          <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding PdfLeft, UpdateSourceTrigger=PropertyChanged}" Margin="0,8,6,0" AutomationProperties.Name="{localization:UiString PdfLeftAutomation}" />
+          <TextBox Grid.Row="1" Grid.Column="2" Text="{Binding PdfBottom, UpdateSourceTrigger=PropertyChanged}" Margin="0,8,6,0" AutomationProperties.Name="{localization:UiString PdfBottomAutomation}" />
+          <TextBox Grid.Row="1" Grid.Column="3" Text="{Binding PdfRight, UpdateSourceTrigger=PropertyChanged}" Margin="0,8,6,0" AutomationProperties.Name="{localization:UiString PdfRightAutomation}" />
+          <TextBox Grid.Row="1" Grid.Column="4" Text="{Binding PdfTop, UpdateSourceTrigger=PropertyChanged}" Margin="0,8,0,0" AutomationProperties.Name="{localization:UiString PdfTopAutomation}" />
           <TextBlock Grid.Row="2" Text="{localization:UiString PdfReason}" Margin="0,11,0,0" />
           <TextBox Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="4" Text="{Binding PdfReason}" Margin="0,8,0,0" AutomationProperties.Name="{localization:UiString PdfReasonAutomation}" />
           <TextBlock Grid.Row="3" Text="{localization:UiString PdfLocation}" Margin="0,11,0,0" />

@@ -293,7 +293,7 @@ internal static class WindowsPurgeCleanupTaskXml
         }
 
         var inner =
-            $"{WindowsCommandLine.Quote(plan.ExecutablePath)} {cleanupArguments}" +
+            $"start \"\" /wait /b {WindowsCommandLine.Quote(plan.ExecutablePath)} {cleanupArguments}" +
             $" && del /f /q {WindowsCommandLine.Quote(plan.ExecutablePath)}" +
             $" && rmdir {WindowsCommandLine.Quote(programFilesRoot)}";
         return $"/d /q /s /c \"{inner}\"";

@@ -45,7 +45,10 @@ public sealed record ApplicationEntryRoute(
                 new(ApplicationEntryKind.AutoLogonRemediation, [], ShowInitially: false),
             ["provision-agent-user", .. var tail] =>
                 new(ApplicationEntryKind.ProvisionAgentUser, tail, ShowInitially: false),
-            ["uninstall", .. var tail] => new(ApplicationEntryKind.Uninstall, tail, ShowInitially: false),
+            ["uninstall", "--ui"] =>
+                new(ApplicationEntryKind.Uninstall, [], ShowInitially: true),
+            ["uninstall", .. var tail] when !tail.Contains("--ui", StringComparer.Ordinal) =>
+                new(ApplicationEntryKind.Uninstall, tail, ShowInitially: false),
             ["purge-quarantine", .. var tail] => new(ApplicationEntryKind.PurgeQuarantine, tail, ShowInitially: false),
             ["--version"] => new(ApplicationEntryKind.Version, [], ShowInitially: false),
             ["pdf-extension", "install", "--media-root", var mediaRoot]
@@ -56,6 +59,8 @@ public sealed record ApplicationEntryRoute(
                     ShowInitially: false),
             ["pdf-extension", "uninstall"] =>
                 new(ApplicationEntryKind.PdfExtension, ["uninstall"], ShowInitially: false),
+            ["pdf-extension", "uninstall", "--ui"] =>
+                new(ApplicationEntryKind.PdfExtension, ["uninstall"], ShowInitially: true),
             ["--internal-pkcs11-helper", var command, "--request", var request]
                 when command is "catalog" or "probe" =>
                 new(ApplicationEntryKind.Pkcs11Helper, [command, "--request", request], ShowInitially: false),

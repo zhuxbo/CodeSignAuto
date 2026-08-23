@@ -1971,6 +1971,11 @@ function Assert-ProductionPurgeTaskExact {
         [string]$ManifestPath
     )
     [xml]$taskXml = Export-ScheduledTask -TaskName $TaskName -ErrorAction Stop
+    $programRoot = Split-Path -Parent $CanonicalApp
+    $expectedArguments = '/d /q /s /c "start "" /wait /b "' + $CanonicalApp +
+        '" purge-quarantine --manifest "' + $ManifestPath +
+        '" && del /f /q "' + $CanonicalApp +
+        '" && rmdir "' + $programRoot + '""'
     $namespace = [System.Xml.XmlNamespaceManager]::new($taskXml.NameTable)
     $namespace.AddNamespace('t', 'http://schemas.microsoft.com/windows/2004/02/mit/task')
     $checks = @{
@@ -1983,8 +1988,8 @@ function Assert-ProductionPurgeTaskExact {
         '//t:Settings/t:StartWhenAvailable' = 'true'
         '//t:Settings/t:Enabled' = 'true'
         '//t:Settings/t:ExecutionTimeLimit' = 'PT1H'
-        '//t:Actions/t:Exec/t:Command' = $CanonicalApp
-        '//t:Actions/t:Exec/t:Arguments' = ('purge-quarantine --manifest "' + $ManifestPath + '"')
+        '//t:Actions/t:Exec/t:Command' = (Join-Path $env:SystemRoot 'System32\cmd.exe')
+        '//t:Actions/t:Exec/t:Arguments' = $expectedArguments
     }
     foreach ($check in $checks.GetEnumerator()) {
         $nodes = @($taskXml.SelectNodes($check.Key, $namespace))

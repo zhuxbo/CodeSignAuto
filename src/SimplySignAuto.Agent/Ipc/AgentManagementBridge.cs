@@ -105,6 +105,10 @@ public sealed class AgentManagementBridge :
     ILocalJobClient,
     IDisposable
 {
+    // Relogin may spend 30s closing SimplySign, 30s on each of two bounded probes,
+    // and up to 3s entering a safe TOTP window. The remainder is scheduling margin.
+    private static readonly TimeSpan MaximumReloginTimeout = TimeSpan.FromSeconds(100);
+
     private readonly object _sync = new();
     private readonly SemaphoreSlim _operationGate = new(1, 1);
     private readonly TimeSpan _refreshTimeout;
@@ -124,11 +128,11 @@ public sealed class AgentManagementBridge :
         TimeProvider? timeProvider = null)
     {
         _refreshTimeout = refreshTimeout ?? TimeSpan.FromSeconds(15);
-        _reloginTimeout = reloginTimeout ?? TimeSpan.FromSeconds(60);
+        _reloginTimeout = reloginTimeout ?? MaximumReloginTimeout;
         _otpStore = otpStore;
         _timeProvider = timeProvider ?? TimeProvider.System;
         if (_refreshTimeout <= TimeSpan.Zero || _refreshTimeout > TimeSpan.FromSeconds(15) ||
-            _reloginTimeout <= TimeSpan.Zero || _reloginTimeout > TimeSpan.FromSeconds(60))
+            _reloginTimeout <= TimeSpan.Zero || _reloginTimeout > MaximumReloginTimeout)
         {
             throw new ArgumentOutOfRangeException(nameof(refreshTimeout));
         }
