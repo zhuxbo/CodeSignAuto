@@ -22,19 +22,21 @@ SimplySignAuto 提供 Authenticode 代码签名、可选 PDF/PAdES 签名、本�
 | --- | --- | --- |
 | ASP.NET Core Runtime 10 | [.NET 10 官方下载页](https://dotnet.microsoft.com/en-us/download/dotnet/10.0) | 最新稳定版 `ASP.NET Core Runtime` 的 Windows x64 安装程序 |
 | WPF / .NET Desktop Runtime 10 | [.NET Desktop Runtime 10 官方下载页](https://dotnet.microsoft.com/en-us/download/dotnet/10.0/runtime) | “Run desktop apps”下的 x64 安装程序 |
-| Certum SimplySign Desktop | [Certum 官方下载页](https://support.certum.eu/en/software/procertum-smartsign/) | `proCertum SmartSign + SimplySign Desktop` 的 Windows 64-bit 安装程序 |
+| Certum SimplySign Desktop | [Certum 官方下载页](https://support.certum.eu/en/cert-offer-software-and-libraries/) | Windows 64-bit `SimplySign Desktop`；不需要安装 proCertum SmartSign |
+| Windows SDK Signing Tools | [Windows SDK 官方下载页](https://learn.microsoft.com/en-us/windows/apps/windows-sdk/downloads) | 仅 Authenticode 需要：使用最新稳定版 Installer，并只选择 `Windows SDK Signing Tools for Desktop Apps` |
 
 安装前请确认：
 
 - .NET Windows Desktop Runtime 与 ASP.NET Core Runtime 为 10 或更高主版本；
 - `C:\Windows\System32\SimplySignPKCS.dll` 已存在；
 - SimplySign PKCS#11 module 能枚举目标证书及其私钥；
-- 如需 Authenticode，已安装 Windows SDK x64 `signtool.exe`。
+- 如需 Authenticode，已安装 Windows SDK Signing Tools，并存在 Windows SDK x64 `signtool.exe`。
 
 补充说明：
 
 - Setup 不下载或安装 .NET；缺少运行时或 SimplySign Desktop 时会在修改系统前提示。
 - 目标机不需要 .NET SDK、Python、IIS 或 Hosting Bundle。
+- 不需要安装完整 Windows SDK 开发组件或 Visual Studio；Authenticode 只需要 Windows SDK Signing Tools。
 - Desktop Runtime 已包含基础 .NET Runtime，无需重复安装。
 - 只使用 PDF 签名时不需要 SignTool。
 

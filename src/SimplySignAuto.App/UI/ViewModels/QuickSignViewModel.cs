@@ -638,7 +638,8 @@ public sealed class QuickSignViewModel : INotifyPropertyChanged, IDisposable
         }
 
         var capability = kind == FileKind.Authenticode ? snapshot.Authenticode : snapshot.Pdf;
-        if (!capability.Configured || !capability.Ready)
+        if (!capability.Configured || kind == FileKind.Pdf && capability.ReasonCode is
+            "pdf_support_not_installed" or "pdf_helper_tampered")
         {
             return kind == FileKind.Authenticode
                 ? UiCulture.Text("QuickSignAuthenticodeNotReady")

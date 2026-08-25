@@ -110,6 +110,23 @@ public sealed class QuickSignViewModelTests
     }
 
     [Fact]
+    public async Task Recoverable_on_demand_state_keeps_code_signing_submission_enabled()
+    {
+        using var fixture = new Fixture();
+        var local = new RecordingLocalJobClient();
+        using var viewModel = new QuickSignViewModel(
+            local,
+            new MutableManagementClient(Snapshot(authenticodeReady: false)),
+            _ => { });
+
+        await viewModel.SelectFileAsync(fixture.Write("source.exe", "MZ-on-demand"u8.ToArray()));
+
+        Assert.True(viewModel.CanSubmit);
+        Assert.NotNull(await viewModel.SubmitAsync(default));
+        Assert.Equal(1, local.SubmitCalls);
+    }
+
+    [Fact]
     public async Task Invalid_PDF_numeric_text_disables_submit_and_valid_text_uses_the_visible_values()
     {
         using var fixture = new Fixture();
@@ -196,7 +213,7 @@ public sealed class QuickSignViewModelTests
     }
 
     [Fact]
-    public async Task Invalid_magic_and_stale_or_wrong_capability_snapshot_fail_closed()
+    public async Task Invalid_magic_stale_agent_or_tampered_pdf_helper_fail_closed()
     {
         using var fixture = new Fixture();
         var invalid = fixture.Write("invalid.pdf", "not-a-pdf"u8.ToArray());
@@ -212,7 +229,7 @@ public sealed class QuickSignViewModelTests
         Assert.False(viewModel.CanSubmit);
         Assert.Equal("签名代理状态已过期", viewModel.ReadinessText);
 
-        management.Publish(Snapshot(pdfReady: false));
+        management.Publish(Snapshot(pdfFailure: "pdf_helper_tampered"));
         Assert.False(viewModel.CanSubmit);
         Assert.Equal("PDF 签名能力未就绪", viewModel.ReadinessText);
         Assert.Equal(0, local.SubmitCalls);

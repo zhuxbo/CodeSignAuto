@@ -22,19 +22,21 @@ The target must be x64 and have a reliably synchronized system clock.
 | --- | --- | --- |
 | ASP.NET Core Runtime 10 | [.NET 10 downloads](https://dotnet.microsoft.com/en-us/download/dotnet/10.0) | The latest stable Windows x64 installer under `ASP.NET Core Runtime` |
 | WPF / .NET Desktop Runtime 10 | [.NET Desktop Runtime 10](https://dotnet.microsoft.com/en-us/download/dotnet/10.0/runtime) | The x64 installer under “Run desktop apps” |
-| Certum SimplySign Desktop | [Certum downloads](https://support.certum.eu/en/software/procertum-smartsign/) | The Windows 64-bit `proCertum SmartSign + SimplySign Desktop` installer |
+| Certum SimplySign Desktop | [Certum downloads](https://support.certum.eu/en/cert-offer-software-and-libraries/) | Windows 64-bit `SimplySign Desktop`; proCertum SmartSign is not required |
+| Windows SDK Signing Tools | [Windows SDK downloads](https://learn.microsoft.com/en-us/windows/apps/windows-sdk/downloads) | Authenticode only: use the latest stable Installer and select only `Windows SDK Signing Tools for Desktop Apps` |
 
 Before installation, confirm that:
 
 - .NET Windows Desktop Runtime and ASP.NET Core Runtime are version 10 or a later major version;
 - `C:\Windows\System32\SimplySignPKCS.dll` exists;
 - the signing user can load the SimplySign PKCS#11 module and enumerate the target certificate and private key;
-- Windows SDK x64 `signtool.exe` is installed when Authenticode is required.
+- Windows SDK Signing Tools are installed, including x64 `signtool.exe`, when Authenticode is required.
 
 Notes:
 
 - Setup does not download or install .NET. Missing runtimes or SimplySign Desktop are reported before system mutation.
 - The target does not need the .NET SDK, Python, IIS, or the Hosting Bundle.
+- A full Windows SDK development workload or Visual Studio is not required; Authenticode only needs Windows SDK Signing Tools.
 - Desktop Runtime already includes the base .NET Runtime.
 - PDF-only operation does not require SignTool.
 
