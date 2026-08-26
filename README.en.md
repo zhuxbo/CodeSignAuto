@@ -385,6 +385,13 @@ $process = Start-Process -FilePath 'C:\Program Files\SimplySignAuto\SimplySignAu
 $process.ExitCode
 ```
 
+Once elevated, the main-application uninstall writes a bounded, structured diagnostic log to
+`%LocalAppData%\SimplySignAuto\logs\uninstall.log`. It records only the product version,
+Windows build, installation-state classification, and stable error codes; it does not record
+tokens, SIDs, paths, or configuration contents. If the receipt and service configuration are
+missing, invalid, or conflicting, uninstall stops before changing the system. A restart cannot
+repair this persistent-state failure, so keep the installation directory and this log for diagnosis.
+
 The PDF extension has a separate uninstall entry. Removing it does not affect the
 main application. Removing the main application first verifies and removes an
 installed PDF extension.

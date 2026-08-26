@@ -140,6 +140,7 @@ internal static class Program
                     Console.Error,
                     cancellationToken);
             case ApplicationEntryKind.Uninstall:
+            {
                 var graphicalUninstall = ShouldUseGraphicalUninstall(
                     route,
                     standardIoAvailable);
@@ -152,17 +153,22 @@ internal static class Program
                         graphical: graphicalUninstall);
                 }
 
+                using var uninstallDiagnostics = UninstallDiagnosticLog.Open();
 #if SIMPLYSIGN_WPF
                 if (graphicalUninstall)
                 {
-                    return GraphicalUninstallHost.RunMain(cancellationToken);
+                    return GraphicalUninstallHost.RunMain(
+                        uninstallDiagnostics,
+                        cancellationToken);
                 }
 #endif
                 return await UninstallCommand.ExecuteAsync(
                     route.Arguments,
                     Console.Out,
                     Console.Error,
-                    cancellationToken);
+                    cancellationToken,
+                    uninstallDiagnostics);
+            }
             case ApplicationEntryKind.PdfExtension:
                 var graphicalPdfUninstall = ShouldUseGraphicalUninstall(
                     route,

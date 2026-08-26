@@ -171,6 +171,14 @@ PowerShell and wait for the GUI-subsystem process:
      -ArgumentList 'uninstall' -NoNewWindow -Wait -PassThru
    $process.ExitCode
 
+Once elevated, the main-product uninstall writes a bounded structured log to
+%LocalAppData%\SimplySignAuto\logs\uninstall.log. It contains only the product
+version, Windows build, persisted-state classification and stable error code;
+it never contains tokens, SIDs, paths or configuration contents. Missing,
+invalid or conflicting install metadata stops uninstall before mutation. A
+restart cannot repair that persistent-state failure, so keep the installation
+directory and this log for diagnosis.
+
 PDF Support has its own Installed apps uninstall entry. Removing it leaves the
 base product intact. Removing the base product also removes an installed PDF
 extension after the same exact-ownership checks.

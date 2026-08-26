@@ -79,8 +79,8 @@ public sealed class UninstallPresentationTests
     [Theory]
     [InlineData("zh-CN", "uninstall_busy", "另一个安装或卸载操作正在进行，请稍后重试。\n\n错误代码：uninstall_busy")]
     [InlineData("en-US", "uninstall_busy", "Another install or uninstall operation is in progress. Try again later.\n\nError code: uninstall_busy")]
-    [InlineData("zh-CN", "owned_resource_mismatch", "安装状态已发生变化，无法安全卸载。请重新安装当前版本后再试。\n\n错误代码：owned_resource_mismatch")]
-    [InlineData("en-US", "owned_resource_mismatch", "The installation state changed and cannot be removed safely. Reinstall the current version, then try again.\n\nError code: owned_resource_mismatch")]
+    [InlineData("zh-CN", "owned_resource_mismatch", "安装状态不完整或已发生变化，无法安全卸载。重启不会修复此问题；请保留安装目录，并提供 %LocalAppData%\\SimplySignAuto\\logs\\uninstall.log。\n\n错误代码：owned_resource_mismatch")]
+    [InlineData("en-US", "owned_resource_mismatch", "The installation state is incomplete or changed and cannot be removed safely. Restarting will not repair it; keep the installation directory and provide %LocalAppData%\\SimplySignAuto\\logs\\uninstall.log.\n\nError code: owned_resource_mismatch")]
     public void Known_uninstall_failures_are_localized_and_keep_the_stable_code(
         string cultureName,
         string code,
@@ -91,6 +91,32 @@ public sealed class UninstallPresentationTests
         Assert.Equal(
             expected.Replace("\n", Environment.NewLine, StringComparison.Ordinal),
             UninstallPresentation.DescribeFailure(code, culture));
+    }
+
+    [Theory]
+    [InlineData("service_configuration_missing")]
+    [InlineData("service_configuration_invalid")]
+    [InlineData("installation_receipt_invalid")]
+    [InlineData("uninstall_installation_state_missing")]
+    [InlineData("owned_resource_mismatch")]
+    public void Persisted_installation_state_failures_do_not_recommend_a_restart(string code)
+    {
+        var message = UninstallPresentation.DescribeFailure(
+            code,
+            UiCulture.ResolveSelection("zh-CN"));
+
+        Assert.Contains("重启不会修复", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("重启 Windows 后重试", message, StringComparison.Ordinal);
+        Assert.Contains($"错误代码：{code}", message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Invalid_receipt_still_opens_the_uninstall_UI_for_authoritative_error_reporting()
+    {
+        var mode = GraphicalUninstallHost.TryReadMainMode(
+            () => throw new InstallException("installation_receipt_invalid"));
+
+        Assert.Null(mode);
     }
 
     [Theory]

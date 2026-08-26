@@ -52,7 +52,9 @@ internal static class UninstallPresentation
         {
             "uninstall_busy" => "UninstallErrorBusy",
             "owned_resource_mismatch" or "uninstall_state_uncertain" or
-                "install_state_uncertain" => "UninstallErrorState",
+                "install_state_uncertain" or "service_configuration_missing" or
+                "service_configuration_invalid" or "installation_receipt_invalid" or
+                "uninstall_installation_state_missing" => "UninstallErrorState",
             _ => "UninstallErrorGeneric",
         };
         var reason = UiCulture.GetString(reasonKey, culture);

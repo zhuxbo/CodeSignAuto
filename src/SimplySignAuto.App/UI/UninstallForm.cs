@@ -169,32 +169,43 @@ internal sealed class UninstallForm : System.Windows.Forms.Form
 
 internal static class GraphicalUninstallHost
 {
-    internal static int RunMain(CancellationToken cancellationToken)
+    internal static int RunMain(
+        TextWriter diagnostics,
+        CancellationToken cancellationToken)
     {
-        InstallationMode? mode = null;
-        try
-        {
-            var receipt = new WindowsInstallationReceiptStore()
+        ArgumentNullException.ThrowIfNull(diagnostics);
+        var mode = TryReadMainMode(() =>
+            new WindowsInstallationReceiptStore()
                 .LoadOptionalAsync(cancellationToken)
                 .GetAwaiter()
-                .GetResult();
-            mode = receipt?.Mode;
-        }
-        catch (Exception error) when (
-            error is InvalidDataException or IOException or UnauthorizedAccessException)
-        {
-            // The uninstall command will report the authoritative ownership error.
-        }
+                .GetResult()?
+                .Mode);
 
         return Run(
             GraphicalUninstallProduct.Main,
             mode,
-            static (output, error, token) => UninstallCommand.ExecuteAsync(
+            (output, error, token) => UninstallCommand.ExecuteAsync(
                 [],
                 output,
                 error,
-                token),
+                token,
+                diagnostics),
             cancellationToken);
+    }
+
+    internal static InstallationMode? TryReadMainMode(Func<InstallationMode?> readMode)
+    {
+        ArgumentNullException.ThrowIfNull(readMode);
+        try
+        {
+            return readMode();
+        }
+        catch (Exception error) when (
+            error is InstallException or InvalidDataException or IOException or UnauthorizedAccessException)
+        {
+            // The uninstall command will report the authoritative ownership error.
+            return null;
+        }
     }
 
     internal static int RunPdfExtension(CancellationToken cancellationToken) => Run(

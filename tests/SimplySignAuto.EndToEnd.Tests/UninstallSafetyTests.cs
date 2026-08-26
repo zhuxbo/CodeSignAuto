@@ -13,6 +13,61 @@ namespace SimplySignAuto.EndToEnd.Tests;
 
 public sealed class UninstallSafetyTests
 {
+    [Theory]
+    [InlineData(InstallationMode.Manual, false, "Manual")]
+    [InlineData(InstallationMode.Manual, true, "Conflict")]
+    [InlineData(InstallationMode.Service, true, "Service")]
+    [InlineData(InstallationMode.Service, false, "Missing")]
+    [InlineData(null, true, "Service")]
+    [InlineData(null, false, "Missing")]
+    public void Uninstall_startup_uses_only_consistent_persisted_mode_evidence(
+        InstallationMode? receiptMode,
+        bool serviceConfigurationExists,
+        string expected)
+    {
+        Assert.Equal(
+            expected,
+            UninstallStartupPolicy.Resolve(receiptMode, serviceConfigurationExists).ToString());
+    }
+
+    [Fact]
+    public void Uninstall_diagnostics_keep_only_structured_state_and_never_change_control_flow()
+    {
+        using var output = new StringWriter();
+
+        UninstallDiagnostics.WriteStart(output, "0.1.1", 19045);
+        UninstallDiagnostics.WriteState(
+            output,
+            UninstallStartupKind.Missing,
+            receiptMode: null,
+            serviceConfigurationExists: false);
+        UninstallDiagnostics.WriteFailure(output, "uninstall_installation_state_missing");
+
+        Assert.Equal(
+            string.Join(
+                Environment.NewLine,
+                "stage=start product_version=0.1.1 os_build=19045",
+                "stage=state startup=missing receipt=missing service_configuration=missing",
+                "stage=failed code=uninstall_installation_state_missing",
+                string.Empty),
+            output.ToString());
+        Assert.DoesNotContain("token", output.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("secret", output.ToString(), StringComparison.OrdinalIgnoreCase);
+
+        using var sanitized = new StringWriter();
+        UninstallDiagnostics.WriteFailure(
+            sanitized,
+            "uninstall_failed\nsecret=must-not-enter-the-log");
+        Assert.Equal(
+            $"stage=failed code=uninstall_failed{Environment.NewLine}",
+            sanitized.ToString());
+
+        Assert.Null(Record.Exception(() =>
+            UninstallDiagnostics.WriteFailure(
+                new ThrowingTextWriter(),
+                "uninstall_installation_state_missing")));
+    }
+
     [Fact]
     public void Trusted_anchor_rejects_every_effective_dangerous_allow_for_an_untrusted_concrete_sid()
     {
@@ -3259,5 +3314,10 @@ public sealed class UninstallSafetyTests
 
             inner.RemoveEmptyOperationRoot(Path.GetDirectoryName(_plan.ManifestPath)!);
         }
+    }
+
+    private sealed class ThrowingTextWriter : StringWriter
+    {
+        public override void WriteLine(string? value) => throw new IOException("log unavailable");
     }
 }

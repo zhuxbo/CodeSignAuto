@@ -16,10 +16,44 @@ internal static class DesktopDiagnosticLog
     }
 
     internal static TextWriter Open(string rootPath, long maximumBytes)
+        => LocalDiagnosticLog.Open(GetPath(rootPath), maximumBytes);
+
+    internal static string GetPath(string rootPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(rootPath);
+        return Path.Combine(Path.GetFullPath(rootPath), "logs", FileName);
+    }
+}
+
+internal static class UninstallDiagnosticLog
+{
+    private const long DefaultMaximumBytes = 1024L * 1024;
+    private const string FileName = "uninstall.log";
+
+    public static TextWriter Open()
+    {
+        var localApplicationData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        return string.IsNullOrWhiteSpace(localApplicationData)
+            ? TextWriter.Null
+            : Open(Path.Combine(localApplicationData, "SimplySignAuto"), DefaultMaximumBytes);
+    }
+
+    internal static TextWriter Open(string rootPath, long maximumBytes) =>
+        LocalDiagnosticLog.Open(GetPath(rootPath), maximumBytes);
+
+    internal static string GetPath(string rootPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(rootPath);
+        return Path.Combine(Path.GetFullPath(rootPath), "logs", FileName);
+    }
+}
+
+internal static class LocalDiagnosticLog
+{
+    public static TextWriter Open(string path, long maximumBytes)
     {
         try
         {
-            var path = GetPath(rootPath);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             return TextWriter.Synchronized(new BoundedUtf8LogWriter(path, maximumBytes));
         }
@@ -27,12 +61,6 @@ internal static class DesktopDiagnosticLog
         {
             return TextWriter.Null;
         }
-    }
-
-    internal static string GetPath(string rootPath)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(rootPath);
-        return Path.Combine(Path.GetFullPath(rootPath), "logs", FileName);
     }
 
     private sealed class BoundedUtf8LogWriter : TextWriter

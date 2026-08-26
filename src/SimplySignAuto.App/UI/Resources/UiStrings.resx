@@ -314,7 +314,7 @@
   <data name="UninstallCompleteRestart" xml:space="preserve"><value>卸载主体已完成。请重启 Windows，以完成程序文件和已安排数据的物理清理。</value></data>
   <data name="PdfUninstallComplete" xml:space="preserve"><value>PDF 签名组件已卸载，主程序和代码签名功能未受影响。</value></data>
   <data name="UninstallErrorBusy" xml:space="preserve"><value>另一个安装或卸载操作正在进行，请稍后重试。</value></data>
-  <data name="UninstallErrorState" xml:space="preserve"><value>安装状态已发生变化，无法安全卸载。请重新安装当前版本后再试。</value></data>
+  <data name="UninstallErrorState" xml:space="preserve"><value>安装状态不完整或已发生变化，无法安全卸载。重启不会修复此问题；请保留安装目录，并提供 %LocalAppData%\SimplySignAuto\logs\uninstall.log。</value></data>
   <data name="UninstallErrorGeneric" xml:space="preserve"><value>卸载未完成。请重启 Windows 后重试；如仍失败，请记录错误代码。</value></data>
   <data name="UninstallErrorCode" xml:space="preserve"><value>错误代码：{0}</value></data>
 </root>

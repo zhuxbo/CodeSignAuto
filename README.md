@@ -378,6 +378,12 @@ $process = Start-Process -FilePath 'C:\Program Files\SimplySignAuto\SimplySignAu
 $process.ExitCode
 ```
 
+主程序卸载进入提升后的执行阶段后，会将有界、结构化的诊断写入
+`%LocalAppData%\SimplySignAuto\logs\uninstall.log`。日志只记录产品版本、Windows
+build、安装状态分类和稳定错误代码，不记录 token、SID、路径或配置内容。安装收据与
+服务配置缺失、损坏或冲突时，卸载会在修改系统前停止；重启不能修复这类持久状态错误，
+请保留安装目录和该日志用于排障。
+
 PDF 扩展有独立卸载入口。卸载扩展不会影响主程序；卸载主程序时会先验证并移除
 已安装的 PDF 扩展。
 

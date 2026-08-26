@@ -4,6 +4,82 @@ namespace SimplySignAuto.App.Commands;
 
 public sealed record UninstallOptions(bool PurgeData, string? Confirmation);
 
+internal enum UninstallStartupKind
+{
+    Manual,
+    Service,
+    Missing,
+    Conflict,
+}
+
+internal static class UninstallStartupPolicy
+{
+    public static UninstallStartupKind Resolve(
+        InstallationMode? receiptMode,
+        bool serviceConfigurationExists) => (receiptMode, serviceConfigurationExists) switch
+        {
+            (InstallationMode.Manual, false) => UninstallStartupKind.Manual,
+            (InstallationMode.Manual, true) => UninstallStartupKind.Conflict,
+            (InstallationMode.Service, true) => UninstallStartupKind.Service,
+            (InstallationMode.Service, false) => UninstallStartupKind.Missing,
+            (null, true) => UninstallStartupKind.Service,
+            (null, false) => UninstallStartupKind.Missing,
+            _ => throw new InstallException("uninstall_installation_state_missing"),
+        };
+}
+
+internal static class UninstallDiagnostics
+{
+    public static void WriteStart(TextWriter writer, string productVersion, int osBuild) =>
+        SafeWrite(writer, $"stage=start product_version={productVersion} os_build={osBuild}");
+
+    public static void WriteState(
+        TextWriter writer,
+        UninstallStartupKind startupKind,
+        InstallationMode? receiptMode,
+        bool serviceConfigurationExists) =>
+        SafeWrite(
+            writer,
+            $"stage=state startup={startupKind.ToString().ToLowerInvariant()} " +
+            $"receipt={FormatReceiptMode(receiptMode)} " +
+            $"service_configuration={(serviceConfigurationExists ? "present" : "missing")}");
+
+    public static void WriteSuccess(TextWriter writer) =>
+        SafeWrite(writer, "stage=completed");
+
+    public static void WriteFailure(TextWriter writer, string code) =>
+        SafeWrite(writer, $"stage=failed code={NormalizeCode(code)}");
+
+    private static string FormatReceiptMode(InstallationMode? receiptMode) => receiptMode switch
+    {
+        InstallationMode.Manual => "manual",
+        InstallationMode.Service => "service",
+        null => "missing",
+        _ => "invalid",
+    };
+
+    private static string NormalizeCode(string? code) =>
+        !string.IsNullOrWhiteSpace(code) &&
+        code.Length <= 80 &&
+        code.All(static character =>
+            character is >= 'a' and <= 'z' or >= '0' and <= '9' or '_')
+            ? code
+            : "uninstall_failed";
+
+    private static void SafeWrite(TextWriter writer, string entry)
+    {
+        try
+        {
+            writer.WriteLine(entry);
+            writer.Flush();
+        }
+        catch (Exception)
+        {
+            // Diagnostics must never change uninstall control flow.
+        }
+    }
+}
+
 public abstract record UninstallAction;
 
 public sealed record RemoveOwnedFirewallRule(string OwnerMarker, int TcpPort) : UninstallAction;
@@ -1160,20 +1236,28 @@ public static class UninstallCommand
         string[] args,
         TextWriter output,
         TextWriter error,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        TextWriter? diagnostics = null)
     {
         ArgumentNullException.ThrowIfNull(args);
         ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(error);
+        var diagnosticWriter = diagnostics ?? TextWriter.Null;
+        UninstallDiagnostics.WriteStart(
+            diagnosticWriter,
+            ApplicationVersion.ReadIdentity(typeof(UninstallCommand).Assembly),
+            Environment.OSVersion.Version.Build);
         using var lease = new ServiceConfigurationWriterLeaseFactory().TryAcquire();
         if (lease is null)
         {
+            UninstallDiagnostics.WriteFailure(diagnosticWriter, "uninstall_busy");
             await error.WriteLineAsync("uninstall_busy").ConfigureAwait(false);
             return 1;
         }
 
         if (!TryParse(args, out var options))
         {
+            UninstallDiagnostics.WriteFailure(diagnosticWriter, "uninstall_arguments_invalid");
             await error.WriteLineAsync("uninstall_arguments_invalid").ConfigureAwait(false);
             return 2;
         }
@@ -1183,55 +1267,79 @@ public static class UninstallCommand
             var receipt = await new WindowsInstallationReceiptStore()
                 .LoadOptionalAsync(cancellationToken)
                 .ConfigureAwait(false);
-            if (receipt?.Mode == InstallationMode.Manual)
+            var serviceConfigurationExists = WindowsPathSafety.EntryExists(
+                WindowsUninstallEnvironment.ConfigurationPath);
+            var startupKind = UninstallStartupPolicy.Resolve(
+                receipt?.Mode,
+                serviceConfigurationExists);
+            UninstallDiagnostics.WriteState(
+                diagnosticWriter,
+                startupKind,
+                receipt?.Mode,
+                serviceConfigurationExists);
+            if (startupKind == UninstallStartupKind.Conflict)
+            {
+                throw new InstallException("owned_resource_mismatch");
+            }
+
+            if (startupKind == UninstallStartupKind.Manual)
             {
                 var manualPlan = await new ManualUninstallPlanner(
-                        new WindowsManualUninstallEnvironment(receipt))
+                        new WindowsManualUninstallEnvironment(receipt!))
                     .PlanAsync(options!, cancellationToken)
                     .ConfigureAwait(false);
                 await new ManualUninstallOrchestrator(
                         new WindowsManualUninstallActionExecutor())
                     .ExecuteAsync(manualPlan, output, cancellationToken)
                     .ConfigureAwait(false);
+                UninstallDiagnostics.WriteSuccess(diagnosticWriter);
                 return 0;
             }
 
-            if (!options!.PurgeData &&
-                !File.Exists(WindowsUninstallEnvironment.ConfigurationPath) &&
-                !WindowsPathSafety.EntryExists(WindowsInstallationReceiptStore.ReceiptPath) &&
-                await new WindowsInterruptedPurgeResume()
+            if (startupKind == UninstallStartupKind.Missing)
+            {
+                if (!options!.PurgeData && await new WindowsInterruptedPurgeResume()
                     .TryResumeAsync(cancellationToken)
                     .ConfigureAwait(false))
-            {
-                await output.WriteLineAsync(
-                    "Interrupted product data isolation resumed; physical cleanup will complete after restart.")
-                    .ConfigureAwait(false);
-                return 0;
+                {
+                    await output.WriteLineAsync(
+                        "Interrupted product data isolation resumed; physical cleanup will complete after restart.")
+                        .ConfigureAwait(false);
+                    UninstallDiagnostics.WriteSuccess(diagnosticWriter);
+                    return 0;
+                }
+
+                throw new InstallException("uninstall_installation_state_missing");
             }
 
             var plan = await new UninstallPlanner(new WindowsUninstallEnvironment())
-                .PlanAsync(options, cancellationToken).ConfigureAwait(false);
+                .PlanAsync(options!, cancellationToken).ConfigureAwait(false);
             await new UninstallOrchestrator(new WindowsUninstallActionExecutor())
                 .ExecuteAsync(plan, output, cancellationToken).ConfigureAwait(false);
+            UninstallDiagnostics.WriteSuccess(diagnosticWriter);
             return 0;
         }
         catch (ServiceConfigurationException configurationError)
         {
+            UninstallDiagnostics.WriteFailure(diagnosticWriter, configurationError.Code);
             await error.WriteLineAsync(configurationError.Code).ConfigureAwait(false);
             return 1;
         }
         catch (InstallException uninstallError)
         {
+            UninstallDiagnostics.WriteFailure(diagnosticWriter, uninstallError.Code);
             await error.WriteLineAsync(uninstallError.Code).ConfigureAwait(false);
             return 1;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            UninstallDiagnostics.WriteFailure(diagnosticWriter, "uninstall_cancelled");
             return 1;
         }
         catch (Exception exception) when (
             exception is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
         {
+            UninstallDiagnostics.WriteFailure(diagnosticWriter, "uninstall_failed");
             await error.WriteLineAsync("uninstall_failed").ConfigureAwait(false);
             return 1;
         }

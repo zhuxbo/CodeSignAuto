@@ -168,6 +168,37 @@ public sealed class DesktopApplicationCompositionTests
     }
 
     [Fact]
+    public void Uninstall_keeps_diagnostics_in_a_separate_bounded_local_log()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"ssa-uninstall-log-{Guid.NewGuid():N}");
+        try
+        {
+            using (var writer = UninstallDiagnosticLog.Open(root, maximumBytes: 256))
+            {
+                writer.WriteLine("stage=start product_version=0.1.1 os_build=19045");
+                writer.WriteLine(new string('x', 220));
+                writer.WriteLine(
+                    "stage=state receipt=missing service_configuration=missing code=uninstall_installation_state_missing");
+            }
+
+            var log = File.ReadAllText(UninstallDiagnosticLog.GetPath(root));
+            Assert.DoesNotContain("stage=start", log, StringComparison.Ordinal);
+            Assert.Contains("code=uninstall_installation_state_missing", log, StringComparison.Ordinal);
+            Assert.True(new FileInfo(UninstallDiagnosticLog.GetPath(root)).Length <= 256);
+            Assert.NotEqual(
+                DesktopDiagnosticLog.GetPath(root),
+                UninstallDiagnosticLog.GetPath(root));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task Desktop_shutdown_stops_activation_before_agent_and_is_idempotent()
     {
         var events = new List<string>();
