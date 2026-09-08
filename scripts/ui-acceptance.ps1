@@ -60,7 +60,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
-$TaskName = 'SimplySignAuto UI Acceptance'
+$TaskName = 'CodeSignAuto UI Acceptance'
 $StableFailure = $null
 $CreatedTask = $false
 $ExpectedTaskDescription = $null
@@ -109,8 +109,8 @@ function Fail-Stable {
 function Protect-UiDiagnosticText {
     param([AllowNull()][string]$Text)
     if ($null -eq $Text) { return '' }
-    if ('SimplySignAuto.Acceptance.Contracts.SecretScanPolicy' -as [type]) {
-        return [SimplySignAuto.Acceptance.Contracts.SecretScanPolicy]::Redact($Text, '')
+    if ('CodeSignAuto.Acceptance.Contracts.SecretScanPolicy' -as [type]) {
+        return [CodeSignAuto.Acceptance.Contracts.SecretScanPolicy]::Redact($Text, '')
     }
     return [regex]::Replace(
         $Text,
@@ -232,7 +232,7 @@ function Assert-TrustedExecutables {
         throw 'dotnet_invalid'
     }
 
-    if (-not [string]::Equals([System.IO.Path]::GetFileName($AppHost), 'SimplySignAuto.exe', [System.StringComparison]::OrdinalIgnoreCase) -or
+    if (-not [string]::Equals([System.IO.Path]::GetFileName($AppHost), 'CodeSignAuto.exe', [System.StringComparison]::OrdinalIgnoreCase) -or
         -not (Test-PathUnder -Path $AppHost -Root $Repo)) {
         throw 'apphost_invalid'
     }
@@ -265,9 +265,9 @@ function Test-WtsActiveSession {
         return $false
     }
 
-    if (-not ('SimplySignAuto.UiAcceptance.NativeWts' -as [type])) {
+    if (-not ('CodeSignAuto.UiAcceptance.NativeWts' -as [type])) {
         Add-Type -TypeDefinition @'
-namespace SimplySignAuto.UiAcceptance {
+namespace CodeSignAuto.UiAcceptance {
     public static class NativeWts {
         [System.Runtime.InteropServices.DllImport("wtsapi32.dll", SetLastError = true)]
         [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
@@ -313,7 +313,7 @@ namespace SimplySignAuto.UiAcceptance {
     }
 
     try {
-        return [SimplySignAuto.UiAcceptance.NativeWts]::IsActive($SessionId)
+        return [CodeSignAuto.UiAcceptance.NativeWts]::IsActive($SessionId)
     } catch {
         return $false
     }
@@ -385,7 +385,7 @@ function Read-StrictJsonObject {
         if ($raw -isnot [string] -or [string]::IsNullOrWhiteSpace($raw) -or $raw.Length -gt 1048576) {
             throw 'ui_acceptance_json_invalid'
         }
-        [SimplySignAuto.UiAcceptance.StrictJson.Preflight]::ValidateObject($raw, 16, 1048576)
+        [CodeSignAuto.UiAcceptance.StrictJson.Preflight]::ValidateObject($raw, 16, 1048576)
         $value = $raw | ConvertFrom-Json
     } catch {
         throw 'ui_acceptance_json_invalid'
@@ -400,13 +400,13 @@ function Read-StrictJsonObject {
 function Initialize-StrictJsonPreflight {
     if ($script:StrictJsonPreflightInitialized) {
         if ([string]::IsNullOrWhiteSpace($script:StrictJsonSourceSha256) -or
-            -not ('SimplySignAuto.UiAcceptance.StrictJson.Preflight' -as [type])) {
+            -not ('CodeSignAuto.UiAcceptance.StrictJson.Preflight' -as [type])) {
             throw 'ui_acceptance_json_parser_invalid'
         }
         return
     }
 
-    if ('SimplySignAuto.UiAcceptance.StrictJson.Preflight' -as [type]) {
+    if ('CodeSignAuto.UiAcceptance.StrictJson.Preflight' -as [type]) {
         throw 'ui_acceptance_json_parser_invalid'
     }
 
@@ -446,7 +446,7 @@ function Initialize-StrictJsonPreflight {
     }
 
     Add-Type -TypeDefinition $sourceText -Language CSharp -ErrorAction Stop
-    if (-not ('SimplySignAuto.UiAcceptance.StrictJson.Preflight' -as [type])) {
+    if (-not ('CodeSignAuto.UiAcceptance.StrictJson.Preflight' -as [type])) {
         throw 'ui_acceptance_json_parser_invalid'
     }
 
@@ -458,12 +458,12 @@ function Initialize-TrxPolicy {
     param([Parameter(Mandatory = $true)][string]$CanonicalRepo)
 
     if ($script:TrxPolicyInitialized) {
-        if (-not ('SimplySignAuto.Acceptance.Contracts.TrxArtifactPolicy' -as [type])) {
+        if (-not ('CodeSignAuto.Acceptance.Contracts.TrxArtifactPolicy' -as [type])) {
             throw 'ui_acceptance_trx_policy_invalid'
         }
         return
     }
-    if ('SimplySignAuto.Acceptance.Contracts.TrxArtifactPolicy' -as [type]) {
+    if ('CodeSignAuto.Acceptance.Contracts.TrxArtifactPolicy' -as [type]) {
         throw 'ui_acceptance_trx_policy_invalid'
     }
 
@@ -481,7 +481,7 @@ function Initialize-TrxPolicy {
     Add-Type -TypeDefinition $utf8.GetString($bytes) -Language CSharp `
         -ReferencedAssemblies @('System.dll', 'System.Core.dll', 'System.Net.Http.dll', 'System.Xml.dll') `
         -ErrorAction Stop
-    if (-not ('SimplySignAuto.Acceptance.Contracts.TrxArtifactPolicy' -as [type])) {
+    if (-not ('CodeSignAuto.Acceptance.Contracts.TrxArtifactPolicy' -as [type])) {
         throw 'ui_acceptance_trx_policy_invalid'
     }
     $script:TrxPolicyInitialized = $true
@@ -713,9 +713,9 @@ function Publish-SafeUiTrx {
             try { $raw = $reader.ReadToEnd() } finally { $reader.Dispose() }
         } finally { $stream.Dispose() }
 
-        $safe = [SimplySignAuto.Acceptance.Contracts.TrxArtifactPolicy]::Sanitize(
+        $safe = [CodeSignAuto.Acceptance.Contracts.TrxArtifactPolicy]::Sanitize(
             $raw,
-            'SimplySignAuto.UI.Tests.dll',
+            'CodeSignAuto.UI.Tests.dll',
             [Environment]::MachineName,
             [System.Security.Principal.WindowsIdentity]::GetCurrent().Name)
         New-CreateNewTextFile -Path $partPath -Content $safe
@@ -743,9 +743,9 @@ function Publish-SafeUiTrx {
 }
 
 function Get-SystemDpi {
-    if (-not ('SimplySignAuto.UiAcceptance.NativeDpi' -as [type])) {
+    if (-not ('CodeSignAuto.UiAcceptance.NativeDpi' -as [type])) {
         Add-Type -TypeDefinition @'
-namespace SimplySignAuto.UiAcceptance {
+namespace CodeSignAuto.UiAcceptance {
     internal static class NativeDpi {
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         internal static extern uint GetDpiForSystem();
@@ -754,7 +754,7 @@ namespace SimplySignAuto.UiAcceptance {
 '@
     }
 
-    return [int][SimplySignAuto.UiAcceptance.NativeDpi]::GetDpiForSystem()
+    return [int][CodeSignAuto.UiAcceptance.NativeDpi]::GetDpiForSystem()
 }
 
 function Assert-ArtifactGate {
@@ -840,7 +840,7 @@ function Assert-ArtifactGate {
             $attestedRunId -cne $RunId -or
             $attestedSessionId -ne $SessionId -or
             $attestedTestName -cne $expectedPng.Value.TestName -or
-            $attestedTitle -cne 'SimplySign Auto' -or
+            $attestedTitle -cne 'CodeSignAuto' -or
             $attestedPngFileName -cne $expectedPng.Key -or
             $attestedCaptureMethod -cne 'PrintWindow.PW_RENDERFULLCONTENT.24bppRgb' -or
             $attestedAnchorCount -ne 3 -or
@@ -909,7 +909,7 @@ function Assert-ArtifactGate {
 
     foreach ($file in @(Get-ChildItem -LiteralPath $RunDirectory -File -Recurse | Where-Object { $_.Extension -in '.trx', '.txt', '.log', '.json' })) {
         $text = Get-Content -LiteralPath $file.FullName -Raw
-        $redacted = [SimplySignAuto.Acceptance.Contracts.SecretScanPolicy]::Redact($text, '')
+        $redacted = [CodeSignAuto.Acceptance.Contracts.SecretScanPolicy]::Redact($text, '')
         if (-not [string]::Equals($text, $redacted, [System.StringComparison]::Ordinal)) {
             if (($file.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
                 throw 'ui_acceptance_sensitive_artifact'
@@ -919,7 +919,7 @@ function Assert-ArtifactGate {
                 $redacted,
                 [System.Text.UTF8Encoding]::new($false, $true))
         }
-        if ([SimplySignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive($redacted, '')) {
+        if ([CodeSignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive($redacted, '')) {
             throw 'ui_acceptance_sensitive_artifact'
         }
     }
@@ -971,7 +971,7 @@ function Assert-ManifestPngEvidence {
         $testName -cne $Expected.TestName -or
         $sessionId -ne $ExpectedSessionId -or
         $dpi -ne $ExpectedDpi -or
-        $title -cne 'SimplySign Auto' -or
+        $title -cne 'CodeSignAuto' -or
         $captureMethod -cne 'PrintWindow.PW_RENDERFULLCONTENT.24bppRgb' -or
         $anchorCount -ne 3 -or
         $anchors[0] -cne 'main_navigation' -or
@@ -1125,7 +1125,7 @@ function Invoke-ChildRun {
         throw 'ui_session_unavailable'
     }
 
-    $testProject = Join-Path $canonicalRepo 'tests\SimplySignAuto.UI.Tests\SimplySignAuto.UI.Tests.csproj'
+    $testProject = Join-Path $canonicalRepo 'tests\CodeSignAuto.UI.Tests\CodeSignAuto.UI.Tests.csproj'
     if (-not (Test-Path -LiteralPath $testProject -PathType Leaf)) {
         throw 'test_project_missing'
     }
@@ -1207,7 +1207,7 @@ function Invoke-ChildRun {
                 'test', $testProject,
                 '-c', 'Release',
                 '--no-restore', '--no-build',
-                '--filter', 'FullyQualifiedName=SimplySignAuto.UI.Tests.Desktop.ProductionQuickSignAcceptanceTests.Production_composition_signs_exe_and_pdf_hides_during_completion_and_restores_from_tray',
+                '--filter', 'FullyQualifiedName=CodeSignAuto.UI.Tests.Desktop.ProductionQuickSignAcceptanceTests.Production_composition_signs_exe_and_pdf_hides_during_completion_and_restores_from_tray',
                 '--logger', 'trx;LogFileName=results.raw.trx',
                 '--results-directory', $productionRaw,
                 '-m:1', '-nodeReuse:false', '-p:UseSharedCompilation=false'
@@ -1220,7 +1220,7 @@ function Invoke-ChildRun {
             $sensitiveProductionLog = $false
             foreach ($logPath in @($productionStdout, $productionStderr)) {
                 $logText = Get-Content -LiteralPath $logPath -Raw
-                if ([SimplySignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive($logText, '')) {
+                if ([CodeSignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive($logText, '')) {
                     $sensitiveProductionLog = $true
                 }
                 Remove-Item -LiteralPath $logPath -Force
@@ -1382,7 +1382,7 @@ try {
     [System.IO.Directory]::CreateDirectory($runDirectory) | Out-Null
     New-CreateNewTextFile -Path (Join-Path $runDirectory 'owner.txt') -Content $runId
 
-    $ExpectedTaskDescription = "SimplySignAuto UI Acceptance owner=$runId"
+    $ExpectedTaskDescription = "CodeSignAuto UI Acceptance owner=$runId"
     $escaped = @($canonicalScript, $canonicalRepo, $runDirectory, $SigningUser, $AdministratorUser, $canonicalDotnet, $canonicalAppHost, $runId) |
         ForEach-Object { '"' + $_.Replace('"', '""') + '"' }
     $ExpectedActionArguments = "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File $($escaped[0]) -RunChild -RepoPath $($escaped[1]) -ArtifactRoot $($escaped[2]) -SigningUser $($escaped[3]) -AdministratorUser $($escaped[4]) -DotnetPath $($escaped[5]) -AppHostPath $($escaped[6]) -RunId $($escaped[7]) -ExpectedSessionId $sessionId"

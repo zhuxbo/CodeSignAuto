@@ -7,15 +7,15 @@ function Move-SimplySignArtifactIntoPlace {
         [Parameter(Mandatory = $true)][string]$DestinationPath
     )
 
-    if ($null -eq ('SimplySignAuto.Release.RemoteSigningNativeMethods' -as [type])) {
-        Add-Type -Namespace SimplySignAuto.Release -Name RemoteSigningNativeMethods -MemberDefinition @'
+    if ($null -eq ('CodeSignAuto.Release.RemoteSigningNativeMethods' -as [type])) {
+        Add-Type -Namespace CodeSignAuto.Release -Name RemoteSigningNativeMethods -MemberDefinition @'
 [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
 [return: MarshalAs(UnmanagedType.Bool)]
 public static extern bool MoveFileEx(string existingFileName, string newFileName, int flags);
 '@
     }
     $replaceExistingAndWriteThrough = 0x00000009
-    if (-not [SimplySignAuto.Release.RemoteSigningNativeMethods]::MoveFileEx(
+    if (-not [CodeSignAuto.Release.RemoteSigningNativeMethods]::MoveFileEx(
             $SignedPath,
             $DestinationPath,
             $replaceExistingAndWriteThrough)) {

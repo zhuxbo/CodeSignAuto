@@ -1,0 +1,58 @@
+<UserControl x:Class="CodeSignAuto.App.UI.Views.ServiceSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:localization="clr-namespace:CodeSignAuto.App.UI.Localization"
+             AutomationProperties.Name="{localization:UiString ServiceSettingsAutomation}"
+             Loaded="OnLoaded">
+  <StackPanel Margin="{DynamicResource SpaceLarge}">
+    <Grid>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <StackPanel>
+        <TextBlock Text="{localization:UiString ServiceSettingsTitle}"
+                   FontSize="26"
+                   FontWeight="SemiBold"
+                   AutomationProperties.Name="{localization:UiString ServiceSettingsTitle}" />
+        <TextBlock Text="{localization:UiString ServiceSettingsDescription}"
+                   Margin="0,5,0,0"
+                   Foreground="{DynamicResource TextSecondaryBrush}" />
+      </StackPanel>
+      <Button Grid.Column="1"
+              Content="{localization:UiString ActionEdit}"
+              Click="OnEdit"
+              VerticalAlignment="Bottom"
+              AutomationProperties.Name="{localization:UiString ActionEdit}" />
+    </Grid>
+
+    <Border Style="{DynamicResource StatusPanelStyle}"
+            Margin="0,20,0,0"
+            AutomationProperties.Name="{localization:UiString ServiceSettingsStatusArea}">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="170" />
+          <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <TextBlock Text="{localization:UiString ServiceSettingsApiAddress}" />
+        <StackPanel Grid.Column="1" Orientation="Horizontal">
+          <TextBlock Text="http://0.0.0.0:" />
+          <TextBlock Text="{Binding Settings.ListenPort}" />
+        </StackPanel>
+        <TextBlock Grid.Row="1" Text="{localization:UiString ServiceSettingsMaximumUpload}" Margin="0,9,0,0" />
+        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding MaximumUploadText}" Margin="0,9,0,0" />
+        <TextBlock Grid.Row="2" Text="{localization:UiString ServiceSettingsRetentionHours}" Margin="0,9,0,0" />
+        <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding RetentionText}" Margin="0,9,0,0" />
+      </Grid>
+    </Border>
+    <TextBlock Text="{Binding ErrorCode}"
+               Margin="0,10,0,0"
+               Foreground="{DynamicResource TextSecondaryBrush}"
+               AutomationProperties.Name="{Binding ErrorCode}" />
+  </StackPanel>
+</UserControl>

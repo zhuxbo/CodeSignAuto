@@ -7,7 +7,7 @@ for package in ("pkcs11", "cryptography"):
     binaries += collect_dynamic_libs(package)
 
 hiddenimports = [
-    "simplysign_pdf_validator",
+    "CodeSignAuto_pdf_validator",
     "pyhanko.pdf_utils.font.opentype",
     "pyhanko.pdf_utils.incremental_writer",
     "pyhanko.pdf_utils.reader",
@@ -35,7 +35,7 @@ EXCLUDED_MODULES = (
 )
 
 a = Analysis(
-    ["simplysign_pdf_signer.py"],
+    ["CodeSignAuto_pdf_signer.py"],
     pathex=[],
     binaries=binaries,
     datas=datas,
@@ -62,7 +62,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name="SimplySignPdfSigner",
+    name="CodeSignAutoPdfSigner",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

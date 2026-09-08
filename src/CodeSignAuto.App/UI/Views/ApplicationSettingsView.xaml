@@ -1,0 +1,62 @@
+<UserControl x:Class="CodeSignAuto.App.UI.Views.ApplicationSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             AutomationProperties.Name="{Binding PageTitle}">
+  <UserControl.Resources>
+    <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+  </UserControl.Resources>
+  <StackPanel Margin="{DynamicResource SpaceLarge}">
+    <TextBlock Text="{Binding PageTitle}"
+               FontSize="26"
+               FontWeight="SemiBold"
+               AutomationProperties.Name="{Binding PageTitle}" />
+    <TextBlock Text="{Binding Description}"
+               Margin="0,5,0,0"
+               Foreground="{DynamicResource TextSecondaryBrush}"
+               TextWrapping="Wrap" />
+
+    <Border Style="{DynamicResource StatusPanelStyle}"
+            Margin="0,20,0,0"
+            AutomationProperties.Name="{Binding StatusAreaAutomationName}">
+      <StackPanel>
+        <TextBlock Text="{Binding LanguageLabel}" />
+        <ComboBox ItemsSource="{Binding Languages}"
+                  DisplayMemberPath="DisplayName"
+                  SelectedValuePath="CultureName"
+                  SelectedValue="{Binding SelectedCultureName}"
+                  Margin="0,8,0,0"
+                  Width="240"
+                  HorizontalAlignment="Left"
+                  AutomationProperties.Name="{Binding LanguageLabel}" />
+        <StackPanel Margin="0,18,0,0"
+                    Visibility="{Binding IsManualMode, Converter={StaticResource BooleanToVisibilityConverter}}">
+          <TextBlock Text="{Binding RetentionLabel}" />
+          <TextBlock Text="{Binding RetentionDescription}"
+                     Margin="0,5,0,0"
+                     Foreground="{DynamicResource TextSecondaryBrush}"
+                     TextWrapping="Wrap" />
+          <TextBox Text="{Binding RetentionHoursText}"
+                   Margin="0,8,0,0"
+                   Width="120"
+                   HorizontalAlignment="Left"
+                   AutomationProperties.Name="{Binding RetentionLabel}" />
+          <TextBlock Text="{Binding RetentionStatusText}"
+                     Margin="0,8,0,0"
+                     Foreground="{DynamicResource TextSecondaryBrush}"
+                     TextWrapping="Wrap"
+                     AutomationProperties.Name="{Binding RetentionStatusText}" />
+        </StackPanel>
+        <Button Content="{Binding SaveButtonText}"
+                Click="OnSave"
+                Margin="0,14,0,0"
+                HorizontalAlignment="Left"
+                AutomationProperties.Name="{Binding SaveButtonText}" />
+        <TextBlock Text="{Binding StatusText}"
+                   Margin="0,12,0,0"
+                   Foreground="{DynamicResource TextSecondaryBrush}"
+                   TextWrapping="Wrap"
+                   AutomationProperties.Name="{Binding StatusText}" />
+      </StackPanel>
+    </Border>
+  </StackPanel>
+</UserControl>

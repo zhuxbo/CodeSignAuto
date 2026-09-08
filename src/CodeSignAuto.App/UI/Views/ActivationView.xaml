@@ -1,0 +1,135 @@
+<UserControl x:Class="CodeSignAuto.App.UI.Views.ActivationView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:localization="clr-namespace:CodeSignAuto.App.UI.Localization"
+             IsVisibleChanged="OnVisibilityChanged"
+             Unloaded="OnUnloaded"
+             AutomationProperties.Name="{localization:UiString ActivationAutomation}">
+  <StackPanel Margin="{DynamicResource SpaceLarge}">
+    <TextBlock Text="{localization:UiString ActivationTitle}"
+               FontSize="26"
+               FontWeight="SemiBold"
+               AutomationProperties.Name="{localization:UiString ActivationTitle}" />
+    <TextBlock Text="{localization:UiString ActivationDescription}"
+               Margin="0,5,0,0"
+               Foreground="{DynamicResource TextSecondaryBrush}"
+               TextWrapping="Wrap" />
+
+    <Border Style="{DynamicResource StatusPanelStyle}"
+            Margin="0,20,0,0"
+            AutomationProperties.Name="{localization:UiString ActivationStatusArea}">
+      <StackPanel>
+        <TextBlock Text="{localization:UiString ActivationSection}" FontSize="16" FontWeight="SemiBold" />
+        <TextBlock Text="{localization:UiString ActivationStorageNotice}"
+                   Margin="0,7,0,0"
+                   Foreground="{DynamicResource TextSecondaryBrush}"
+                   TextWrapping="Wrap" />
+        <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+          <Button x:Name="OpenImportButton"
+                  Content="{localization:UiString ActivationImport}"
+                  Click="OnOpenImport"
+                  AutomationProperties.Name="{localization:UiString ActivationImportAutomation}" />
+          <Button Content="{localization:UiString ActionClear}"
+                  IsEnabled="{Binding CanClearOtp}"
+                  Click="OnClearOtpAndLogout"
+                  Style="{DynamicResource DangerButtonStyle}"
+                  AutomationProperties.Name="{localization:UiString ActivationClearAutomation}" />
+        </StackPanel>
+        <TextBlock Text="{Binding DisplaySummary}"
+                   Margin="0,9,0,0"
+                   AutomationProperties.Name="{Binding DisplaySummary}" />
+        <TextBlock Text="{Binding ErrorText}"
+                   Margin="0,5,0,0"
+                   Foreground="{DynamicResource TextSecondaryBrush}"
+                   AutomationProperties.Name="{Binding ErrorText}" />
+
+        <Border Margin="0,14,0,0"
+                Padding="12"
+                Background="{DynamicResource SelectionBrush}"
+                CornerRadius="8"
+                AutomationProperties.Name="{localization:UiString ActivationManualLoginArea}">
+          <StackPanel>
+            <TextBlock Text="{localization:UiString ActivationManualLoginTitle}"
+                       FontSize="15"
+                       FontWeight="SemiBold" />
+            <TextBlock Text="{Binding TotpInstruction}"
+                       Margin="0,5,0,0"
+                       Foreground="{DynamicResource TextSecondaryBrush}"
+                       TextWrapping="Wrap"
+                       AutomationProperties.Name="{localization:UiString ActivationManualLoginInstruction}" />
+            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+              <Button Content="{localization:UiString ActivationGenerateCode}"
+                      Click="OnGenerateTotp"
+                      AutomationProperties.Name="{localization:UiString ActivationGenerateCodeAutomation}" />
+              <Button Content="{localization:UiString ActionCopy}"
+                      IsEnabled="{Binding HasTotpCode}"
+                      Click="OnCopyTotp"
+                      AutomationProperties.Name="{localization:UiString ActivationCopyCodeAutomation}" />
+            </StackPanel>
+            <TextBlock Text="{Binding TotpCode}"
+                       Margin="0,10,0,0"
+                       FontFamily="Consolas"
+                       FontSize="28"
+                       FontWeight="SemiBold"
+                       AutomationProperties.Name="{localization:UiString ActivationCurrentCode}" />
+            <TextBlock Margin="0,4,0,0"
+                       Foreground="{DynamicResource TextSecondaryBrush}">
+              <Run Text="{localization:UiString ActivationRemainingPrefix}" />
+              <Run Text="{Binding TotpRemainingSeconds, Mode=OneWay}" />
+              <Run Text="{localization:UiString ActivationRemainingSuffix}" />
+            </TextBlock>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </Border>
+
+    <ItemsControl ItemsSource="{Binding Certificates}" Margin="0,14,0,0">
+      <ItemsControl.ItemTemplate>
+        <DataTemplate>
+          <Border Style="{DynamicResource StatusPanelStyle}" Margin="0,0,0,10" AutomationProperties.Name="{localization:UiString ActivationCertificateCard}">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="90" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+              </Grid.RowDefinitions>
+              <TextBlock Text="CN" />
+              <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <TextBlock Text="{Binding CommonName}" FontWeight="SemiBold" />
+                <TextBlock Text=" · " />
+                <TextBlock Text="{Binding StatusText}" Foreground="{DynamicResource TextSecondaryBrush}" />
+              </StackPanel>
+              <TextBlock Grid.Row="1" Text="{localization:UiString ActivationSerialNumber}" Margin="0,8,0,0" />
+              <TextBox Grid.Row="1" Grid.Column="1"
+                       Text="{Binding SerialNumber, Mode=OneWay}"
+                       IsReadOnly="True" BorderThickness="0" Background="Transparent" Padding="0"
+                       Margin="0,8,0,0" FontFamily="Consolas"
+                       PreviewMouseDoubleClick="OnSerialDoubleClick"
+                       AutomationProperties.Name="{localization:UiString ActivationCertificateSerial}" />
+              <TextBlock Grid.Row="2" Text="{localization:UiString ActivationValidity}" Margin="0,8,0,0" />
+              <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding ValidityText}" Margin="0,8,0,0" />
+            </Grid>
+          </Border>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+
+    <Border Style="{DynamicResource StatusPanelStyle}" Margin="0,4,0,0">
+      <StackPanel>
+        <TextBlock Text="{localization:UiString ActivationSession}" FontSize="16" FontWeight="SemiBold" />
+        <TextBlock Text="{Binding SessionText}" Margin="0,8,0,0" TextWrapping="Wrap" />
+        <TextBlock Text="{Binding HeartbeatText}" Margin="0,5,0,0" TextWrapping="Wrap" />
+      </StackPanel>
+    </Border>
+
+    <Button Content="{localization:UiString ActivationCopyDiagnostics}"
+            Margin="0,14,0,0"
+            HorizontalAlignment="Left"
+            Click="OnCopyDiagnostics"
+            AutomationProperties.Name="{localization:UiString ActivationCopyDiagnostics}" />
+  </StackPanel>
+</UserControl>

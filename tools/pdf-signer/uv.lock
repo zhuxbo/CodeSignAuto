@@ -426,7 +426,7 @@ wheels = [
 ]
 
 [[package]]
-name = "simplysign-pdf-signer"
+name = "codesignauto-pdf-signer"
 version = "0.1.1"
 source = { virtual = "." }
 dependencies = [

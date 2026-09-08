@@ -75,9 +75,9 @@ if ($decision.releasePdf) {
     throw 'release_notes_decision_invalid'
 }
 
-$expectedNames = @("SimplySignAutoSetup-$Version-win-x64.exe")
+$expectedNames = @("CodeSignAutoSetup-$Version-win-x64.exe")
 if ($decision.releasePdf) {
-    $expectedNames = @("SimplySignAutoPdfSetup-$Version-win-x64.exe") + $expectedNames
+    $expectedNames = @("CodeSignAutoPdfSetup-$Version-win-x64.exe") + $expectedNames
 }
 $actualEntries = @(Get-ChildItem -LiteralPath $canonicalReleaseRoot -Force)
 if ($actualEntries.Count -ne $expectedNames.Count -or

@@ -112,7 +112,7 @@ $requiredFiles = @(
     'scripts/pre-release-check.ps1',
     '.github/workflows/release.yml',
     'AGENTS.md',
-    '.agents/skills/simplysignauto-release/SKILL.md'
+    '.agents/skills/CodeSignAuto-release/SKILL.md'
 )
 foreach ($relativePath in $requiredFiles) {
     if (-not (Test-Path -LiteralPath (Join-Path $root $relativePath) -PathType Leaf)) {

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace SimplySignAuto.UiAcceptance.StrictJson
+namespace CodeSignAuto.UiAcceptance.StrictJson
 {
     public static class Preflight
     {

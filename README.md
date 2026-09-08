@@ -1,8 +1,8 @@
-# SimplySignAuto
+# CodeSignAuto
 
 [中文（默认）](README.md) | [English](README.en.md)
 
-SimplySignAuto 提供 Authenticode 代码签名、可选 PDF/PAdES 签名、本机 WPF
+CodeSignAuto 提供 Authenticode 代码签名、可选 PDF/PAdES 签名、本机 WPF
 手工签名，以及 Windows Server 无人值守签名与 HTTP API。
 
 ## 安装需求
@@ -56,7 +56,7 @@ SimplySignAuto 提供 Authenticode 代码签名、可选 PDF/PAdES 签名、本�
 | 适用场景 | Windows 10/11 或管理员按需签名 | Windows Server 无人值守签名 |
 | 签名进程 | 当前管理员打开程序后运行 | 后台 Service 与专用签名用户运行 |
 | Windows Service | 不创建 | 创建 LocalSystem Service |
-| 专用用户 / AutoLogon | 不创建 | 创建 `SimplySignAgent` 与受保护 AutoLogon |
+| 专用用户 / AutoLogon | 不创建 | 创建 `CodeSignAutoAgent` 与受保护 AutoLogon |
 | HTTP API | 不开放 | 开放 |
 | 关闭控制台 | 当前任务完成后可退出 | 不影响后台任务 |
 
@@ -71,10 +71,10 @@ SimplySignAuto 提供 Authenticode 代码签名、可选 PDF/PAdES 签名、本�
 
 ## 快速开始
 
-1. 下载 `SimplySignAutoSetup-<version>-win-x64.exe`。
+1. 下载 `CodeSignAutoSetup-<version>-win-x64.exe`。
 2. 验证安装包的 Authenticode 签名和时间戳。
 3. 双击安装包，选择语言和安装模式。
-4. 手工模式安装后直接打开 SimplySignAuto。
+4. 手工模式安装后直接打开 CodeSignAuto。
 5. 服务模式按提示重启，再由 Administrator 从公共桌面打开管理控制台。
 6. 在“激活凭证”页导入完整 `otpauth://` 激活内容。
 7. 在“概览”页确认目标证书和所需签名能力已就绪。
@@ -82,7 +82,7 @@ SimplySignAuto 提供 Authenticode 代码签名、可选 PDF/PAdES 签名、本�
 
 仅服务模式还需处理 API token：
 
-1. 从 `%ProgramData%\SimplySignAuto\install-token.txt` 读取一次性 token。
+1. 从 `%ProgramData%\CodeSignAuto\install-token.txt` 读取一次性 token。
 2. 立即保存到调用方 secret store。
 3. 验证 API 后删除该文件。
 4. 服务端只保留 token 的 SHA-256。
@@ -93,11 +93,11 @@ SimplySignAuto 提供 Authenticode 代码签名、可选 PDF/PAdES 签名、本�
 
 公开 Release 始终包含：
 
-- `SimplySignAutoSetup-<version>-win-x64.exe`。
+- `CodeSignAutoSetup-<version>-win-x64.exe`。
 
 仅当 PDF 有效输入相对上一主程序版本变化时，还包含：
 
-- `SimplySignAutoPdfSetup-<version>-win-x64.exe`。
+- `CodeSignAutoPdfSetup-<version>-win-x64.exe`。
 
 因此 PDF 安装包版本允许断档，例如从 `0.1.0` 直接到 `0.1.3`。
 
@@ -105,7 +105,7 @@ SimplySignAuto 提供 Authenticode 代码签名、可选 PDF/PAdES 签名、本�
 
 ```powershell
 $setups = Get-ChildItem -LiteralPath . -File |
-  Where-Object Name -Match '^SimplySignAuto(Pdf)?Setup-[0-9].*-win-x64\.exe$'
+  Where-Object Name -Match '^CodeSignAuto(Pdf)?Setup-[0-9].*-win-x64\.exe$'
 
 foreach ($setup in $setups) {
   $signature = Get-AuthenticodeSignature -LiteralPath $setup.FullName
@@ -133,7 +133,7 @@ foreach ($setup in $setups) {
 核对签名后运行主安装包：
 
 ```powershell
-& '.\SimplySignAutoSetup-0.1.0-win-x64.exe'
+& '.\CodeSignAutoSetup-0.1.0-win-x64.exe'
 ```
 
 Setup 不接受参数，通过应用清单触发 UAC。安装前检查：
@@ -156,14 +156,14 @@ PDF helper 不是主程序安装前提。
 - 安装收据和卸载注册项。
 
 不会创建 Service、专用用户、AutoLogon、计划任务或 API token。
-`%ProgramData%\SimplySignAuto` 只保存管理员可读的 `install.json` 安装收据。
+`%ProgramData%\CodeSignAuto` 只保存管理员可读的 `install.json` 安装收据。
 
 #### 自动签名服务模式
 
 安装内容：
 
 - LocalSystem Service；
-- 低权限签名用户 `SimplySignAgent`；
+- 低权限签名用户 `CodeSignAutoAgent`；
 - Windows profile；
 - 仅存于 LSA private data 的随机密码；
 - 受保护 AutoLogon；
@@ -198,7 +198,7 @@ PDF helper 不是主程序安装前提。
 需要 PDF/PAdES 时，单独运行：
 
 ```powershell
-& '.\SimplySignAutoPdfSetup-<version>-win-x64.exe'
+& '.\CodeSignAutoPdfSetup-<version>-win-x64.exe'
 ```
 
 规则如下：
@@ -212,6 +212,9 @@ PDF helper 不是主程序安装前提。
   `pdf_appearance_font_missing`。
 
 ### 原地升级
+
+原地升级仅适用于使用 `CodeSignAuto` 安装标识的版本。改名前的安装不支持直接升级；
+请先按旧版卸载流程完成卸载及重启，再安装本产品，旧设置与激活信息不会自动迁移。
 
 同一主程序 Setup 同时负责全新安装和受控升级。
 
@@ -275,7 +278,7 @@ Administrator 在 WPF 控制台“激活凭证”页导入完整 `otpauth://` �
 底层 `configure-otp` 仅用于目标签名用户上下文的离线修复：
 
 ```powershell
-Get-Clipboard | .\SimplySignAuto.exe configure-otp
+Get-Clipboard | .\CodeSignAuto.exe configure-otp
 Set-Clipboard -Value ''
 ```
 
@@ -373,13 +376,13 @@ API token 只存在于服务模式，可在“服务设置”中轮换。
 从 PowerShell 启动时使用等待式调用，可在当前终端输出稳定结果和错误代码，便于管理员排障：
 
 ```powershell
-$process = Start-Process -FilePath 'C:\Program Files\SimplySignAuto\SimplySignAuto.exe' `
+$process = Start-Process -FilePath 'C:\Program Files\CodeSignAuto\CodeSignAuto.exe' `
   -ArgumentList 'uninstall' -NoNewWindow -Wait -PassThru
 $process.ExitCode
 ```
 
 主程序卸载进入提升后的执行阶段后，会将有界、结构化的诊断写入
-`%LocalAppData%\SimplySignAuto\logs\uninstall.log`。日志只记录产品版本、Windows
+`%LocalAppData%\CodeSignAuto\logs\uninstall.log`。日志只记录产品版本、Windows
 build、安装状态分类和稳定错误代码，不记录 token、SID、路径或配置内容。安装收据与
 服务配置缺失、损坏或冲突时，卸载会在修改系统前停止；重启不能修复这类持久状态错误，
 请保留安装目录和该日志用于排障。
@@ -397,7 +400,7 @@ PDF 扩展有独立卸载入口。卸载扩展不会影响主程序；卸载主�
 只有显式运行以下命令才删除受控数据：
 
 ```powershell
-$process = Start-Process -FilePath 'C:\Program Files\SimplySignAuto\SimplySignAuto.exe' `
+$process = Start-Process -FilePath 'C:\Program Files\CodeSignAuto\CodeSignAuto.exe' `
   -ArgumentList 'uninstall', '--purge-data', '--confirm', 'PURGE' `
   -NoNewWindow -Wait -PassThru
 $process.ExitCode
@@ -418,7 +421,7 @@ $process.ExitCode
 
 | 现象或错误码 | 处理建议 |
 | --- | --- |
-| `live` 503 | 检查 `SimplySignAuto.Service`、Event Log、`jobs.db` 所在卷和 ProgramData ACL。不要删除数据库。 |
+| `live` 503 | 检查 `CodeSignAuto.Service`、Event Log、`jobs.db` 所在卷和 ProgramData ACL。不要删除数据库。 |
 | `ready` 503、`live` 200 | 检查非 0 签名用户会话、Agent 任务、系统时间、SimplySign Desktop、token、证书和私钥。 |
 | `installation_mode_change_requires_reinstall` | 卸载后重装，并选择另一模式。 |
 | `autologon_conflict` / `autologon_plaintext_password_present` | 在服务模式安装器中选择“安全禁用并继续”，或改用手工模式。 |
@@ -481,7 +484,7 @@ $env:SIMPLYSIGN_SIGNING_CERTIFICATE_SERIAL = '<certificate serial>'
   -Version <version> `
   -SigningBaseUrl 'http://signing-host.internal:7080' `
   -BearerTokenPath 'C:\BuildSecrets\simplysign-token.txt' `
-  -SigningReferencePath 'C:\BuildSecrets\SimplySignAuto-reference.exe' `
+  -SigningReferencePath 'C:\BuildSecrets\CodeSignAuto-reference.exe' `
   -DotnetRoot 'C:\Program Files\dotnet' `
   -UvPath '<path-to-uv.exe>'
 ```
@@ -490,5 +493,5 @@ Bearer token 只应通过受保护文件或进程环境进入发布子进程，�
 
 ## 许可证
 
-SimplySignAuto 使用 [MIT License](LICENSE)。完整第三方版权与许可证文本见
+CodeSignAuto 使用 [MIT License](LICENSE)。完整第三方版权与许可证文本见
 [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt)。每个发布安装包都内嵌这两份文件。

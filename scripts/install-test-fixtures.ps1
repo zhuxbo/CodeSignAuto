@@ -198,9 +198,9 @@ function Get-ExecutableTrustSnapshot {
     param([string]$Path, [string[]]$TrustedRoots)
     $item = Get-Item -LiteralPath $Path -Force
     $acl = Get-TrustedAclState $Path
-    $identity = [SimplySignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read($Path, $false)
+    $identity = [CodeSignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read($Path, $false)
     $signature = Get-AuthenticodeSignature -LiteralPath $Path
-    return [SimplySignAuto.Acceptance.Contracts.ExecutableTrustSnapshot]::new(
+    return [CodeSignAuto.Acceptance.Contracts.ExecutableTrustSnapshot]::new(
         $item.FullName,
         $identity.Identity,
         (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant(),
@@ -231,11 +231,11 @@ function Add-FixtureToolGuard {
         [System.IO.FileShare]::Read)
     try {
         $snapshot = Get-ExecutableTrustSnapshot $canonical $TrustedRoots
-        [SimplySignAuto.Acceptance.Contracts.TrustedExecutablePolicy]::Validate(
+        [CodeSignAuto.Acceptance.Contracts.TrustedExecutablePolicy]::Validate(
             $snapshot,
             $snapshot,
             $TrustedRoots,
-            [SimplySignAuto.Acceptance.Contracts.ExecutableTrustKind]::PlatformPublisher,
+            [CodeSignAuto.Acceptance.Contracts.ExecutableTrustKind]::PlatformPublisher,
             $ExpectedPublisherSha256)
         $script:FixtureToolGuards.Add($canonical, [pscustomobject]@{
                 Stream = $stream
@@ -257,11 +257,11 @@ function Assert-FixtureToolGuardUnchanged {
         throw 'acceptance_fixture_executable_untrusted'
     }
     $guard = $script:FixtureToolGuards[$Path]
-    [SimplySignAuto.Acceptance.Contracts.TrustedExecutablePolicy]::Validate(
+    [CodeSignAuto.Acceptance.Contracts.TrustedExecutablePolicy]::Validate(
         $guard.Snapshot,
         (Get-ExecutableTrustSnapshot $Path ([string[]]$guard.TrustedRoots)),
         [string[]]$guard.TrustedRoots,
-        [SimplySignAuto.Acceptance.Contracts.ExecutableTrustKind]::PlatformPublisher,
+        [CodeSignAuto.Acceptance.Contracts.ExecutableTrustKind]::PlatformPublisher,
         [string]$guard.ExpectedPublisherSha256)
 }
 
@@ -318,7 +318,7 @@ function Get-DefaultSystemDriverPath {
 function Initialize-AcceptanceContracts {
     param([Parameter(Mandatory = $true)][string]$CanonicalRepo)
 
-    if ('SimplySignAuto.Acceptance.Contracts.AcceptanceModePolicy' -as [type]) {
+    if ('CodeSignAuto.Acceptance.Contracts.AcceptanceModePolicy' -as [type]) {
         throw 'acceptance_fixture_contract_invalid'
     }
 
@@ -339,7 +339,7 @@ function Initialize-AcceptanceContracts {
         -Language CSharp `
         -ReferencedAssemblies @('System.dll', 'System.Core.dll', 'System.Net.Http.dll', 'System.Xml.dll') `
         -ErrorAction Stop
-    if (-not ('SimplySignAuto.Acceptance.Contracts.AcceptanceModePolicy' -as [type])) {
+    if (-not ('CodeSignAuto.Acceptance.Contracts.AcceptanceModePolicy' -as [type])) {
         throw 'acceptance_fixture_contract_invalid'
     }
 
@@ -354,7 +354,7 @@ function Initialize-AcceptanceContracts {
         -TypeDefinition $encoding.GetString($strictJsonBytes) `
         -Language CSharp `
         -ErrorAction Stop
-    if (-not ('SimplySignAuto.UiAcceptance.StrictJson.Preflight' -as [type])) {
+    if (-not ('CodeSignAuto.UiAcceptance.StrictJson.Preflight' -as [type])) {
         throw 'acceptance_fixture_contract_invalid'
     }
 }
@@ -365,7 +365,7 @@ function ConvertFrom-StrictJson {
     if ([string]::IsNullOrWhiteSpace($Json) -or $Json.Length -gt 1048576) {
         throw 'acceptance_fixture_manifest_invalid'
     }
-    [SimplySignAuto.UiAcceptance.StrictJson.Preflight]::ValidateObject($Json, 24, 1048576)
+    [CodeSignAuto.UiAcceptance.StrictJson.Preflight]::ValidateObject($Json, 24, 1048576)
     $value = $Json | ConvertFrom-Json
     if ($null -eq $value -or $value -isnot [System.Management.Automation.PSCustomObject]) {
         throw 'acceptance_fixture_manifest_invalid'
@@ -383,7 +383,7 @@ function Assert-ExactProperties {
         throw 'acceptance_fixture_manifest_invalid'
     }
     $actual = @($Value.PSObject.Properties.Name)
-    [SimplySignAuto.Acceptance.Contracts.ArtifactSetPolicy]::ValidateExact($Expected, $actual)
+    [CodeSignAuto.Acceptance.Contracts.ArtifactSetPolicy]::ValidateExact($Expected, $actual)
 }
 
 function New-CreateNewBytes {
@@ -493,11 +493,11 @@ function Invoke-BoundedProcess {
             $taskkillAfter = Get-ExecutableTrustSnapshot `
                 $script:canonicalTaskkill `
                 @((Get-CanonicalExistingPath -Path $env:SystemRoot -Kind Container))
-            [SimplySignAuto.Acceptance.Contracts.TrustedExecutablePolicy]::Validate(
+            [CodeSignAuto.Acceptance.Contracts.TrustedExecutablePolicy]::Validate(
                 $script:taskkillSnapshot,
                 $taskkillAfter,
                 @((Get-CanonicalExistingPath -Path $env:SystemRoot -Kind Container)),
-                [SimplySignAuto.Acceptance.Contracts.ExecutableTrustKind]::PlatformPublisher,
+                [CodeSignAuto.Acceptance.Contracts.ExecutableTrustKind]::PlatformPublisher,
                 ($script:windowsSystemPublishers.ResolveExpectedPublisherSha256(
                     $script:canonicalTaskkill)))
             $killer = [System.Diagnostics.Process]::Start($script:canonicalTaskkill, "/PID $($process.Id) /T /F")
@@ -508,11 +508,11 @@ function Invoke-BoundedProcess {
             $taskkillAfter = Get-ExecutableTrustSnapshot `
                 $script:canonicalTaskkill `
                 @((Get-CanonicalExistingPath -Path $env:SystemRoot -Kind Container))
-            [SimplySignAuto.Acceptance.Contracts.TrustedExecutablePolicy]::Validate(
+            [CodeSignAuto.Acceptance.Contracts.TrustedExecutablePolicy]::Validate(
                 $script:taskkillSnapshot,
                 $taskkillAfter,
                 @((Get-CanonicalExistingPath -Path $env:SystemRoot -Kind Container)),
-                [SimplySignAuto.Acceptance.Contracts.ExecutableTrustKind]::PlatformPublisher,
+                [CodeSignAuto.Acceptance.Contracts.ExecutableTrustKind]::PlatformPublisher,
                 ($script:windowsSystemPublishers.ResolveExpectedPublisherSha256(
                     $script:canonicalTaskkill)))
             $process.WaitForExit(10000) | Out-Null
@@ -559,10 +559,10 @@ function New-MinimalMsiFixture {
         $database = $installer.OpenDatabase($Path, 3)
         $queries = @(
             'CREATE TABLE `Property` (`Property` CHAR(72) NOT NULL, `Value` CHAR(0) LOCALIZABLE PRIMARY KEY `Property`)',
-            "INSERT INTO `Property` (`Property`, `Value`) VALUES ('ProductName', 'SimplySignAuto Native Fixture')",
+            "INSERT INTO `Property` (`Property`, `Value`) VALUES ('ProductName', 'CodeSignAuto Native Fixture')",
             "INSERT INTO `Property` (`Property`, `Value`) VALUES ('ProductCode', '{$([guid]::NewGuid().ToString().ToUpperInvariant())}')",
             "INSERT INTO `Property` (`Property`, `Value`) VALUES ('ProductVersion', '1.0.0')",
-            "INSERT INTO `Property` (`Property`, `Value`) VALUES ('Manufacturer', 'SimplySignAuto Acceptance')"
+            "INSERT INTO `Property` (`Property`, `Value`) VALUES ('Manufacturer', 'CodeSignAuto Acceptance')"
         )
         foreach ($query in $queries) {
             $view = $null
@@ -598,7 +598,7 @@ function New-NativeFixtureSet {
     [System.IO.Directory]::CreateDirectory($nativeBuild) | Out-Null
     try {
         $source = Join-Path $nativeBuild 'native-fixture.cs'
-        New-CreateNewText $source 'public static class SimplySignAutoNativeFixture { public static int Value { get { return 20; } } }'
+        New-CreateNewText $source 'public static class CodeSignAutoNativeFixture { public static int Value { get { return 20; } } }'
         $dll = Join-Path $FixtureDirectory 'native-fixture.dll'
         Assert-FixtureToolGuardUnchanged $CanonicalCsc
         Invoke-BoundedProcess `
@@ -678,7 +678,7 @@ function Get-FixtureEntry {
     if (($Kind -eq 'reparse') -ne $reparse -or $item.PSIsContainer) {
         throw 'acceptance_fixture_manifest_invalid'
     }
-    $identity = [SimplySignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read($path, $false)
+    $identity = [CodeSignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read($path, $false)
     $sha = if ($Kind -eq 'reparse') { $null } else { (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash }
     return [ordered]@{
         relativePath = $RelativePath
@@ -721,7 +721,7 @@ function Invoke-FixtureFailureCleanup {
             throw 'acceptance_fixture_cleanup_uncertain'
         }
         $rootItem = Get-Item -LiteralPath $script:FixtureDirectoryForFailure -Force
-        $rootIdentity = [SimplySignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read(
+        $rootIdentity = [CodeSignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read(
             $script:FixtureDirectoryForFailure,
             $true)
         if ([string]::IsNullOrWhiteSpace($script:FixtureDirectoryIdentity)) {
@@ -759,7 +759,7 @@ function Invoke-FixtureFailureCleanup {
 
     if ($null -ne $script:FixtureSentinelPath) {
         if (-not (Test-Path -LiteralPath $script:FixtureSentinelPath -PathType Leaf)) { return }
-        $sentinelCurrent = [SimplySignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read(
+        $sentinelCurrent = [CodeSignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read(
             $script:FixtureSentinelPath,
             $false)
         $sentinelCurrentHash = (Get-FileHash -LiteralPath $script:FixtureSentinelPath -Algorithm SHA256).Hash
@@ -771,7 +771,7 @@ function Invoke-FixtureFailureCleanup {
         }
         if ($sentinelCurrent.Identity -cne $script:FixtureSentinelIdentity -or
             $sentinelCurrentHash -cne $script:FixtureSentinelHash -or
-            -not [SimplySignAuto.Acceptance.Contracts.WindowsFileIdentity]::DeleteOrdinaryFileIfExact(
+            -not [CodeSignAuto.Acceptance.Contracts.WindowsFileIdentity]::DeleteOrdinaryFileIfExact(
                 $script:FixtureSentinelPath,
                 $script:FixtureSentinelIdentity,
                 $script:FixtureSentinelHash) -or
@@ -837,7 +837,7 @@ function Invoke-FixtureCleanup {
     if (@($entries | Where-Object { $_.cleanup -ne $true }).Count -ne 0) {
         throw 'acceptance_fixture_manifest_invalid'
     }
-    [SimplySignAuto.Acceptance.Contracts.ArtifactSetPolicy]::ValidateExact(
+    [CodeSignAuto.Acceptance.Contracts.ArtifactSetPolicy]::ValidateExact(
         $(if ($entries.Count -eq $baseRelativePaths.Count) {
             $baseRelativePaths
         } else {
@@ -851,13 +851,13 @@ function Invoke-FixtureCleanup {
     if (Test-PathUnder -Path $sentinelPath -Root $fixtureDirectory) {
         throw 'acceptance_fixture_manifest_invalid'
     }
-    $sentinelIdentity = [SimplySignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read($sentinelPath, $false)
+    $sentinelIdentity = [CodeSignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read($sentinelPath, $false)
     if ($sentinelIdentity.Identity -cne [string]$manifest.sentinelIdentity -or
         $sentinelIdentity.LinkCount -ne 1 -or
         (Get-FileHash -LiteralPath $sentinelPath -Algorithm SHA256).Hash -cne [string]$manifest.sentinelSha256) {
         throw 'acceptance_fixture_cleanup_uncertain'
     }
-    [SimplySignAuto.Acceptance.Contracts.SentinelLayoutPolicy]::Validate(
+    [CodeSignAuto.Acceptance.Contracts.SentinelLayoutPolicy]::Validate(
         $fixtureDirectory,
         $sentinelPath,
         [string]$manifest.sentinelIdentity,
@@ -867,13 +867,13 @@ function Invoke-FixtureCleanup {
 
     $actualNames = @(Get-ChildItem -LiteralPath $fixtureDirectory -Force | ForEach-Object { $_.Name })
     $expectedNames = @($entries | ForEach-Object { $_.relativePath }) + @('fixture-manifest.json', 'fixture-owner.txt')
-    [SimplySignAuto.Acceptance.Contracts.ArtifactSetPolicy]::ValidateExact($expectedNames, $actualNames)
+    [CodeSignAuto.Acceptance.Contracts.ArtifactSetPolicy]::ValidateExact($expectedNames, $actualNames)
 
     # Validate the complete batch before deleting the first entry.
     foreach ($entry in $entries) {
         $path = Join-Path $fixtureDirectory ([string]$entry.relativePath)
         $item = Get-Item -LiteralPath $path -Force
-        $identity = [SimplySignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read($path, $false)
+        $identity = [CodeSignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read($path, $false)
         $isReparse = ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0
         if ($item.PSIsContainer -or $identity.Identity -cne [string]$entry.identity -or
             [int]$identity.LinkCount -ne [int]$entry.linkCount -or
@@ -907,14 +907,14 @@ function Invoke-FixtureCleanup {
         $sentinelIdentity.Identity -cne [string]$manifest.sentinelIdentity -or $sentinelIdentity.LinkCount -ne 1) {
         throw 'acceptance_fixture_cleanup_uncertain'
     }
-    [SimplySignAuto.Acceptance.Contracts.SentinelLayoutPolicy]::Validate(
+    [CodeSignAuto.Acceptance.Contracts.SentinelLayoutPolicy]::Validate(
         $fixtureDirectory,
         $sentinelPath,
         [string]$manifest.sentinelIdentity,
         $sentinelIdentity.Identity,
         ([string]$manifest.sentinelSha256).ToLowerInvariant(),
         (Get-FileHash -LiteralPath $sentinelPath -Algorithm SHA256).Hash.ToLowerInvariant())
-    [SimplySignAuto.Acceptance.Contracts.ArtifactSetPolicy]::ValidateExact(
+    [CodeSignAuto.Acceptance.Contracts.ArtifactSetPolicy]::ValidateExact(
         @('fixture-manifest.json', 'fixture-owner.txt'),
         @(Get-ChildItem -LiteralPath $fixtureDirectory -Force | ForEach-Object { $_.Name }))
 
@@ -939,7 +939,7 @@ try {
     }
 
     $script:windowsSystemPublishers =
-        [SimplySignAuto.Acceptance.Contracts.WindowsSystemPublisherMapPolicy]::Parse(
+        [CodeSignAuto.Acceptance.Contracts.WindowsSystemPublisherMapPolicy]::Parse(
             $WindowsSystemPublisherSha256Map)
 
     $canonicalDotnet = Get-CanonicalExistingPath -Path $DotnetPath -Kind Leaf
@@ -949,7 +949,7 @@ try {
         -Path (Join-Path $canonicalSystemRoot 'System32\taskkill.exe') `
         -Kind Leaf
     if (-not [string]::Equals([System.IO.Path]::GetFileName($canonicalDotnet), 'dotnet.exe', [System.StringComparison]::OrdinalIgnoreCase) -or
-        -not [SimplySignAuto.Acceptance.Contracts.TrustedExecutablePolicy]::IsWithinTrustedRoot(
+        -not [CodeSignAuto.Acceptance.Contracts.TrustedExecutablePolicy]::IsWithinTrustedRoot(
             $canonicalDotnet, @($canonicalRepoForContracts, $canonicalProgramFiles))) {
         throw 'acceptance_fixture_dotnet_invalid'
     }
@@ -961,11 +961,11 @@ try {
     $dotnetSnapshot = Get-ExecutableTrustSnapshot `
         $canonicalDotnet `
         @($canonicalRepoForContracts, $canonicalProgramFiles)
-    [SimplySignAuto.Acceptance.Contracts.TrustedExecutablePolicy]::Validate(
+    [CodeSignAuto.Acceptance.Contracts.TrustedExecutablePolicy]::Validate(
         $dotnetSnapshot,
         $dotnetSnapshot,
         @($canonicalRepoForContracts, $canonicalProgramFiles),
-        [SimplySignAuto.Acceptance.Contracts.ExecutableTrustKind]::PlatformPublisher,
+        [CodeSignAuto.Acceptance.Contracts.ExecutableTrustKind]::PlatformPublisher,
         $DotnetPublisherSha256)
     $script:taskkillGuard = [System.IO.FileStream]::new(
         $script:canonicalTaskkill,
@@ -975,11 +975,11 @@ try {
     $script:taskkillSnapshot = Get-ExecutableTrustSnapshot `
         $script:canonicalTaskkill `
         @($canonicalSystemRoot)
-    [SimplySignAuto.Acceptance.Contracts.TrustedExecutablePolicy]::Validate(
+    [CodeSignAuto.Acceptance.Contracts.TrustedExecutablePolicy]::Validate(
         $script:taskkillSnapshot,
         $script:taskkillSnapshot,
         @($canonicalSystemRoot),
-        [SimplySignAuto.Acceptance.Contracts.ExecutableTrustKind]::PlatformPublisher,
+        [CodeSignAuto.Acceptance.Contracts.ExecutableTrustKind]::PlatformPublisher,
         ($script:windowsSystemPublishers.ResolveExpectedPublisherSha256(
             $script:canonicalTaskkill)))
 
@@ -987,8 +987,8 @@ try {
     $canonicalCsc = $null
     $canonicalDriver = $null
     if ($GenerateNativeFixtures) {
-        [SimplySignAuto.Acceptance.Contracts.NativeFixtureSourcePolicy]::ValidateToolPublisherHashes(
-            [SimplySignAuto.Acceptance.Contracts.NativeFixtureSourceMode]::AutoGenerated,
+        [CodeSignAuto.Acceptance.Contracts.NativeFixtureSourcePolicy]::ValidateToolPublisherHashes(
+            [CodeSignAuto.Acceptance.Contracts.NativeFixtureSourceMode]::AutoGenerated,
             $MakeCatPublisherSha256,
             $CscPublisherSha256,
             $SystemDriverPublisherSha256)
@@ -1025,7 +1025,7 @@ try {
     [System.IO.Directory]::CreateDirectory($fixtureDirectory) | Out-Null
     $script:FixtureRootCreated = $true
     $script:FixtureDirectoryForFailure = $fixtureDirectory
-    $script:FixtureDirectoryIdentity = [SimplySignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read(
+    $script:FixtureDirectoryIdentity = [CodeSignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read(
         $fixtureDirectory,
         $true).Identity
     $ownerMarker = Join-Path $fixtureDirectory 'fixture-owner.txt'
@@ -1036,7 +1036,7 @@ try {
     if (Test-Path -LiteralPath $sentinelPath) { throw 'acceptance_fixture_collision' }
     $script:FixtureSentinelPath = $sentinelPath
     New-CreateNewText -Path $sentinelPath -Text 'SSA preserved sentinel'
-    $sentinelIdentity = [SimplySignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read($sentinelPath, $false)
+    $sentinelIdentity = [CodeSignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read($sentinelPath, $false)
     $script:FixtureSentinelIdentity = $sentinelIdentity.Identity
     $script:FixtureSentinelHash = (Get-FileHash -LiteralPath $sentinelPath -Algorithm SHA256).Hash
 
@@ -1044,7 +1044,7 @@ try {
     [System.IO.Directory]::CreateDirectory($buildDirectory) | Out-Null
     try {
         $project = Get-CanonicalExistingPath `
-            -Path (Join-Path $canonicalRepoForContracts 'tests\SimplySignAuto.Agent.Tests\Fixtures\UnsignedHello\UnsignedHello.csproj') `
+            -Path (Join-Path $canonicalRepoForContracts 'tests\CodeSignAuto.Agent.Tests\Fixtures\UnsignedHello\UnsignedHello.csproj') `
             -Kind Leaf
         Invoke-BoundedProcess `
             -Executable $canonicalDotnet `
@@ -1056,20 +1056,20 @@ try {
         $dotnetAfter = Get-ExecutableTrustSnapshot `
             $canonicalDotnet `
             @($canonicalRepoForContracts, $canonicalProgramFiles)
-        [SimplySignAuto.Acceptance.Contracts.TrustedExecutablePolicy]::Validate(
+        [CodeSignAuto.Acceptance.Contracts.TrustedExecutablePolicy]::Validate(
             $dotnetSnapshot,
             $dotnetAfter,
             @($canonicalRepoForContracts, $canonicalProgramFiles),
-            [SimplySignAuto.Acceptance.Contracts.ExecutableTrustKind]::PlatformPublisher,
+            [CodeSignAuto.Acceptance.Contracts.ExecutableTrustKind]::PlatformPublisher,
             $DotnetPublisherSha256)
         $taskkillAfter = Get-ExecutableTrustSnapshot `
             $script:canonicalTaskkill `
             @($canonicalSystemRoot)
-        [SimplySignAuto.Acceptance.Contracts.TrustedExecutablePolicy]::Validate(
+        [CodeSignAuto.Acceptance.Contracts.TrustedExecutablePolicy]::Validate(
             $script:taskkillSnapshot,
             $taskkillAfter,
             @($canonicalSystemRoot),
-            [SimplySignAuto.Acceptance.Contracts.ExecutableTrustKind]::PlatformPublisher,
+            [CodeSignAuto.Acceptance.Contracts.ExecutableTrustKind]::PlatformPublisher,
             ($script:windowsSystemPublishers.ResolveExpectedPublisherSha256(
                 $script:canonicalTaskkill)))
         $script:dotnetGuard.Dispose()
@@ -1108,11 +1108,11 @@ try {
     New-CreateNewText -Path (Join-Path $fixtureDirectory 'fake.exe') -Text 'MZ-not-a-portable-executable'
     New-CreateNewBytes -Path (Join-Path $fixtureDirectory 'wrong-extension.pdf') -Bytes $unsignedBytes
     New-CreateNewText -Path (Join-Path $fixtureDirectory 'hardlink-source.bin') -Text 'SSA hardlink fixture'
-    [SimplySignAuto.Acceptance.Contracts.WindowsFileIdentity]::CreateHardLink(
+    [CodeSignAuto.Acceptance.Contracts.WindowsFileIdentity]::CreateHardLink(
         (Join-Path $fixtureDirectory 'hardlink-alias.bin'),
         (Join-Path $fixtureDirectory 'hardlink-source.bin'))
     New-CreateNewText -Path (Join-Path $fixtureDirectory 'reparse-target.bin') -Text 'SSA reparse sentinel'
-    [SimplySignAuto.Acceptance.Contracts.WindowsFileIdentity]::CreateFileSymbolicLink(
+    [CodeSignAuto.Acceptance.Contracts.WindowsFileIdentity]::CreateFileSymbolicLink(
         (Join-Path $fixtureDirectory 'reparse-link.bin'),
         (Join-Path $fixtureDirectory 'reparse-target.bin'))
     New-CreateNewText -Path (Join-Path $fixtureDirectory 'path-swap-a.bin') -Text 'SSA path swap A'
@@ -1129,11 +1129,11 @@ try {
     $taskkillAfter = Get-ExecutableTrustSnapshot `
         $script:canonicalTaskkill `
         @($canonicalSystemRoot)
-    [SimplySignAuto.Acceptance.Contracts.TrustedExecutablePolicy]::Validate(
+    [CodeSignAuto.Acceptance.Contracts.TrustedExecutablePolicy]::Validate(
         $script:taskkillSnapshot,
         $taskkillAfter,
         @($canonicalSystemRoot),
-        [SimplySignAuto.Acceptance.Contracts.ExecutableTrustKind]::PlatformPublisher,
+        [CodeSignAuto.Acceptance.Contracts.ExecutableTrustKind]::PlatformPublisher,
         ($script:windowsSystemPublishers.ResolveExpectedPublisherSha256(
             $script:canonicalTaskkill)))
     $script:taskkillGuard.Dispose()
@@ -1178,7 +1178,7 @@ try {
 
     $actual = @(Get-ChildItem -LiteralPath $fixtureDirectory -Force | ForEach-Object { $_.Name })
     $expected = @($entries | ForEach-Object { $_.relativePath }) + @('fixture-manifest.json', 'fixture-owner.txt')
-    [SimplySignAuto.Acceptance.Contracts.ArtifactSetPolicy]::ValidateExact($expected, $actual)
+    [CodeSignAuto.Acceptance.Contracts.ArtifactSetPolicy]::ValidateExact($expected, $actual)
     [Console]::Out.WriteLine('acceptance_fixtures_ready')
     exit 0
 } catch {

@@ -1,5 +1,5 @@
 [project]
-name = "simplysign-pdf-signer"
+name = "codesignauto-pdf-signer"
 version = "0.1.1"
 requires-python = ">=3.12,<3.13"
 dependencies = [

@@ -1,8 +1,8 @@
-# SimplySignAuto
+# CodeSignAuto
 
 [中文（默认）](README.md) | [English](README.en.md)
 
-SimplySignAuto provides Authenticode signing, optional PDF/PAdES signing, local
+CodeSignAuto provides Authenticode signing, optional PDF/PAdES signing, local
 WPF manual signing, and unattended Windows Server signing through an HTTP API.
 
 ## Installation requirements
@@ -56,7 +56,7 @@ The first installation requires one fixed mode. Manual signing is selected by de
 | Intended use | Windows 10/11 or administrator-operated signing | Unattended Windows Server signing |
 | Signing runtime | Runs while the current administrator app is open | Background Service and dedicated signing user |
 | Windows Service | Not created | LocalSystem Service |
-| Dedicated user / AutoLogon | Not created | `SimplySignAgent` with protected AutoLogon |
+| Dedicated user / AutoLogon | Not created | `CodeSignAutoAgent` with protected AutoLogon |
 | HTTP API | Not exposed | Exposed |
 | Closing the console | Allowed after the active job completes | Does not stop background jobs |
 
@@ -72,10 +72,10 @@ has been saved and can be changed under Application Settings.
 
 ## Quick start
 
-1. Download `SimplySignAutoSetup-<version>-win-x64.exe`.
+1. Download `CodeSignAutoSetup-<version>-win-x64.exe`.
 2. Verify its Authenticode signature and timestamp.
 3. Run Setup and select the language and installation mode.
-4. In Manual mode, open SimplySignAuto after installation.
+4. In Manual mode, open CodeSignAuto after installation.
 5. In Service mode, restart when prompted, then open the public-desktop shortcut as Administrator.
 6. Import the complete `otpauth://` activation content on the Activation page.
 7. Confirm that the target certificate and required signing capability are ready on Overview.
@@ -83,7 +83,7 @@ has been saved and can be changed under Application Settings.
 
 Service mode also creates a one-time API token:
 
-1. Read `%ProgramData%\SimplySignAuto\install-token.txt`.
+1. Read `%ProgramData%\CodeSignAuto\install-token.txt`.
 2. Store the token in the caller's secret store immediately.
 3. Delete the file after API access is verified.
 4. The Service retains only the token SHA-256.
@@ -94,11 +94,11 @@ See the complete [HTTP API documentation](docs/API.md).
 
 Every public Release contains:
 
-- `SimplySignAutoSetup-<version>-win-x64.exe`.
+- `CodeSignAutoSetup-<version>-win-x64.exe`.
 
 When an effective PDF input changed since the previous main release, it also contains:
 
-- `SimplySignAutoPdfSetup-<version>-win-x64.exe`.
+- `CodeSignAutoPdfSetup-<version>-win-x64.exe`.
 
 PDF versions may therefore have gaps, for example from `0.1.0` directly to `0.1.3`.
 
@@ -106,7 +106,7 @@ Verify installers in the current directory with PowerShell:
 
 ```powershell
 $setups = Get-ChildItem -LiteralPath . -File |
-  Where-Object Name -Match '^SimplySignAuto(Pdf)?Setup-[0-9].*-win-x64\.exe$'
+  Where-Object Name -Match '^CodeSignAuto(Pdf)?Setup-[0-9].*-win-x64\.exe$'
 
 foreach ($setup in $setups) {
   $signature = Get-AuthenticodeSignature -LiteralPath $setup.FullName
@@ -133,7 +133,7 @@ Package boundaries:
 After signature verification, run the main Setup:
 
 ```powershell
-& '.\SimplySignAutoSetup-0.1.0-win-x64.exe'
+& '.\CodeSignAutoSetup-0.1.0-win-x64.exe'
 ```
 
 Setup accepts no arguments and requests UAC through its application manifest. Its
@@ -157,7 +157,7 @@ Installed resources:
 - an installation receipt and uninstall registration.
 
 This mode creates no Service, dedicated user, AutoLogon, scheduled task, or API
-token. `%ProgramData%\SimplySignAuto` contains only the administrator-readable
+token. `%ProgramData%\CodeSignAuto` contains only the administrator-readable
 `install.json` receipt.
 
 #### Automatic signing service mode
@@ -165,7 +165,7 @@ token. `%ProgramData%\SimplySignAuto` contains only the administrator-readable
 Installed resources:
 
 - a LocalSystem Service;
-- the low-privilege `SimplySignAgent` user;
+- the low-privilege `CodeSignAutoAgent` user;
 - a Windows profile;
 - a random password stored only in LSA private data;
 - protected AutoLogon;
@@ -202,7 +202,7 @@ types, or any other relevant state cannot be proven.
 When PDF/PAdES is required, run the independent Setup:
 
 ```powershell
-& '.\SimplySignAutoPdfSetup-<version>-win-x64.exe'
+& '.\CodeSignAutoPdfSetup-<version>-win-x64.exe'
 ```
 
 Rules:
@@ -215,6 +215,10 @@ Rules:
 - If no protected Windows system font covers all visible text, signing returns `pdf_appearance_font_missing`.
 
 ### In-place upgrade
+
+In-place upgrades require an existing `CodeSignAuto` installation identity.
+For installations made before the rename, complete the old version's uninstall
+and restart before installing this product. Settings and activation are not migrated automatically.
 
 The same main Setup handles clean installation and bounded in-place upgrade.
 
@@ -279,7 +283,7 @@ The low-level `configure-otp` command is only for explicit offline repair in the
 actual signing-user context:
 
 ```powershell
-Get-Clipboard | .\SimplySignAuto.exe configure-otp
+Get-Clipboard | .\CodeSignAuto.exe configure-otp
 Set-Clipboard -Value ''
 ```
 
@@ -380,13 +384,13 @@ a command window. From PowerShell, use a wait-style invocation to keep stable ou
 in the current terminal for administration and troubleshooting:
 
 ```powershell
-$process = Start-Process -FilePath 'C:\Program Files\SimplySignAuto\SimplySignAuto.exe' `
+$process = Start-Process -FilePath 'C:\Program Files\CodeSignAuto\CodeSignAuto.exe' `
   -ArgumentList 'uninstall' -NoNewWindow -Wait -PassThru
 $process.ExitCode
 ```
 
 Once elevated, the main-application uninstall writes a bounded, structured diagnostic log to
-`%LocalAppData%\SimplySignAuto\logs\uninstall.log`. It records only the product version,
+`%LocalAppData%\CodeSignAuto\logs\uninstall.log`. It records only the product version,
 Windows build, installation-state classification, and stable error codes; it does not record
 tokens, SIDs, paths, or configuration contents. If the receipt and service configuration are
 missing, invalid, or conflicting, uninstall stops before changing the system. A restart cannot
@@ -406,7 +410,7 @@ Manual uninstall:
 Only this explicit command removes the controlled data directory:
 
 ```powershell
-$process = Start-Process -FilePath 'C:\Program Files\SimplySignAuto\SimplySignAuto.exe' `
+$process = Start-Process -FilePath 'C:\Program Files\CodeSignAuto\CodeSignAuto.exe' `
   -ArgumentList 'uninstall', '--purge-data', '--confirm', 'PURGE' `
   -NoNewWindow -Wait -PassThru
 $process.ExitCode
@@ -426,7 +430,7 @@ certificates, or an operator-managed reverse proxy.
 
 | Symptom or code | Action |
 | --- | --- |
-| `live` 503 | Check `SimplySignAuto.Service`, Event Log, the `jobs.db` volume, and ProgramData ACLs. Do not delete the database. |
+| `live` 503 | Check `CodeSignAuto.Service`, Event Log, the `jobs.db` volume, and ProgramData ACLs. Do not delete the database. |
 | `ready` 503 with `live` 200 | Check the nonzero signing-user session, Agent task, clock, SimplySign Desktop, token, certificate, and private key. |
 | `installation_mode_change_requires_reinstall` | Uninstall, rerun Setup, and select the other mode. |
 | `autologon_conflict` / `autologon_plaintext_password_present` | Select **Disable safely and continue** in Service-mode Setup, or use Manual mode. |
@@ -489,7 +493,7 @@ Credential-free local wrapper:
   -Version <version> `
   -SigningBaseUrl 'http://signing-host.internal:7080' `
   -BearerTokenPath 'C:\BuildSecrets\simplysign-token.txt' `
-  -SigningReferencePath 'C:\BuildSecrets\SimplySignAuto-reference.exe' `
+  -SigningReferencePath 'C:\BuildSecrets\CodeSignAuto-reference.exe' `
   -DotnetRoot 'C:\Program Files\dotnet' `
   -UvPath '<path-to-uv.exe>'
 ```
@@ -499,6 +503,6 @@ process environment. Never record it in the repository, command line, or logs.
 
 ## License
 
-SimplySignAuto uses the [MIT License](LICENSE). Complete third-party copyright and
+CodeSignAuto uses the [MIT License](LICENSE). Complete third-party copyright and
 license texts are in [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt). Both files
 are embedded in every released installer.

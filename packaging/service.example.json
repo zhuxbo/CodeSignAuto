@@ -1,11 +1,11 @@
 {
   "tokenHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "signingUserSid": "S-1-5-21-1000-2000-3000-4000",
-  "dataRoot": "C:\\ProgramData\\SimplySignAuto",
-  "spoolRoot": "C:\\ProgramData\\SimplySignAuto\\spool",
+  "dataRoot": "C:\\ProgramData\\CodeSignAuto",
+  "spoolRoot": "C:\\ProgramData\\CodeSignAuto\\spool",
   "listenPort": 7080,
-  "ownerMarker": "SimplySignAuto/v1",
+  "ownerMarker": "CodeSignAuto/v1",
   "installInstanceId": "0123456789abcdef0123456789abcdef",
-  "executablePath": "C:\\Program Files\\SimplySignAuto\\SimplySignAuto.exe",
-  "agentConfigurationPath": "C:\\Users\\signer\\AppData\\Local\\SimplySignAuto\\agent.json"
+  "executablePath": "C:\\Program Files\\CodeSignAuto\\CodeSignAuto.exe",
+  "agentConfigurationPath": "C:\\Users\\signer\\AppData\\Local\\CodeSignAuto\\agent.json"
 }

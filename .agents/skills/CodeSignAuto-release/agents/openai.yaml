@@ -1,0 +1,4 @@
+interface:
+  display_name: "CodeSignAuto 发布与验证"
+  short_description: "构建、签名、安装和验证 CodeSignAuto 发布版本"
+  default_prompt: "按项目发布边界检查、构建、签名并验证 CodeSignAuto，明确区分 Windows 构建机与发布验证机。"

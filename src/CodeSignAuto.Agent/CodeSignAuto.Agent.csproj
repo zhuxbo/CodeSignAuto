@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" />
+    <PackageReference Include="Pkcs11Interop" />
+    <ProjectReference Include="../CodeSignAuto.Core/CodeSignAuto.Core.csproj" />
+    <ProjectReference Include="../CodeSignAuto.Protocol/CodeSignAuto.Protocol.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="CodeSignAuto.Agent.Tests" />
+    <InternalsVisibleTo Include="CodeSignAuto.EndToEnd.Tests" />
+  </ItemGroup>
+</Project>

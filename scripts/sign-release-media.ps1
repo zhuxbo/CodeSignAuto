@@ -15,9 +15,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
-$publisherPlaceholder = '__SIMPLYSIGNAUTO_PUBLISHER_CERTIFICATE_SHA256__'
+$publisherPlaceholder = '__CODESIGNAUTO_PUBLISHER_CERTIFICATE_SHA256__'
 $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
-$releaseNativeTypeBase64 = 'dXNpbmcgU3lzdGVtOyB1c2luZyBTeXN0ZW0uUnVudGltZS5JbnRlcm9wU2VydmljZXM7IHVzaW5nIE1pY3Jvc29mdC5XaW4zMi5TYWZlSGFuZGxlczsgbmFtZXNwYWNlIFNpbXBseVNpZ25BdXRvLlJlbGVhc2UgeyBbU3RydWN0TGF5b3V0KExheW91dEtpbmQuU2VxdWVudGlhbCldIHB1YmxpYyBzdHJ1Y3QgRmlsZUluZm9ybWF0aW9uIHsgcHVibGljIHVpbnQgRmlsZUF0dHJpYnV0ZXM7IHB1YmxpYyBTeXN0ZW0uUnVudGltZS5JbnRlcm9wU2VydmljZXMuQ29tVHlwZXMuRklMRVRJTUUgQ3JlYXRpb25UaW1lOyBwdWJsaWMgU3lzdGVtLlJ1bnRpbWUuSW50ZXJvcFNlcnZpY2VzLkNvbVR5cGVzLkZJTEVUSU1FIExhc3RBY2Nlc3NUaW1lOyBwdWJsaWMgU3lzdGVtLlJ1bnRpbWUuSW50ZXJvcFNlcnZpY2VzLkNvbVR5cGVzLkZJTEVUSU1FIExhc3RXcml0ZVRpbWU7IHB1YmxpYyB1aW50IFZvbHVtZVNlcmlhbE51bWJlcjsgcHVibGljIHVpbnQgRmlsZVNpemVIaWdoOyBwdWJsaWMgdWludCBGaWxlU2l6ZUxvdzsgcHVibGljIHVpbnQgbk51bWJlck9mTGlua3M7IHB1YmxpYyB1aW50IEZpbGVJbmRleEhpZ2g7IHB1YmxpYyB1aW50IEZpbGVJbmRleExvdzsgfSBwdWJsaWMgc3RhdGljIGNsYXNzIE5hdGl2ZU1ldGhvZHMgeyBbRGxsSW1wb3J0KCJrZXJuZWwzMi5kbGwiLCBTZXRMYXN0RXJyb3I9dHJ1ZSldIFtyZXR1cm46IE1hcnNoYWxBcyhVbm1hbmFnZWRUeXBlLkJvb2wpXSBwdWJsaWMgc3RhdGljIGV4dGVybiBib29sIEdldEZpbGVJbmZvcm1hdGlvbkJ5SGFuZGxlKFNhZmVGaWxlSGFuZGxlIGhhbmRsZSwgb3V0IEZpbGVJbmZvcm1hdGlvbiBpbmZvcm1hdGlvbik7IH0gfQ=='
+$releaseNativeTypeBase64 = 'dXNpbmcgU3lzdGVtOyB1c2luZyBTeXN0ZW0uUnVudGltZS5JbnRlcm9wU2VydmljZXM7IHVzaW5nIE1pY3Jvc29mdC5XaW4zMi5TYWZlSGFuZGxlczsgbmFtZXNwYWNlIENvZGVTaWduQXV0by5SZWxlYXNlIHsgW1N0cnVjdExheW91dChMYXlvdXRLaW5kLlNlcXVlbnRpYWwpXSBwdWJsaWMgc3RydWN0IEZpbGVJbmZvcm1hdGlvbiB7IHB1YmxpYyB1aW50IEZpbGVBdHRyaWJ1dGVzOyBwdWJsaWMgU3lzdGVtLlJ1bnRpbWUuSW50ZXJvcFNlcnZpY2VzLkNvbVR5cGVzLkZJTEVUSU1FIENyZWF0aW9uVGltZTsgcHVibGljIFN5c3RlbS5SdW50aW1lLkludGVyb3BTZXJ2aWNlcy5Db21UeXBlcy5GSUxFVElNRSBMYXN0QWNjZXNzVGltZTsgcHVibGljIFN5c3RlbS5SdW50aW1lLkludGVyb3BTZXJ2aWNlcy5Db21UeXBlcy5GSUxFVElNRSBMYXN0V3JpdGVUaW1lOyBwdWJsaWMgdWludCBWb2x1bWVTZXJpYWxOdW1iZXI7IHB1YmxpYyB1aW50IEZpbGVTaXplSGlnaDsgcHVibGljIHVpbnQgRmlsZVNpemVMb3c7IHB1YmxpYyB1aW50IG5OdW1iZXJPZkxpbmtzOyBwdWJsaWMgdWludCBGaWxlSW5kZXhIaWdoOyBwdWJsaWMgdWludCBGaWxlSW5kZXhMb3c7IH0gcHVibGljIHN0YXRpYyBjbGFzcyBOYXRpdmVNZXRob2RzIHsgW0RsbEltcG9ydCgia2VybmVsMzIuZGxsIiwgU2V0TGFzdEVycm9yPXRydWUpXSBbcmV0dXJuOiBNYXJzaGFsQXMoVW5tYW5hZ2VkVHlwZS5Cb29sKV0gcHVibGljIHN0YXRpYyBleHRlcm4gYm9vbCBHZXRGaWxlSW5mb3JtYXRpb25CeUhhbmRsZShTYWZlRmlsZUhhbmRsZSBoYW5kbGUsIG91dCBGaWxlSW5mb3JtYXRpb24gaW5mb3JtYXRpb24pOyB9IH0='
 $signingClientScript = Join-Path $PSScriptRoot 'sign-via-simplysign.ps1'
 . $signingClientScript
 
@@ -62,7 +62,7 @@ function Get-CertificateSha256 {
 function Assert-PayloadTree {
     param([Parameter(Mandatory = $true)][string]$Root)
 
-    if ($null -eq ('SimplySignAuto.Release.NativeMethods' -as [type])) {
+    if ($null -eq ('CodeSignAuto.Release.NativeMethods' -as [type])) {
         $nativeSource = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($releaseNativeTypeBase64))
         Add-Type -TypeDefinition $nativeSource -ErrorAction Stop
     }
@@ -81,8 +81,8 @@ function Assert-PayloadTree {
             [IO.FileAccess]::Read,
             ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
         try {
-            $information = New-Object SimplySignAuto.Release.FileInformation
-            if (-not [SimplySignAuto.Release.NativeMethods]::GetFileInformationByHandle(
+            $information = New-Object CodeSignAuto.Release.FileInformation
+            if (-not [CodeSignAuto.Release.NativeMethods]::GetFileInformationByHandle(
                     $stream.SafeFileHandle,
                     [ref]$information) -or
                 $information.nNumberOfLinks -ne 1) {
@@ -176,7 +176,7 @@ function Invoke-SignReleaseMediaMain {
     $PackageRoot = Get-CanonicalPlainPath -Path $PackageRoot -Kind Container
     Assert-PayloadTree -Root $PackageRoot
 
-    $applicationPath = Get-CanonicalPlainPath -Path (Join-Path $PackageRoot 'SimplySignAuto.exe') -Kind Leaf
+    $applicationPath = Get-CanonicalPlainPath -Path (Join-Path $PackageRoot 'CodeSignAuto.exe') -Kind Leaf
     $prerequisiteScriptPath = Get-CanonicalPlainPath -Path (Join-Path $PackageRoot 'install-prerequisites.ps1') -Kind Leaf
     $catalogPath = Join-Path $PackageRoot 'release-files.cat'
     if (Test-Path -LiteralPath $catalogPath) {

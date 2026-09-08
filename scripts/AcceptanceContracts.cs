@@ -19,7 +19,7 @@ using System.Text.RegularExpressions;
 #pragma warning disable 8603
 #endif
 
-namespace SimplySignAuto.Acceptance.Contracts
+namespace CodeSignAuto.Acceptance.Contracts
 {
     public sealed class AcceptanceContractException : Exception
     {
@@ -874,11 +874,11 @@ namespace SimplySignAuto.Acceptance.Contracts
                 RunIdPattern.IsMatch(runId) &&
                 string.Equals(
                     lsaKey,
-                    "SimplySignAuto/Acceptance/" + runId + "/Api",
+                    "CodeSignAuto/Acceptance/" + runId + "/Api",
                     StringComparison.Ordinal) &&
                 string.Equals(
                     taskName,
-                    "SimplySignAuto.Acceptance.Boot." + runId,
+                    "CodeSignAuto.Acceptance.Boot." + runId,
                     StringComparison.Ordinal);
         }
     }
@@ -930,8 +930,8 @@ namespace SimplySignAuto.Acceptance.Contracts
                 !string.Equals(expected.LogonType, "ServiceAccount", StringComparison.Ordinal) ||
                 !string.Equals(expected.RunLevel, "Highest", StringComparison.Ordinal) ||
                 !string.Equals(expected.Trigger, "AtStartup", StringComparison.Ordinal) ||
-                !string.Equals(expected.Source, "SimplySignAuto/v1", StringComparison.Ordinal) ||
-                !string.Equals(expected.OwnerMarker, "SimplySignAuto/AcceptanceBoot/v1", StringComparison.Ordinal) ||
+                !string.Equals(expected.Source, "CodeSignAuto/v1", StringComparison.Ordinal) ||
+                !string.Equals(expected.OwnerMarker, "CodeSignAuto/AcceptanceBoot/v1", StringComparison.Ordinal) ||
                 expected.ExecutionLimitSeconds < 60 ||
                 expected.ExecutionLimitSeconds > 1800 ||
                 expected.ActionCount != 1 ||
@@ -1206,17 +1206,17 @@ namespace SimplySignAuto.Acceptance.Contracts
     {
         private static readonly string[] InteractiveTests = new[]
         {
-            "SimplySignAuto.Agent.Tests.DpapiOtpStoreTests.Protects_file_acl_for_current_user_and_system_only",
-            "SimplySignAuto.Agent.Tests.DpapiOtpStoreTests.Reports_corrupt_when_ciphertext_is_tampered",
-            "SimplySignAuto.Agent.Tests.DpapiOtpStoreTests.Saves_and_loads_for_current_windows_user",
-            "SimplySignAuto.Agent.Tests.DpapiOtpStoreTests.Reports_missing_for_missing_file",
-            "SimplySignAuto.Agent.Tests.AgentHostTests.Windows_local_mutex_rejects_a_second_owner_for_the_same_sid",
-            "SimplySignAuto.Agent.Tests.AgentHostTests.Windows_local_mutex_lease_can_be_disposed_from_a_different_thread",
-            "SimplySignAuto.Agent.Tests.AgentHostTests.Windows_session_ending_monitor_can_start_and_stop_its_hidden_window",
-            "SimplySignAuto.Service.Tests.WindowsSpoolAclPolicyTests.Windows_signing_user_can_delete_only_the_part_it_created",
-            "SimplySignAuto.UI.Tests.WindowsDesktopIntegrationTests.Wpf_runtime_preserves_theme_icon_tray_and_opens_settings_on_its_visible_main_window",
-            "SimplySignAuto.UI.Tests.WindowsDesktopIntegrationTests.Activation_pipe_is_exclusive_and_accepts_only_the_current_signing_user",
-            "SimplySignAuto.UI.Tests.WindowsDesktopIntegrationTests.A_preexisting_pipe_squatter_cannot_be_claimed_and_never_starts_the_agent",
+            "CodeSignAuto.Agent.Tests.DpapiOtpStoreTests.Protects_file_acl_for_current_user_and_system_only",
+            "CodeSignAuto.Agent.Tests.DpapiOtpStoreTests.Reports_corrupt_when_ciphertext_is_tampered",
+            "CodeSignAuto.Agent.Tests.DpapiOtpStoreTests.Saves_and_loads_for_current_windows_user",
+            "CodeSignAuto.Agent.Tests.DpapiOtpStoreTests.Reports_missing_for_missing_file",
+            "CodeSignAuto.Agent.Tests.AgentHostTests.Windows_local_mutex_rejects_a_second_owner_for_the_same_sid",
+            "CodeSignAuto.Agent.Tests.AgentHostTests.Windows_local_mutex_lease_can_be_disposed_from_a_different_thread",
+            "CodeSignAuto.Agent.Tests.AgentHostTests.Windows_session_ending_monitor_can_start_and_stop_its_hidden_window",
+            "CodeSignAuto.Service.Tests.WindowsSpoolAclPolicyTests.Windows_signing_user_can_delete_only_the_part_it_created",
+            "CodeSignAuto.UI.Tests.WindowsDesktopIntegrationTests.Wpf_runtime_preserves_theme_icon_tray_and_opens_settings_on_its_visible_main_window",
+            "CodeSignAuto.UI.Tests.WindowsDesktopIntegrationTests.Activation_pipe_is_exclusive_and_accepts_only_the_current_signing_user",
+            "CodeSignAuto.UI.Tests.WindowsDesktopIntegrationTests.A_preexisting_pipe_squatter_cannot_be_claimed_and_never_starts_the_agent",
         };
 
         private static readonly HashSet<string> InteractiveSet =
@@ -2720,7 +2720,7 @@ namespace SimplySignAuto.Acceptance.Contracts
         private const uint PolicyAccess = 0x00000004 | 0x00000020;
         private const uint StatusObjectNameNotFound = 0xC0000034;
         private static readonly Regex KeyPattern = new Regex(
-            "^SimplySignAuto/Acceptance/[0-9a-f]{32}/Api$",
+            "^CodeSignAuto/Acceptance/[0-9a-f]{32}/Api$",
             RegexOptions.CultureInvariant);
 
         public static void StoreNew(string key, string secret)

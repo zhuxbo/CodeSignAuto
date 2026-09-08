@@ -14,7 +14,7 @@ from cryptography.x509.oid import NameOID
 from pkcs11 import Attribute, ObjectClass
 from pkcs11.exceptions import AttributeSensitive, AttributeTypeInvalid, FunctionFailed
 
-from simplysign_pdf_signer import (
+from CodeSignAuto_pdf_signer import (
     CatalogRequest,
     ProbeRequest,
     RequestError,

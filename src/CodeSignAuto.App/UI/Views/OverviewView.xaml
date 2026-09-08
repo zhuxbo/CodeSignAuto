@@ -1,0 +1,180 @@
+<UserControl x:Class="CodeSignAuto.App.UI.Views.OverviewView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:localization="clr-namespace:CodeSignAuto.App.UI.Localization"
+             AutomationProperties.Name="{localization:UiString OverviewAutomation}">
+  <StackPanel Margin="{DynamicResource SpaceLarge}">
+    <Grid>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <StackPanel>
+        <TextBlock Text="{localization:UiString OverviewTitle}"
+                   FontSize="26"
+                   FontWeight="SemiBold"
+                   AutomationProperties.Name="{localization:UiString OverviewTitle}" />
+        <TextBlock Text="{localization:UiString OverviewDescription}"
+                   Margin="0,5,0,0"
+                   Foreground="{DynamicResource TextSecondaryBrush}" />
+      </StackPanel>
+      <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Bottom">
+        <Button Content="{Binding LoginButtonText}"
+                Command="{Binding LoginCommand}"
+                AutomationProperties.Name="{Binding LoginButtonText}" />
+      </StackPanel>
+    </Grid>
+
+    <Grid Margin="0,20,0,0">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="14" />
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition>
+          <ColumnDefinition.Style>
+            <Style TargetType="ColumnDefinition">
+              <Setter Property="Width" Value="14" />
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding PdfExtensionVisible}" Value="False">
+                  <Setter Property="Width" Value="0" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </ColumnDefinition.Style>
+        </ColumnDefinition>
+        <ColumnDefinition>
+          <ColumnDefinition.Style>
+            <Style TargetType="ColumnDefinition">
+              <Setter Property="Width" Value="*" />
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding PdfExtensionVisible}" Value="False">
+                  <Setter Property="Width" Value="0" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </ColumnDefinition.Style>
+        </ColumnDefinition>
+      </Grid.ColumnDefinitions>
+
+      <Border Grid.Column="0"
+              Style="{DynamicResource StatusPanelStyle}"
+              AutomationProperties.Name="{localization:UiString SimplySignStatusPanel}">
+        <StackPanel>
+          <TextBlock Text="SimplySign" FontSize="16" FontWeight="SemiBold" />
+          <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+            <TextBlock Text="{Binding SimplySignStatusIcon}"
+                       Margin="0,0,7,0"
+                       AutomationProperties.Name="{localization:UiString SimplySignStatusIcon}" />
+            <TextBlock Text="{Binding SimplySignStatusText}"
+                       TextWrapping="Wrap"
+                       AutomationProperties.Name="{Binding SimplySignStatusText}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <Border Grid.Column="2"
+              Style="{DynamicResource StatusPanelStyle}"
+              AutomationProperties.Name="{localization:UiString AuthenticodeStatusPanel}">
+        <StackPanel>
+          <TextBlock Text="{localization:UiString AuthenticodeTitle}" FontSize="16" FontWeight="SemiBold" />
+          <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+            <TextBlock Text="{Binding AuthenticodeStatusIcon}"
+                       Margin="0,0,7,0"
+                       AutomationProperties.Name="{localization:UiString AuthenticodeStatusIcon}" />
+            <TextBlock Text="{Binding AuthenticodeStatusText}"
+                       TextWrapping="Wrap"
+                       AutomationProperties.Name="{Binding AuthenticodeStatusText}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <Border Grid.Column="4"
+              Style="{DynamicResource StatusPanelStyle}"
+              Visibility="{Binding PdfExtensionVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+              AutomationProperties.Name="{localization:UiString PdfStatusPanel}">
+        <StackPanel>
+          <TextBlock Text="{localization:UiString PdfSigningTitle}" FontSize="16" FontWeight="SemiBold" />
+          <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+            <TextBlock Text="{Binding PdfStatusIcon}"
+                       Margin="0,0,7,0"
+                       AutomationProperties.Name="{localization:UiString PdfStatusIcon}" />
+            <TextBlock Text="{Binding PdfStatusText}"
+                       TextWrapping="Wrap"
+                       AutomationProperties.Name="{Binding PdfStatusText}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </Grid>
+
+    <StackPanel Margin="0,14,0,0"
+                Visibility="{Binding HasDiagnostics, Converter={StaticResource BooleanToVisibilityConverter}}">
+      <ItemsControl ItemsSource="{Binding ReasonMessages}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <TextBlock Text="{Binding}"
+                       Margin="0,2"
+                       Foreground="{DynamicResource TextSecondaryBrush}"
+                       TextWrapping="Wrap"
+                       AutomationProperties.Name="{Binding}" />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <TextBlock Text="{Binding CorrelationText}"
+                 Margin="0,4,0,0"
+                 Foreground="{DynamicResource TextSecondaryBrush}"
+                 AutomationProperties.Name="{Binding CorrelationText}" />
+    </StackPanel>
+
+    <Border Style="{DynamicResource StatusPanelStyle}" Margin="0,18,0,0">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <StackPanel>
+          <TextBlock Text="{localization:UiString CurrentJobTitle}" FontSize="16" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding QueueStatusText}"
+                     Margin="0,9,0,0"
+                     Foreground="{DynamicResource TextSecondaryBrush}" />
+          <TextBlock Text="{Binding CurrentJobText}"
+                     Margin="0,5,0,0"
+                     TextWrapping="Wrap"
+                     AutomationProperties.Name="{Binding CurrentJobText}" />
+        </StackPanel>
+        <Button Grid.Column="1"
+                Content="{localization:UiString OpenJobs}"
+                Command="{Binding OpenJobsCommand}"
+                VerticalAlignment="Center"
+                AutomationProperties.Name="{localization:UiString OpenJobsAutomation}" />
+      </Grid>
+    </Border>
+
+    <Border Style="{DynamicResource StatusPanelStyle}" Margin="0,14,0,0">
+      <StackPanel>
+        <TextBlock Text="{localization:UiString RecentCompleted}" FontSize="16" FontWeight="SemiBold" />
+        <ItemsControl ItemsSource="{Binding RecentJobs}" Margin="0,8,0,0">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Grid Margin="0,5">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="120" />
+                  <ColumnDefinition Width="100" />
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="{Binding Kind}" />
+                <TextBlock Grid.Column="1" Text="{Binding TerminalState}" />
+                <TextBlock Grid.Column="2"
+                           Text="{Binding ErrorCode, TargetNullValue={localization:UiString StatusSuccess}}"
+                           Foreground="{DynamicResource TextSecondaryBrush}" />
+                <TextBlock Grid.Column="3"
+                           Text="{Binding CompletedAtUtc}"
+                           Foreground="{DynamicResource TextSecondaryBrush}" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </Border>
+  </StackPanel>
+</UserControl>

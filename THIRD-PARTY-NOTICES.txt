@@ -1,4 +1,4 @@
-SimplySignAuto Third-Party Notices
+CodeSignAuto Third-Party Notices
 =================================
 
 This distribution includes third-party software. Components are included only in the installer that uses them.

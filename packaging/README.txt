@@ -1,4 +1,4 @@
-SimplySignAuto installation and release notes
+CodeSignAuto installation and release notes
 ==============================================
 
 Read OPERATIONS.md before installation. This package targets Windows Server
@@ -13,7 +13,7 @@ Setup offers two fixed modes. Manual signing is the client default and runs
 local jobs in the current administrator's WPF process without a Service,
 dedicated user, AutoLogon or HTTP API. Automatic signing service is the server
 default and provides unattended signing through a LocalSystem Service and a
-dedicated SimplySignAgent session. Upgrades inherit the installed mode. Switching
+dedicated CodeSignAutoAgent session. Upgrades inherit the installed mode. Switching
 modes requires uninstall and reinstall.
 
 Prerequisites
@@ -37,13 +37,13 @@ Package contents
 ----------------
 
 - The public release always contains the signed, versioned main installer,
-  SimplySignAutoSetup-<version>-win-x64.exe. It also contains
-  SimplySignAutoPdfSetup-<version>-win-x64.exe only when effective PDF helper,
+  CodeSignAutoSetup-<version>-win-x64.exe. It also contains
+  CodeSignAutoPdfSetup-<version>-win-x64.exe only when effective PDF helper,
   dependency, shared Setup, toolchain or license inputs changed since the
   previous main release. Every published installer embeds its payload and
   accepts no arguments. PDF versions therefore may have gaps, but when a PDF
   installer is published its version matches that main release.
-- SimplySignAuto.exe and e_sqlite3.dll: framework-dependent Service, headless
+- CodeSignAuto.exe and e_sqlite3.dll: framework-dependent Service, headless
   Agent and administrator WPF app payload.
 - install-prerequisites.ps1 and runtime-prerequisites.json: signed prerequisite
   checker and strict runtime policy. Missing supported .NET runtimes stop setup
@@ -54,11 +54,11 @@ Package contents
 - OPERATIONS.md: API, health, retention, upgrade and incident guide.
 - sbom.spdx.json and reproducibility.json: dependency inventory and repeat-
   build comparison.
-- LICENSE.txt: SimplySignAuto MIT license.
+- LICENSE.txt: CodeSignAuto MIT license.
 - THIRD-PARTY-NOTICES.txt: dependency attributions and complete license texts.
 
 The main installer contains only the base product and enables Authenticode.
-The PDF installer contains extension.json, the signed SimplySignPdfSigner
+The PDF installer contains extension.json, the signed CodeSignAutoPdfSigner
 executable, and the two license documents. The helper is never downloaded by the product.
 Visible PDF stamps select a font that covers the required text from the protected
 Windows Fonts directory; no font file is bundled in the helper.
@@ -73,16 +73,16 @@ Standard install
    through its application manifest. Select Chinese or English and one fixed
    installation mode. Setup verifies its own publisher and embedded signed
    media, then atomically stages the validated payload into
-   C:\Program Files\SimplySignAuto.
+   C:\Program Files\CodeSignAuto.
 3. Before the first mutation, Setup verifies Windows/admin/non-domain-controller
    state, SimplySign Desktop and PKCS#11. Missing SimplySign prerequisites stop
    setup without creating a user.
 4. Manual mode creates protected per-administrator local job data, the public
    shortcut, receipt and registration. It creates no Service, user, AutoLogon,
    task or API token. ProgramData contains only install.json, not service
-   configuration, a job database or spool. Open SimplySignAuto directly, import
+   configuration, a job database or spool. Open CodeSignAuto directly, import
    activation and submit local jobs. History and signed results are retained.
-5. Service mode creates the low-privilege SimplySignAgent account and profile,
+5. Service mode creates the low-privilege CodeSignAutoAgent account and profile,
    a non-displayed random password held only in Windows LSA private data,
    protected AutoLogon, the exact AtLogOn/InteractiveToken Agent task,
    ProgramData, generated configuration and the LocalSystem Service. It refuses
@@ -90,10 +90,10 @@ Standard install
    failed readback. Failure rolls back only exact-owned changes; uncertain
    rollback reports setup_state_uncertain.
 6. Service mode only: copy the one-time API token to client secret storage and
-   delete C:\ProgramData\SimplySignAuto\install-token.txt after verification.
+   delete C:\ProgramData\CodeSignAuto\install-token.txt after verification.
    Restart Windows when requested so the signing user's nonzero session starts
    the headless Agent. Administrators never operate that user's desktop.
-7. Run SimplySignAuto.exe as Administrator. Manual mode hosts the signing worker
+7. Run CodeSignAuto.exe as Administrator. Manual mode hosts the signing worker
    in this process and refuses Exit while a job is active. Service mode opens an
    elevated control console without loading agent.json or starting another
    Agent.
@@ -106,7 +106,11 @@ Standard install
    then, PDF controls remain hidden and base readiness depends only on
    Authenticode.
 
-An exact existing SimplySignAuto installation selects a bounded in-place upgrade
+Installations made before the CodeSignAuto rename must be uninstalled using the
+old version and restarted before installation. Settings and activation are not
+automatically migrated.
+
+An exact existing CodeSignAuto installation selects a bounded in-place upgrade
 and locks the installed mode. Manual upgrades replace only verified media and
 registration while preserving per-administrator activation, settings, history
 and signed results. Service upgrades verify the owned identity, ACLs, service,
@@ -164,15 +168,15 @@ Do not use curl -k. Process presence alone is not readiness.
 Uninstall
 ---------
 
-Use Windows Settings > Apps > Installed apps > SimplySignAuto, or run from
+Use Windows Settings > Apps > Installed apps > CodeSignAuto, or run from
 PowerShell and wait for the GUI-subsystem process:
 
-   $process = Start-Process -FilePath 'C:\Program Files\SimplySignAuto\SimplySignAuto.exe' `
+   $process = Start-Process -FilePath 'C:\Program Files\CodeSignAuto\CodeSignAuto.exe' `
      -ArgumentList 'uninstall' -NoNewWindow -Wait -PassThru
    $process.ExitCode
 
 Once elevated, the main-product uninstall writes a bounded structured log to
-%LocalAppData%\SimplySignAuto\logs\uninstall.log. It contains only the product
+%LocalAppData%\CodeSignAuto\logs\uninstall.log. It contains only the product
 version, Windows build, persisted-state classification and stable error code;
 it never contains tokens, SIDs, paths or configuration contents. Missing,
 invalid or conflicting install metadata stops uninstall before mutation. A
@@ -199,8 +203,8 @@ Service, logs off exact-SID sessions, disables only product-owned AutoLogon,
 deletes the exact-owned user and profile, then quarantines ProgramData. The
 protected disabled-AutoLogon receipt makes an interrupted uninstall retryable.
 SYSTEM completes physical quarantine and exact owner/SID Winlogon/LSA cleanup
-cleanup after restart. Keep C:\Program Files\SimplySignAuto unchanged until
-that restart completes and the SimplySignAuto.Purge.* task/quarantine are gone;
+cleanup after restart. Keep C:\Program Files\CodeSignAuto unchanged until
+that restart completes and the CodeSignAuto.Purge.* task/quarantine are gone;
 the cleanup task requires the same executable path and hash. Advanced
 ExistingUser installations preserve the external account and profile.
 

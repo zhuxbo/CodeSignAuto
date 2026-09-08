@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>CodeSignAutoSetup</AssemblyName>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <SelfContained>false</SelfContained>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <PublishTrimmed>false</PublishTrimmed>
+    <InformationalVersion>$(Version)</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'win-x64'">
+    <SelfContained>false</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
+    <EnableSingleFileAnalyzer>false</EnableSingleFileAnalyzer>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(SetupPayloadPath)' != ''">
+    <EmbeddedResource Include="$(SetupPayloadPath)" LogicalName="CodeSignAuto.Setup.Payload.zip" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(SetupMetadataPath)' != ''">
+    <EmbeddedResource Include="$(SetupMetadataPath)" LogicalName="CodeSignAuto.Setup.Metadata.json" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="CodeSignAuto.EndToEnd.Tests" />
+  </ItemGroup>
+</Project>

@@ -21,8 +21,8 @@ from pkcs11.exceptions import (
     UserNotLoggedIn,
 )
 
-import simplysign_pdf_signer
-from simplysign_pdf_signer import (
+import CodeSignAuto_pdf_signer
+from CodeSignAuto_pdf_signer import (
     RequestError,
     SignRequest,
     _failure_exit_code,
@@ -30,7 +30,7 @@ from simplysign_pdf_signer import (
     sign_document,
 )
 
-SCRIPT = Path(__file__).parents[1] / "simplysign_pdf_signer.py"
+SCRIPT = Path(__file__).parents[1] / "CodeSignAuto_pdf_signer.py"
 CERTIFICATE_ID = bytes.fromhex("c0ffee01")
 PRIVATE_KEY_ID = bytes.fromhex("decafbad")
 
@@ -590,12 +590,12 @@ def test_sign_and_validation_failures_use_20_and_30_and_never_reuse_part(
 def test_pyinstaller_spec_collects_only_required_runtime_graph_without_secrets() -> None:
     spec = (SCRIPT.parent / "pdf-signer.spec").read_text(encoding="utf-8")
 
-    assert 'name="SimplySignPdfSigner"' in spec
+    assert 'name="CodeSignAutoPdfSigner"' in spec
     assert "collect_all" not in spec
     assert "collect_dynamic_libs" in spec
     assert "optimize=2" in spec
     for module in (
-        "simplysign_pdf_validator",
+        "CodeSignAuto_pdf_validator",
         "pyhanko.sign.pkcs11",
         "pyhanko.sign.signers",
         "pyhanko.sign.validation",
@@ -620,14 +620,14 @@ def test_frozen_helper_uses_only_trusted_windows_appearance_fonts(
     monkeypatch.setattr(sys, "frozen", True, raising=False)
     monkeypatch.setattr(sys, "_MEIPASS", str(tmp_path / "bundle"), raising=False)
     monkeypatch.setattr(
-        simplysign_pdf_signer,
+        CodeSignAuto_pdf_signer,
         "_windows_fonts_directory",
         lambda: windows_root / "Fonts",
     )
 
-    assert simplysign_pdf_signer._appearance_font_candidates() == tuple(
+    assert CodeSignAuto_pdf_signer._appearance_font_candidates() == tuple(
         windows_root / "Fonts" / name
-        for name in simplysign_pdf_signer.WINDOWS_APPEARANCE_FONTS
+        for name in CodeSignAuto_pdf_signer.WINDOWS_APPEARANCE_FONTS
     )
 
 
@@ -635,15 +635,15 @@ def test_windows_signature_stamp_rejects_missing_appearance_font(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(simplysign_pdf_signer.os, "name", "nt")
+    monkeypatch.setattr(CodeSignAuto_pdf_signer.os, "name", "nt")
     monkeypatch.setattr(
-        simplysign_pdf_signer,
+        CodeSignAuto_pdf_signer,
         "_windows_fonts_directory",
         lambda: tmp_path / "Windows" / "Fonts",
     )
 
     with pytest.raises(RuntimeError, match="^pdf_appearance_font_missing$"):
-        simplysign_pdf_signer._signature_stamp_style("组织名称")
+        CodeSignAuto_pdf_signer._signature_stamp_style("组织名称")
 
 
 def test_pyinstaller_spec_excludes_cli_and_image_surfaces_and_keeps_text_and_native_crypto(
@@ -883,18 +883,18 @@ def test_main_catalog_unknown_dispatch_errors_keep_catalog_envelope_and_tracebac
         raise RuntimeError(f"catalog {failure_point} diagnostic /module/path 42")
 
     if failure_point == "loader":
-        monkeypatch.setattr(simplysign_pdf_signer, "load_catalog_request", raise_unknown)
+        monkeypatch.setattr(CodeSignAuto_pdf_signer, "load_catalog_request", raise_unknown)
     else:
         monkeypatch.setattr(
-            simplysign_pdf_signer,
+            CodeSignAuto_pdf_signer,
             "load_catalog_request",
-            lambda path: simplysign_pdf_signer.CatalogRequest(
+            lambda path: CodeSignAuto_pdf_signer.CatalogRequest(
                 module_path=Path("/controlled/pkcs11.dll")
             ),
         )
-        monkeypatch.setattr(simplysign_pdf_signer, "catalog_certificates", raise_unknown)
+        monkeypatch.setattr(CodeSignAuto_pdf_signer, "catalog_certificates", raise_unknown)
 
-    exit_code = simplysign_pdf_signer.main(["catalog", "--request", "/unused-request.json"])
+    exit_code = CodeSignAuto_pdf_signer.main(["catalog", "--request", "/unused-request.json"])
     captured = capsys.readouterr()
 
     assert exit_code == 10

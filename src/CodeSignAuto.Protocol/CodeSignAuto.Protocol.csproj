@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../CodeSignAuto.Core/CodeSignAuto.Core.csproj" />
+  </ItemGroup>
+</Project>

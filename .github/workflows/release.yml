@@ -19,8 +19,8 @@ jobs:
     permissions:
       contents: write
     env:
-      MAIN_SETUP: artifacts/release/SimplySignAutoSetup-${{ inputs.version }}-win-x64.exe
-      PDF_SETUP: artifacts/release/SimplySignAutoPdfSetup-${{ inputs.version }}-win-x64.exe
+      MAIN_SETUP: artifacts/release/CodeSignAutoSetup-${{ inputs.version }}-win-x64.exe
+      PDF_SETUP: artifacts/release/CodeSignAutoPdfSetup-${{ inputs.version }}-win-x64.exe
       PDF_DECISION: artifacts/build/${{ inputs.version }}/pdf-release-decision.json
 
     steps:
@@ -85,7 +85,7 @@ jobs:
 
       - name: Restore locked dependencies
         shell: pwsh
-        run: dotnet restore SimplySignAuto.sln --locked-mode -p:NuGetAudit=true -p:NuGetAuditMode=all -m:1 -nodeReuse:false
+        run: dotnet restore CodeSignAuto.sln --locked-mode -p:NuGetAudit=true -p:NuGetAuditMode=all -m:1 -nodeReuse:false
 
       - name: Build and sign release installers
         shell: powershell
@@ -153,5 +153,5 @@ jobs:
           gh release create "v${{ inputs.version }}" `
             @assets `
             --verify-tag `
-            --title "SimplySignAuto v${{ inputs.version }}" `
+            --title "CodeSignAuto v${{ inputs.version }}" `
             --notes-file "${{ runner.temp }}/release-notes.md"

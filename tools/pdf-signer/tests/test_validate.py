@@ -27,14 +27,14 @@ from pyhanko.sign.signers import PdfTimeStamper, SimpleSigner
 from pyhanko.sign.timestamps import DummyTimeStamper
 from pyhanko_certvalidator.registry import SimpleCertificateStore
 
-from simplysign_pdf_signer import (
+from CodeSignAuto_pdf_signer import (
     RequestError,
     SignRequest,
     load_validate_request,
     main,
     sign_pdf_with_signer,
 )
-from simplysign_pdf_validator import (
+from CodeSignAuto_pdf_validator import (
     ValidationFacts,
     ValidationRequest,
     _spawn_validate_with_pid,
@@ -43,7 +43,7 @@ from simplysign_pdf_validator import (
     validate_signed_pdf,
 )
 
-SCRIPT = Path(__file__).parents[1] / "simplysign_pdf_signer.py"
+SCRIPT = Path(__file__).parents[1] / "CodeSignAuto_pdf_signer.py"
 
 
 def issue_certificate(
@@ -326,7 +326,7 @@ def test_validate_cli_returns_one_strict_safe_evidence_line_without_pkcs11_or_ne
     def forbidden_pkcs11(*_: object, **__: object) -> object:
         raise AssertionError("validate must not load PKCS11")
 
-    monkeypatch.setattr("simplysign_pdf_signer.pkcs11.lib", forbidden_pkcs11)
+    monkeypatch.setattr("CodeSignAuto_pdf_signer.pkcs11.lib", forbidden_pkcs11)
     assert main(["validate", "--request", str(request_path)]) == 0
     captured = capsys.readouterr()
     assert captured.err == ""

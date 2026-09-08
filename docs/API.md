@@ -1,6 +1,6 @@
-# SimplySignAuto HTTP API
+# CodeSignAuto HTTP API
 
-本文档描述 SimplySignAuto 当前公开的 HTTP 签名接口。产品本身不提供 HTTPS、证书导入或证书自动更新；需要 HTTPS 时，由部署者在产品外配置反向代理，并把请求转发到 SimplySignAuto 的 HTTP 监听端口。
+本文档描述 CodeSignAuto 当前公开的 HTTP 签名接口。产品本身不提供 HTTPS、证书导入或证书自动更新；需要 HTTPS 时，由部署者在产品外配置反向代理，并把请求转发到 CodeSignAuto 的 HTTP 监听端口。
 
 ## 基本约定
 
@@ -15,7 +15,7 @@
 安装成功后，一次性明文 token 位于：
 
 ```text
-%ProgramData%\SimplySignAuto\install-token.txt
+%ProgramData%\CodeSignAuto\install-token.txt
 ```
 
 把 token 复制到调用方的 secret store 并确认 API 可访问后，应删除该文件。服务端只保存 token 的 SHA-256。

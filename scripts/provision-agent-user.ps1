@@ -8,7 +8,7 @@ param(
     [ValidatePattern('^[A-Za-z0-9_.-]{1,20}$')]
     [string]$UserName,
 
-    [string]$AppPath = (Join-Path $PSScriptRoot '..\SimplySignAuto.exe')
+    [string]$AppPath = (Join-Path $PSScriptRoot '..\CodeSignAuto.exe')
 )
 
 $ErrorActionPreference = 'Stop'

@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="WindowMainTitle" xml:space="preserve"><value>CodeSignAuto 安装</value></data>
+  <data name="WindowPdfTitle" xml:space="preserve"><value>CodeSignAuto PDF 扩展安装</value></data>
+  <data name="MainTitle" xml:space="preserve"><value>安装 CodeSignAuto</value></data>
+  <data name="PdfTitle" xml:space="preserve"><value>安装 CodeSignAuto PDF 扩展</value></data>
+  <data name="MainDescription" xml:space="preserve"><value>安装程序将验证安装介质并初始化所选代码签名模式。</value></data>
+  <data name="PdfDescription" xml:space="preserve"><value>安装程序将验证离线扩展介质并安装 PDF 签名支持。</value></data>
+  <data name="LanguageLabel" xml:space="preserve"><value>语言</value></data>
+  <data name="LanguageChinese" xml:space="preserve"><value>中文</value></data>
+  <data name="LanguageEnglish" xml:space="preserve"><value>English</value></data>
+  <data name="ModeLabel" xml:space="preserve"><value>安装模式</value></data>
+  <data name="ModeManualName" xml:space="preserve"><value>手工签名模式</value></data>
+  <data name="ModeServiceName" xml:space="preserve"><value>自动签名服务模式</value></data>
+  <data name="ModeManualDescription" xml:space="preserve"><value>适合 Windows 10/11 当前管理员按需打开程序并手工提交签名；不创建服务、专用用户或自动登录。</value></data>
+  <data name="ModeServiceDescription" xml:space="preserve"><value>适合服务器无人值守自动签名；会创建签名服务、专用签名用户和受控自动登录。</value></data>
+  <data name="ModeSwitchRequiresReinstall" xml:space="preserve"><value>安装后模式固定；切换模式需卸载重装。</value></data>
+  <data name="InstallButton" xml:space="preserve"><value>安装</value></data>
+  <data name="CancelButton" xml:space="preserve"><value>取消</value></data>
+  <data name="CloseButton" xml:space="preserve"><value>关闭</value></data>
+  <data name="StatusReady" xml:space="preserve"><value>准备安装</value></data>
+  <data name="StatusVerifyingMedia" xml:space="preserve"><value>正在验证安装介质…</value></data>
+  <data name="StatusInstallComplete" xml:space="preserve"><value>安装完成</value></data>
+  <data name="StatusInstallFailed" xml:space="preserve"><value>安装失败</value></data>
+  <data name="StatusInstallFailedCode" xml:space="preserve"><value>安装失败（代码 {0}）</value></data>
+  <data name="StatusDisablingAutoLogon" xml:space="preserve"><value>正在安全禁用系统自动登录…</value></data>
+  <data name="StatusRetryingInstallation" xml:space="preserve"><value>自动登录已安全禁用，正在重新检查并继续安装…</value></data>
+  <data name="ProgressMediaVerified" xml:space="preserve"><value>安装介质已验证</value></data>
+  <data name="ProgressPublisherMediaVerified" xml:space="preserve"><value>发布介质已验证</value></data>
+  <data name="ProgressRuntimeManifestVerified" xml:space="preserve"><value>运行时清单已验证</value></data>
+  <data name="ProgressSystemPrerequisitesComplete" xml:space="preserve"><value>系统前置检查已完成</value></data>
+  <data name="ProgressRuntimeStatusChecked" xml:space="preserve"><value>运行时状态已检查</value></data>
+  <data name="ProgressPdfMediaVerified" xml:space="preserve"><value>PDF 扩展介质已验证</value></data>
+  <data name="ProgressLaunchConditionsVerified" xml:space="preserve"><value>应用启动条件已验证</value></data>
+  <data name="ProgressProductInitializationComplete" xml:space="preserve"><value>产品初始化完成</value></data>
+  <data name="ProgressProductInstallComplete" xml:space="preserve"><value>产品安装完成</value></data>
+  <data name="ProgressInstallComplete" xml:space="preserve"><value>安装完成</value></data>
+  <data name="ProgressAutoLogonCleanupStarting" xml:space="preserve"><value>正在禁用系统自动登录</value></data>
+  <data name="ProgressAutoLogonCleanupComplete" xml:space="preserve"><value>系统自动登录已安全禁用</value></data>
+  <data name="ErrorRequiredRuntimeMissing" xml:space="preserve"><value>缺少 CodeSignAuto 所需的 .NET 10 Windows x64 运行环境。请安装 ASP.NET Core Runtime 和 .NET Desktop Runtime 后重新运行安装程序。
+ASP.NET Core Runtime：https://dotnet.microsoft.com/en-us/download/dotnet/10.0
+.NET Desktop Runtime：https://dotnet.microsoft.com/en-us/download/dotnet/10.0/runtime</value></data>
+  <data name="ErrorSimplySignDesktopMissing" xml:space="preserve"><value>Certum SimplySign Desktop（Windows 64 位）未安装。请安装后重新运行安装程序。
+下载：https://support.certum.eu/en/software/procertum-smartsign/</value></data>
+  <data name="ErrorSimplySignPkcs11Missing" xml:space="preserve"><value>未找到 C:\Windows\System32\SimplySignPKCS.dll。请修复或重新安装 Certum SimplySign Desktop（Windows 64 位）。
+下载：https://support.certum.eu/en/software/procertum-smartsign/</value></data>
+  <data name="ErrorOsUnsupported" xml:space="preserve"><value>不支持当前 Windows 版本或版本组合。支持 x64 Windows 10 22H2、受支持的 Windows 10 LTSC/Windows 11，以及 Windows Server 2019/2022/2025 Desktop Experience。</value></data>
+  <data name="ErrorDesktopExperienceRequired" xml:space="preserve"><value>自动签名服务需要 Windows Server Desktop Experience，不支持 Server Core。</value></data>
+  <data name="ErrorArchitectureUnsupported" xml:space="preserve"><value>CodeSignAuto 只支持 x64 Windows。请在 64 位操作系统中运行 64 位安装程序。</value></data>
+  <data name="ErrorAdministratorRequired" xml:space="preserve"><value>安装需要管理员权限。请右键安装程序并选择“以管理员身份运行”，然后重新运行。</value></data>
+  <data name="ErrorDomainControllerUnsupported" xml:space="preserve"><value>不支持在域控制器上安装。请改用工作组计算机、域成员客户端或成员服务器。</value></data>
+  <data name="ErrorAutoLogonConflict" xml:space="preserve"><value>检测到账户 {0} 已配置自动登录。自动签名服务需要独占该配置，安装程序不会覆盖现有设置。可由安装程序安全禁用自动登录并继续，或返回选择手工签名模式。</value></data>
+  <data name="AutoLogonAccountUnknown" xml:space="preserve"><value>（未知账户）</value></data>
+  <data name="ErrorAutoLogonPlaintextPasswordPresent" xml:space="preserve"><value>自动登录已关闭，但检测到系统仍保存自动登录凭据。可由安装程序安全移除后继续安装；安装程序不会显示、记录或使用密码内容。</value></data>
+  <data name="AutoLogonResolutionTitle" xml:space="preserve"><value>需要处理现有自动登录设置</value></data>
+  <data name="AutoLogonActiveDetail" xml:space="preserve"><value>检测到账户 {0} 的系统自动登录仍处于启用状态。自动签名服务不能与现有自动登录共用该配置。</value></data>
+  <data name="AutoLogonResidualDetail" xml:space="preserve"><value>系统自动登录当前已关闭，但系统中仍保存自动登录凭据。自动签名服务安装前需要先安全移除这些残留凭据。</value></data>
+  <data name="AutoLogonCleanupScope" xml:space="preserve"><value>安全禁用只会关闭系统自动登录并删除 Windows 保存的自动登录凭据；不会删除用户、不会更改 Windows 账户密码，也不会显示、记录或使用密码内容。</value></data>
+  <data name="AutoLogonDisableAndContinueButton" xml:space="preserve"><value>安全禁用并继续</value></data>
+  <data name="AutoLogonUseManualModeButton" xml:space="preserve"><value>改用手工签名模式</value></data>
+  <data name="AutoLogonCleanupAcknowledge" xml:space="preserve"><value>我已了解：此操作不可撤销，但不会更改 Windows 账户密码。</value></data>
+  <data name="ErrorAutoLogonCleanupOwnedState" xml:space="preserve"><value>检测到 CodeSignAuto 管理的自动登录或卸载状态。为避免破坏产品状态，安装程序不会清理。请先完成原版本卸载，或改用手工签名模式。</value></data>
+  <data name="ErrorAutoLogonCleanupStateUncertain" xml:space="preserve"><value>检测到系统自动登录状态异常，无法确认可安全处理。安装程序未做更改；请检查系统设置，或改用手工签名模式。</value></data>
+  <data name="ErrorAutoLogonCleanupBusy" xml:space="preserve"><value>CodeSignAuto 配置正在被其他进程修改。请等待该操作完成后稍后重试。</value></data>
+  <data name="ErrorAutoLogonCleanupFailed" xml:space="preserve"><value>安装程序无法安全禁用系统自动登录，并已停止继续安装。请检查系统设置后重试，或改用手工签名模式。</value></data>
+  <data name="ErrorInstallMediaTargetExists" xml:space="preserve"><value>检测到已有的 CodeSignAuto 安装目录。若刚完成卸载，请重启 Windows 完成受保护的清理后再安装；安装程序不会覆盖来源不明的文件。</value></data>
+  <data name="ErrorGeneric" xml:space="preserve"><value>安装未完成。请检查系统要求并修正问题后重新运行安装程序。</value></data>
+  <data name="ErrorCodeFormat" xml:space="preserve"><value>错误代码：{0}</value></data>
+</root>

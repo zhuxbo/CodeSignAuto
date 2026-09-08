@@ -1,0 +1,66 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>CodeSignAuto</AssemblyName>
+    <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
+    <EnableDefaultPageItems>false</EnableDefaultPageItems>
+    <SelfContained>false</SelfContained>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <PublishTrimmed>false</PublishTrimmed>
+    <InformationalVersion>$(Version)</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'win-x64'">
+    <PublishSingleFile>true</PublishSingleFile>
+    <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
+    <EnableSingleFileAnalyzer>false</EnableSingleFileAnalyzer>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(OS)' == 'Windows_NT'">
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>UI/Resources/app.ico</ApplicationIcon>
+    <DefineConstants>$(DefineConstants);CODESIGNAUTO_WPF</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(OS)' == 'Windows_NT'">
+    <None Remove="UI/App.xaml" />
+    <None Remove="UI/MainWindow.xaml" />
+    <None Remove="UI/Views/OverviewView.xaml" />
+    <None Remove="UI/Views/QuickSignView.xaml" />
+    <None Remove="UI/Views/JobsView.xaml" />
+    <None Remove="UI/Views/ActivationView.xaml" />
+    <None Remove="UI/Views/ActivationImportDialog.xaml" />
+    <None Remove="UI/Views/ServiceSettingsView.xaml" />
+    <None Remove="UI/Views/ServiceSettingsDialog.xaml" />
+    <None Remove="UI/Views/ApplicationSettingsView.xaml" />
+    <None Remove="UI/Themes/Colors.Light.xaml" />
+    <None Remove="UI/Themes/Colors.Dark.xaml" />
+    <None Remove="UI/Themes/Controls.xaml" />
+    <None Remove="UI/Resources/app.ico" />
+    <Page Include="UI/App.xaml" />
+    <Page Include="UI/MainWindow.xaml" />
+    <Page Include="UI/Views/OverviewView.xaml" />
+    <Page Include="UI/Views/QuickSignView.xaml" />
+    <Page Include="UI/Views/JobsView.xaml" />
+    <Page Include="UI/Views/ActivationView.xaml" />
+    <Page Include="UI/Views/ActivationImportDialog.xaml" />
+    <Page Include="UI/Views/ServiceSettingsView.xaml" />
+    <Page Include="UI/Views/ServiceSettingsDialog.xaml" />
+    <Page Include="UI/Views/ApplicationSettingsView.xaml" />
+    <Page Include="UI/Themes/Colors.Light.xaml" />
+    <Page Include="UI/Themes/Colors.Dark.xaml" />
+    <Page Include="UI/Themes/Controls.xaml" />
+    <Resource Include="UI/Resources/app.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../CodeSignAuto.Service/CodeSignAuto.Service.csproj" />
+    <ProjectReference Include="../CodeSignAuto.Agent/CodeSignAuto.Agent.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="CodeSignAuto.Agent.Tests" />
+    <InternalsVisibleTo Include="CodeSignAuto.EndToEnd.Tests" />
+    <InternalsVisibleTo Include="CodeSignAuto.UI.Tests" />
+  </ItemGroup>
+</Project>

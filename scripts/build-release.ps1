@@ -11,7 +11,7 @@ $ProgressPreference = 'SilentlyContinue'
 $SemVerPattern = '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$'
 $Utf8NoBom = [System.Text.UTF8Encoding]::new($false)
 $SbomCreatedUtc = '1980-01-01T00:00:00Z'
-$ReleaseNativeTypeBase64 = 'dXNpbmcgU3lzdGVtOyB1c2luZyBTeXN0ZW0uUnVudGltZS5JbnRlcm9wU2VydmljZXM7IHVzaW5nIE1pY3Jvc29mdC5XaW4zMi5TYWZlSGFuZGxlczsgbmFtZXNwYWNlIFNpbXBseVNpZ25BdXRvLlJlbGVhc2UgeyBbU3RydWN0TGF5b3V0KExheW91dEtpbmQuU2VxdWVudGlhbCldIHB1YmxpYyBzdHJ1Y3QgRmlsZUluZm9ybWF0aW9uIHsgcHVibGljIHVpbnQgRmlsZUF0dHJpYnV0ZXM7IHB1YmxpYyBTeXN0ZW0uUnVudGltZS5JbnRlcm9wU2VydmljZXMuQ29tVHlwZXMuRklMRVRJTUUgQ3JlYXRpb25UaW1lOyBwdWJsaWMgU3lzdGVtLlJ1bnRpbWUuSW50ZXJvcFNlcnZpY2VzLkNvbVR5cGVzLkZJTEVUSU1FIExhc3RBY2Nlc3NUaW1lOyBwdWJsaWMgU3lzdGVtLlJ1bnRpbWUuSW50ZXJvcFNlcnZpY2VzLkNvbVR5cGVzLkZJTEVUSU1FIExhc3RXcml0ZVRpbWU7IHB1YmxpYyB1aW50IFZvbHVtZVNlcmlhbE51bWJlcjsgcHVibGljIHVpbnQgRmlsZVNpemVIaWdoOyBwdWJsaWMgdWludCBGaWxlU2l6ZUxvdzsgcHVibGljIHVpbnQgbk51bWJlck9mTGlua3M7IHB1YmxpYyB1aW50IEZpbGVJbmRleEhpZ2g7IHB1YmxpYyB1aW50IEZpbGVJbmRleExvdzsgfSBwdWJsaWMgc3RhdGljIGNsYXNzIE5hdGl2ZU1ldGhvZHMgeyBbRGxsSW1wb3J0KCJrZXJuZWwzMi5kbGwiLCBTZXRMYXN0RXJyb3I9dHJ1ZSldIFtyZXR1cm46IE1hcnNoYWxBcyhVbm1hbmFnZWRUeXBlLkJvb2wpXSBwdWJsaWMgc3RhdGljIGV4dGVybiBib29sIEdldEZpbGVJbmZvcm1hdGlvbkJ5SGFuZGxlKFNhZmVGaWxlSGFuZGxlIGhhbmRsZSwgb3V0IEZpbGVJbmZvcm1hdGlvbiBpbmZvcm1hdGlvbik7IH0gfQ=='
+$ReleaseNativeTypeBase64 = 'dXNpbmcgU3lzdGVtOyB1c2luZyBTeXN0ZW0uUnVudGltZS5JbnRlcm9wU2VydmljZXM7IHVzaW5nIE1pY3Jvc29mdC5XaW4zMi5TYWZlSGFuZGxlczsgbmFtZXNwYWNlIENvZGVTaWduQXV0by5SZWxlYXNlIHsgW1N0cnVjdExheW91dChMYXlvdXRLaW5kLlNlcXVlbnRpYWwpXSBwdWJsaWMgc3RydWN0IEZpbGVJbmZvcm1hdGlvbiB7IHB1YmxpYyB1aW50IEZpbGVBdHRyaWJ1dGVzOyBwdWJsaWMgU3lzdGVtLlJ1bnRpbWUuSW50ZXJvcFNlcnZpY2VzLkNvbVR5cGVzLkZJTEVUSU1FIENyZWF0aW9uVGltZTsgcHVibGljIFN5c3RlbS5SdW50aW1lLkludGVyb3BTZXJ2aWNlcy5Db21UeXBlcy5GSUxFVElNRSBMYXN0QWNjZXNzVGltZTsgcHVibGljIFN5c3RlbS5SdW50aW1lLkludGVyb3BTZXJ2aWNlcy5Db21UeXBlcy5GSUxFVElNRSBMYXN0V3JpdGVUaW1lOyBwdWJsaWMgdWludCBWb2x1bWVTZXJpYWxOdW1iZXI7IHB1YmxpYyB1aW50IEZpbGVTaXplSGlnaDsgcHVibGljIHVpbnQgRmlsZVNpemVMb3c7IHB1YmxpYyB1aW50IG5OdW1iZXJPZkxpbmtzOyBwdWJsaWMgdWludCBGaWxlSW5kZXhIaWdoOyBwdWJsaWMgdWludCBGaWxlSW5kZXhMb3c7IH0gcHVibGljIHN0YXRpYyBjbGFzcyBOYXRpdmVNZXRob2RzIHsgW0RsbEltcG9ydCgia2VybmVsMzIuZGxsIiwgU2V0TGFzdEVycm9yPXRydWUpXSBbcmV0dXJuOiBNYXJzaGFsQXMoVW5tYW5hZ2VkVHlwZS5Cb29sKV0gcHVibGljIHN0YXRpYyBleHRlcm4gYm9vbCBHZXRGaWxlSW5mb3JtYXRpb25CeUhhbmRsZShTYWZlRmlsZUhhbmRsZSBoYW5kbGUsIG91dCBGaWxlSW5mb3JtYXRpb24gaW5mb3JtYXRpb24pOyB9IH0='
 $SigningClientScript = Join-Path $PSScriptRoot 'sign-via-simplysign.ps1'
 . $SigningClientScript
 $PdfReleaseDecisionScript = Join-Path $PSScriptRoot 'get-pdf-release-decision.ps1'
@@ -130,12 +130,12 @@ function Invoke-ReleaseTestSuite {
     )
 
     $projects = [ordered]@{
-        'SimplySignAuto.Core.Tests' = 'tests/SimplySignAuto.Core.Tests/SimplySignAuto.Core.Tests.csproj'
-        'SimplySignAuto.Protocol.Tests' = 'tests/SimplySignAuto.Protocol.Tests/SimplySignAuto.Protocol.Tests.csproj'
-        'SimplySignAuto.Service.Tests' = 'tests/SimplySignAuto.Service.Tests/SimplySignAuto.Service.Tests.csproj'
-        'SimplySignAuto.Agent.Tests' = 'tests/SimplySignAuto.Agent.Tests/SimplySignAuto.Agent.Tests.csproj'
-        'SimplySignAuto.UI.Tests' = 'tests/SimplySignAuto.UI.Tests/SimplySignAuto.UI.Tests.csproj'
-        'SimplySignAuto.EndToEnd.Tests' = 'tests/SimplySignAuto.EndToEnd.Tests/SimplySignAuto.EndToEnd.Tests.csproj'
+        'CodeSignAuto.Core.Tests' = 'tests/CodeSignAuto.Core.Tests/CodeSignAuto.Core.Tests.csproj'
+        'CodeSignAuto.Protocol.Tests' = 'tests/CodeSignAuto.Protocol.Tests/CodeSignAuto.Protocol.Tests.csproj'
+        'CodeSignAuto.Service.Tests' = 'tests/CodeSignAuto.Service.Tests/CodeSignAuto.Service.Tests.csproj'
+        'CodeSignAuto.Agent.Tests' = 'tests/CodeSignAuto.Agent.Tests/CodeSignAuto.Agent.Tests.csproj'
+        'CodeSignAuto.UI.Tests' = 'tests/CodeSignAuto.UI.Tests/CodeSignAuto.UI.Tests.csproj'
+        'CodeSignAuto.EndToEnd.Tests' = 'tests/CodeSignAuto.EndToEnd.Tests/CodeSignAuto.EndToEnd.Tests.csproj'
     }
     if (Test-Path -LiteralPath $ResultsRoot) {
         Assert-PlainDirectory -Path $ResultsRoot
@@ -197,7 +197,7 @@ function Assert-ReleaseTree {
 
     $canonicalRoot = [IO.Path]::GetFullPath($Root).TrimEnd('\')
     Assert-PlainDirectory -Path $canonicalRoot
-    if ($null -eq ('SimplySignAuto.Release.NativeMethods' -as [type])) {
+    if ($null -eq ('CodeSignAuto.Release.NativeMethods' -as [type])) {
         $nativeSource = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($ReleaseNativeTypeBase64))
         Add-Type -TypeDefinition $nativeSource -ErrorAction Stop
     }
@@ -219,8 +219,8 @@ function Assert-ReleaseTree {
             [IO.FileAccess]::Read,
             ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
         try {
-            $information = New-Object SimplySignAuto.Release.FileInformation
-            if (-not [SimplySignAuto.Release.NativeMethods]::GetFileInformationByHandle(
+            $information = New-Object CodeSignAuto.Release.FileInformation
+            if (-not [CodeSignAuto.Release.NativeMethods]::GetFileInformationByHandle(
                     $stream.SafeFileHandle,
                     [ref]$information) -or
                 $information.nNumberOfLinks -ne 1) {
@@ -327,9 +327,9 @@ function Assert-PublishPayloadPolicy {
     param([Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$RelativePaths)
 
     $allowed = @(
-        'SimplySignAuto.exe'
+        'CodeSignAuto.exe'
         'e_sqlite3.dll'
-        'SimplySignAuto.runtimeconfig.json'
+        'CodeSignAuto.runtimeconfig.json'
     )
     $seen = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     foreach ($path in $RelativePaths) {
@@ -339,7 +339,7 @@ function Assert-PublishPayloadPolicy {
             Fail-Release 'release_publish_payload_forbidden'
         }
     }
-    foreach ($required in @('SimplySignAuto.exe', 'e_sqlite3.dll')) {
+    foreach ($required in @('CodeSignAuto.exe', 'e_sqlite3.dll')) {
         if (-not ($RelativePaths -ccontains $required)) {
             Fail-Release 'release_publish_payload_missing'
         }
@@ -403,18 +403,18 @@ function Get-ManagedAssemblyHashes {
         Justification = 'The established private function returns a set of hashes and is retained for compatibility.')]
     param([Parameter(Mandatory = $true)][string]$RepoRoot)
 
-    $bundleInputRoot = Join-Path $RepoRoot 'src/SimplySignAuto.App/bin/Release/net10.0-windows/win-x64'
+    $bundleInputRoot = Join-Path $RepoRoot 'src/CodeSignAuto.App/bin/Release/net10.0-windows/win-x64'
     if (-not (Test-Path -LiteralPath $bundleInputRoot -PathType Container) -or
         ((Get-Item -LiteralPath $bundleInputRoot -Force).Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
         Fail-Release 'release_managed_output_missing'
     }
 
     $projects = @(
-        'SimplySignAuto.Core'
-        'SimplySignAuto.Protocol'
-        'SimplySignAuto.Agent'
-        'SimplySignAuto.Service'
-        'SimplySignAuto'
+        'CodeSignAuto.Core'
+        'CodeSignAuto.Protocol'
+        'CodeSignAuto.Agent'
+        'CodeSignAuto.Service'
+        'CodeSignAuto'
     )
     $hashes = [ordered]@{}
     foreach ($project in $projects) {
@@ -535,7 +535,7 @@ function Invoke-ReleaseCandidate {
     [System.IO.Directory]::CreateDirectory($publishRoot) | Out-Null
 
     Invoke-Checked -FilePath $Dotnet -WorkingDirectory $RidSourceRoot -ArgumentList @(
-        'publish', 'src/SimplySignAuto.App/SimplySignAuto.App.csproj',
+        'publish', 'src/CodeSignAuto.App/CodeSignAuto.App.csproj',
         '-c', 'Release',
         '-r', 'win-x64',
         '--self-contained', 'false',
@@ -554,7 +554,7 @@ function Invoke-ReleaseCandidate {
         '-o', $publishRoot
     )
 
-    $application = Join-Path $publishRoot 'SimplySignAuto.exe'
+    $application = Join-Path $publishRoot 'CodeSignAuto.exe'
     if (-not (Test-Path -LiteralPath $application -PathType Leaf)) {
         Fail-Release 'release_application_missing'
     }
@@ -663,22 +663,22 @@ function Write-SpdxSbom {
         spdxVersion = 'SPDX-2.3'
         dataLicense = 'CC0-1.0'
         SPDXID = 'SPDXRef-DOCUMENT'
-        name = "SimplySignAuto-$Version-win-x64"
-        documentNamespace = "https://simplysignauto.invalid/spdx/$Version/win-x64"
+        name = "CodeSignAuto-$Version-win-x64"
+        documentNamespace = "https://codesignauto.invalid/spdx/$Version/win-x64"
         creationInfo = [ordered]@{
             created = $SbomCreatedUtc
             creators = @('Tool: scripts/build-release.ps1')
         }
         packages = @(
             [ordered]@{
-                name = 'SimplySignAuto'
+                name = 'CodeSignAuto'
                 versionInfo = $Version
                 supplier = 'NOASSERTION'
                 downloadLocation = 'NOASSERTION'
                 filesAnalyzed = $false
                 licenseConcluded = 'NOASSERTION'
                 licenseDeclared = 'NOASSERTION'
-                SPDXID = 'SPDXRef-Package-SimplySignAuto'
+                SPDXID = 'SPDXRef-Package-CodeSignAuto'
             }
         ) + $sortedPackages
     }
@@ -815,7 +815,7 @@ function Publish-SetupArtifact {
         "-p:SetupPayloadPath=$PayloadPath",
         "-p:SetupMetadataPath=$MetadataPath",
         '-o', $publishRoot)
-    $builtSetupPath = Join-Path $publishRoot 'SimplySignAutoSetup.exe'
+    $builtSetupPath = Join-Path $publishRoot 'CodeSignAutoSetup.exe'
     if (-not (Test-Path -LiteralPath $builtSetupPath -PathType Leaf) -or
         ((Get-Item -LiteralPath $builtSetupPath -Force).Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
         Fail-Release 'release_setup_missing'
@@ -884,7 +884,7 @@ $SigningTimeout = [TimeSpan]::FromMinutes(10)
 $RepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 Assert-PlainDirectory -Path $RepoRoot
 $Dotnet = (Get-Command dotnet -CommandType Application -ErrorAction Stop).Path
-$Solution = Join-Path $RepoRoot 'SimplySignAuto.sln'
+$Solution = Join-Path $RepoRoot 'CodeSignAuto.sln'
 $ArtifactsRoot = Join-Path $RepoRoot 'artifacts'
 $BuildBase = Join-Path $ArtifactsRoot 'build'
 $BuildRoot = Join-Path $BuildBase $Version
@@ -918,7 +918,7 @@ Invoke-ReleaseTestSuite -Dotnet $Dotnet -RepoRoot $RepoRoot -ResultsRoot (Join-P
 
 $ridSourceRoot = Join-Path $BuildRoot 'rid-source'
 Copy-ReleaseSource -RepoRoot $RepoRoot -DestinationRoot $ridSourceRoot
-$ridAppProject = Join-Path $ridSourceRoot 'src/SimplySignAuto.App/SimplySignAuto.App.csproj'
+$ridAppProject = Join-Path $ridSourceRoot 'src/CodeSignAuto.App/CodeSignAuto.App.csproj'
 Invoke-Checked -FilePath $Dotnet -WorkingDirectory $ridSourceRoot -ArgumentList @(
     'restore', $ridAppProject, '--force-evaluate', '-r', 'win-x64',
     '-p:NuGetAudit=false', '-m:1', '-nodeReuse:false')
@@ -931,9 +931,9 @@ $first = Invoke-ReleaseCandidate -Name 'first' -RidSourceRoot $ridSourceRoot -Bu
 $second = Invoke-ReleaseCandidate -Name 'second' -RidSourceRoot $ridSourceRoot -BuildRoot $BuildRoot -Dotnet $Dotnet
 $reproducibility = Join-Path $BuildRoot 'reproducibility.json'
 Assert-Reproducibility -First $first -Second $second -ReportPath $reproducibility
-$expectedPublishFiles = @('SimplySignAuto.exe', 'e_sqlite3.dll')
-if (@($first.Files | Where-Object { $_.path -ceq 'SimplySignAuto.runtimeconfig.json' }).Count -eq 1) {
-    $expectedPublishFiles += 'SimplySignAuto.runtimeconfig.json'
+$expectedPublishFiles = @('CodeSignAuto.exe', 'e_sqlite3.dll')
+if (@($first.Files | Where-Object { $_.path -ceq 'CodeSignAuto.runtimeconfig.json' }).Count -eq 1) {
+    $expectedPublishFiles += 'CodeSignAuto.runtimeconfig.json'
 }
 
 $pdfHelperRoot = Join-Path $RepoRoot 'tools/pdf-signer'
@@ -943,7 +943,7 @@ Invoke-Checked -FilePath $uv -WorkingDirectory $pdfHelperRoot -ArgumentList @('r
 Invoke-Checked -FilePath $uv -WorkingDirectory $pdfHelperRoot -ArgumentList @('run', 'ruff', 'check', '.')
 Invoke-Checked -FilePath $uv -WorkingDirectory $pdfHelperRoot -ArgumentList @(
     'run', 'pyinstaller', '--clean', '--noconfirm', 'pdf-signer.spec')
-$builtPdfHelperPath = Join-Path $pdfHelperRoot 'dist/SimplySignPdfSigner.exe'
+$builtPdfHelperPath = Join-Path $pdfHelperRoot 'dist/CodeSignAutoPdfSigner.exe'
 if (-not (Test-Path -LiteralPath $builtPdfHelperPath -PathType Leaf)) {
     Fail-Release 'release_pdf_helper_missing'
 }
@@ -981,7 +981,7 @@ if ($pdfReleaseDecision.releasePdf -and $pdfHelperVersion -cne $Version) {
     Fail-Release 'release_pdf_helper_version_mismatch'
 }
 
-$packageRoot = Join-Path $BuildRoot ("SimplySignAuto-$Version-win-x64")
+$packageRoot = Join-Path $BuildRoot ("CodeSignAuto-$Version-win-x64")
 [System.IO.Directory]::CreateDirectory($packageRoot) | Out-Null
 $null = Copy-PublishPayload -PublishRoot $first.PublishRoot -PackageRoot $packageRoot
 [System.IO.File]::Copy((Join-Path $RepoRoot 'packaging/agent.example.json'), (Join-Path $packageRoot 'agent.example.json'), $false)
@@ -1034,7 +1034,7 @@ Invoke-Checked -FilePath $windowsPowerShell -WorkingDirectory $RepoRoot -Argumen
 $expectedSignedPackageFiles = @($expectedPackageFiles + 'release-files.cat') | Sort-Object
 Assert-ReleasePackageFileSet -Root $packageRoot -ExpectedFiles $expectedSignedPackageFiles
 $mainApplicationSignature = Get-AuthenticodeSignature -LiteralPath (
-    Join-Path $packageRoot 'SimplySignAuto.exe')
+    Join-Path $packageRoot 'CodeSignAuto.exe')
 if ($mainApplicationSignature.Status -ne [System.Management.Automation.SignatureStatus]::Valid -or
     $null -eq $mainApplicationSignature.SignerCertificate -or
     $null -eq $mainApplicationSignature.TimeStamperCertificate -or
@@ -1054,7 +1054,7 @@ Invoke-Checked -FilePath $windowsPowerShell -WorkingDirectory $RepoRoot -Argumen
     '-VerifyMediaOnly')
 Assert-ReleasePackageFileSet -Root $packageRoot -ExpectedFiles $expectedSignedPackageFiles
 
-$mainPayloadZipPath = Join-Path $BuildRoot ("SimplySignAuto-$Version-win-x64.internal.zip")
+$mainPayloadZipPath = Join-Path $BuildRoot ("CodeSignAuto-$Version-win-x64.internal.zip")
 New-DeterministicZip -SourceRoot $packageRoot -DestinationPath $mainPayloadZipPath
 $mainSetupMetadataPath = Join-Path $BuildRoot 'setup-main-metadata.json'
 Write-SetupPayloadMetadata `
@@ -1063,7 +1063,7 @@ Write-SetupPayloadMetadata `
     -ProductKind 'main' `
     -PublisherCertificateSha256 $publisherCertificateSha256
 
-$ridSetupProject = Join-Path $ridSourceRoot 'src/SimplySignAuto.Setup/SimplySignAuto.Setup.csproj'
+$ridSetupProject = Join-Path $ridSourceRoot 'src/CodeSignAuto.Setup/CodeSignAuto.Setup.csproj'
 Invoke-Checked -FilePath $Dotnet -WorkingDirectory $ridSourceRoot -ArgumentList @(
     'restore', $ridSetupProject, '--force-evaluate', '-r', 'win-x64',
     '-p:NuGetAudit=false', '-m:1', '-nodeReuse:false')
@@ -1074,7 +1074,7 @@ $setupArtifactPath = Publish-SetupArtifact `
     -BuildRoot $BuildRoot `
     -ReleaseRoot $ReleaseRoot `
     -PublishName 'main' `
-    -ArtifactName ("SimplySignAutoSetup-$Version-win-x64.exe") `
+    -ArtifactName ("CodeSignAutoSetup-$Version-win-x64.exe") `
     -PayloadPath $mainPayloadZipPath `
     -MetadataPath $mainSetupMetadataPath `
     -SigningBaseUrl $SigningBaseUrl `
@@ -1085,7 +1085,7 @@ $setupArtifactPath = Publish-SetupArtifact `
 $finalArtifactPaths = @($setupArtifactPath)
 $pdfSetupArtifactPath = $null
 if ($pdfReleaseDecision.releasePdf) {
-    $pdfHelperArtifactPath = Join-Path $BuildRoot 'SimplySignPdfSigner.exe'
+    $pdfHelperArtifactPath = Join-Path $BuildRoot 'CodeSignAutoPdfSigner.exe'
     [System.IO.File]::Copy($builtPdfHelperPath, $pdfHelperArtifactPath, $false)
     $pdfHelperSignature = Invoke-ReleaseArtifactSign `
         -Path $pdfHelperArtifactPath `
@@ -1101,11 +1101,11 @@ if ($pdfReleaseDecision.releasePdf) {
     $pdfHelperArtifact = Get-Item -LiteralPath $pdfHelperArtifactPath -Force
     $pdfHelperSha256 = Get-LowerSha256 -Path $pdfHelperArtifactPath
 
-    $pdfPackageRoot = Join-Path $BuildRoot ("SimplySignAutoPdfSupport-$Version-win-x64")
+    $pdfPackageRoot = Join-Path $BuildRoot ("CodeSignAutoPdfSupport-$Version-win-x64")
     [System.IO.Directory]::CreateDirectory($pdfPackageRoot) | Out-Null
     [System.IO.File]::Copy(
         $pdfHelperArtifactPath,
-        (Join-Path $pdfPackageRoot 'SimplySignPdfSigner.exe'),
+        (Join-Path $pdfPackageRoot 'CodeSignAutoPdfSigner.exe'),
         $false)
     [System.IO.File]::Copy(
         (Join-Path $RepoRoot 'LICENSE'),
@@ -1127,10 +1127,10 @@ if ($pdfReleaseDecision.releasePdf) {
         -ExpectedFiles @(
             'extension.json',
             'LICENSE.txt',
-            'SimplySignPdfSigner.exe',
+            'CodeSignAutoPdfSigner.exe',
             'THIRD-PARTY-NOTICES.txt')
     $pdfPayloadZipPath = Join-Path $BuildRoot (
-        "SimplySignAutoPdfSupport-$Version-win-x64.internal.zip")
+        "CodeSignAutoPdfSupport-$Version-win-x64.internal.zip")
     New-DeterministicZip -SourceRoot $pdfPackageRoot -DestinationPath $pdfPayloadZipPath
     $pdfSetupMetadataPath = Join-Path $BuildRoot 'setup-pdf-metadata.json'
     Write-SetupPayloadMetadata `
@@ -1146,7 +1146,7 @@ if ($pdfReleaseDecision.releasePdf) {
         -BuildRoot $BuildRoot `
         -ReleaseRoot $ReleaseRoot `
         -PublishName 'pdf' `
-        -ArtifactName ("SimplySignAutoPdfSetup-$Version-win-x64.exe") `
+        -ArtifactName ("CodeSignAutoPdfSetup-$Version-win-x64.exe") `
         -PayloadPath $pdfPayloadZipPath `
         -MetadataPath $pdfSetupMetadataPath `
         -SigningBaseUrl $SigningBaseUrl `

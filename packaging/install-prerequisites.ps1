@@ -21,8 +21,8 @@ if ([string]::IsNullOrWhiteSpace($ManifestPath)) {
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 
-$releasePublisherCertificateSha256 = '__SIMPLYSIGNAUTO_PUBLISHER_CERTIFICATE_SHA256__'
-$releaseNativeTypeBase64 = 'dXNpbmcgU3lzdGVtOyB1c2luZyBTeXN0ZW0uUnVudGltZS5JbnRlcm9wU2VydmljZXM7IHVzaW5nIE1pY3Jvc29mdC5XaW4zMi5TYWZlSGFuZGxlczsgbmFtZXNwYWNlIFNpbXBseVNpZ25BdXRvLlJlbGVhc2UgeyBbU3RydWN0TGF5b3V0KExheW91dEtpbmQuU2VxdWVudGlhbCldIHB1YmxpYyBzdHJ1Y3QgRmlsZUluZm9ybWF0aW9uIHsgcHVibGljIHVpbnQgRmlsZUF0dHJpYnV0ZXM7IHB1YmxpYyBTeXN0ZW0uUnVudGltZS5JbnRlcm9wU2VydmljZXMuQ29tVHlwZXMuRklMRVRJTUUgQ3JlYXRpb25UaW1lOyBwdWJsaWMgU3lzdGVtLlJ1bnRpbWUuSW50ZXJvcFNlcnZpY2VzLkNvbVR5cGVzLkZJTEVUSU1FIExhc3RBY2Nlc3NUaW1lOyBwdWJsaWMgU3lzdGVtLlJ1bnRpbWUuSW50ZXJvcFNlcnZpY2VzLkNvbVR5cGVzLkZJTEVUSU1FIExhc3RXcml0ZVRpbWU7IHB1YmxpYyB1aW50IFZvbHVtZVNlcmlhbE51bWJlcjsgcHVibGljIHVpbnQgRmlsZVNpemVIaWdoOyBwdWJsaWMgdWludCBGaWxlU2l6ZUxvdzsgcHVibGljIHVpbnQgbk51bWJlck9mTGlua3M7IHB1YmxpYyB1aW50IEZpbGVJbmRleEhpZ2g7IHB1YmxpYyB1aW50IEZpbGVJbmRleExvdzsgfSBwdWJsaWMgc3RhdGljIGNsYXNzIE5hdGl2ZU1ldGhvZHMgeyBbRGxsSW1wb3J0KCJrZXJuZWwzMi5kbGwiLCBTZXRMYXN0RXJyb3I9dHJ1ZSldIFtyZXR1cm46IE1hcnNoYWxBcyhVbm1hbmFnZWRUeXBlLkJvb2wpXSBwdWJsaWMgc3RhdGljIGV4dGVybiBib29sIEdldEZpbGVJbmZvcm1hdGlvbkJ5SGFuZGxlKFNhZmVGaWxlSGFuZGxlIGhhbmRsZSwgb3V0IEZpbGVJbmZvcm1hdGlvbiBpbmZvcm1hdGlvbik7IH0gfQ=='
+$releasePublisherCertificateSha256 = '__CODESIGNAUTO_PUBLISHER_CERTIFICATE_SHA256__'
+$releaseNativeTypeBase64 = 'dXNpbmcgU3lzdGVtOyB1c2luZyBTeXN0ZW0uUnVudGltZS5JbnRlcm9wU2VydmljZXM7IHVzaW5nIE1pY3Jvc29mdC5XaW4zMi5TYWZlSGFuZGxlczsgbmFtZXNwYWNlIENvZGVTaWduQXV0by5SZWxlYXNlIHsgW1N0cnVjdExheW91dChMYXlvdXRLaW5kLlNlcXVlbnRpYWwpXSBwdWJsaWMgc3RydWN0IEZpbGVJbmZvcm1hdGlvbiB7IHB1YmxpYyB1aW50IEZpbGVBdHRyaWJ1dGVzOyBwdWJsaWMgU3lzdGVtLlJ1bnRpbWUuSW50ZXJvcFNlcnZpY2VzLkNvbVR5cGVzLkZJTEVUSU1FIENyZWF0aW9uVGltZTsgcHVibGljIFN5c3RlbS5SdW50aW1lLkludGVyb3BTZXJ2aWNlcy5Db21UeXBlcy5GSUxFVElNRSBMYXN0QWNjZXNzVGltZTsgcHVibGljIFN5c3RlbS5SdW50aW1lLkludGVyb3BTZXJ2aWNlcy5Db21UeXBlcy5GSUxFVElNRSBMYXN0V3JpdGVUaW1lOyBwdWJsaWMgdWludCBWb2x1bWVTZXJpYWxOdW1iZXI7IHB1YmxpYyB1aW50IEZpbGVTaXplSGlnaDsgcHVibGljIHVpbnQgRmlsZVNpemVMb3c7IHB1YmxpYyB1aW50IG5OdW1iZXJPZkxpbmtzOyBwdWJsaWMgdWludCBGaWxlSW5kZXhIaWdoOyBwdWJsaWMgdWludCBGaWxlSW5kZXhMb3c7IH0gcHVibGljIHN0YXRpYyBjbGFzcyBOYXRpdmVNZXRob2RzIHsgW0RsbEltcG9ydCgia2VybmVsMzIuZGxsIiwgU2V0TGFzdEVycm9yPXRydWUpXSBbcmV0dXJuOiBNYXJzaGFsQXMoVW5tYW5hZ2VkVHlwZS5Cb29sKV0gcHVibGljIHN0YXRpYyBleHRlcm4gYm9vbCBHZXRGaWxlSW5mb3JtYXRpb25CeUhhbmRsZShTYWZlRmlsZUhhbmRsZSBoYW5kbGUsIG91dCBGaWxlSW5mb3JtYXRpb24gaW5mb3JtYXRpb24pOyB9IH0='
 
 function Stop-PrerequisiteCheck {
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
@@ -98,8 +98,8 @@ function Test-SingleFileLink {
         [IO.FileAccess]::Read,
         ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
     try {
-        $information = New-Object SimplySignAuto.Release.FileInformation
-        if (-not [SimplySignAuto.Release.NativeMethods]::GetFileInformationByHandle(
+        $information = New-Object CodeSignAuto.Release.FileInformation
+        if (-not [CodeSignAuto.Release.NativeMethods]::GetFileInformationByHandle(
                 $stream.SafeFileHandle,
                 [ref]$information) -or
             $information.nNumberOfLinks -ne 1) {
@@ -149,7 +149,7 @@ function Test-ReleaseMedia {
         $ancestor = $ancestor.Parent
     }
 
-    if ($null -eq ('SimplySignAuto.Release.NativeMethods' -as [type])) {
+    if ($null -eq ('CodeSignAuto.Release.NativeMethods' -as [type])) {
         $nativeSource = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($releaseNativeTypeBase64))
         Add-Type -TypeDefinition $nativeSource -ErrorAction Stop
     }
@@ -169,7 +169,7 @@ function Test-ReleaseMedia {
 
     $catalogPath = Join-Path $canonicalRoot 'release-files.cat'
     $scriptPath = Join-Path $canonicalRoot 'install-prerequisites.ps1'
-    $applicationPath = Join-Path $canonicalRoot 'SimplySignAuto.exe'
+    $applicationPath = Join-Path $canonicalRoot 'CodeSignAuto.exe'
     foreach ($required in @($catalogPath, $scriptPath, $applicationPath)) {
         if (-not (Test-Path -LiteralPath $required -PathType Leaf)) {
             Stop-PrerequisiteCheck 'media' 'media_missing'
@@ -196,7 +196,7 @@ function Test-ReleaseMedia {
         -Detailed `
         -Path $canonicalRoot `
         -CatalogFilePath $catalogPath `
-        -FilesToSkip @('release-files.cat', 'SimplySignAuto.exe') `
+        -FilesToSkip @('release-files.cat', 'CodeSignAuto.exe') `
         -ErrorAction Stop
     $payloadFiles = @($items | Where-Object {
         -not $_.PSIsContainer -and
@@ -828,7 +828,7 @@ function Test-StrictVersionOutput {
 }
 
 function Invoke-PrerequisiteProbe {
-    $executable = Join-Path $PSScriptRoot 'SimplySignAuto.exe'
+    $executable = Join-Path $PSScriptRoot 'CodeSignAuto.exe'
     if (-not (Test-PlainFile $executable)) {
         Stop-PrerequisiteCheck 'probe' 'probe_executable_missing'
     }
@@ -920,7 +920,7 @@ try {
     else {
         $result = Invoke-PrerequisiteCheck
         if ($result -eq 0 -and -not [string]::IsNullOrWhiteSpace($ReleaseMediaRoot)) {
-            $applicationPath = Join-Path ([IO.Path]::GetFullPath($ReleaseMediaRoot)) 'SimplySignAuto.exe'
+            $applicationPath = Join-Path ([IO.Path]::GetFullPath($ReleaseMediaRoot)) 'CodeSignAuto.exe'
             & $applicationPath setup --mode $InstallMode | ForEach-Object { [Console]::Out.WriteLine($_) }
             $result = $LASTEXITCODE
         }

@@ -244,7 +244,7 @@ param(
     [int]$ExpectedSessionId,
 
     [Parameter(Mandatory = $true, ParameterSetName = 'Child')]
-    [ValidatePattern('^SimplySignAuto/v1/[0-9a-f]{32}$')]
+    [ValidatePattern('^CodeSignAuto/v1/[0-9a-f]{32}$')]
     [string]$ExpectedAgentTaskSource,
 
     [Parameter(Mandatory = $true, ParameterSetName = 'Child')]
@@ -313,48 +313,48 @@ $FreshSetupStatePath = $null
 $FreshSetupContinuation = $null
 $AutoReloginAfterCloseObserved = $false
 $ExpectedWindowsNativeTests = @(
-    'SimplySignAuto.Agent.Tests.DpapiOtpStoreTests.Protects_file_acl_for_current_user_and_system_only',
-    'SimplySignAuto.Agent.Tests.DpapiOtpStoreTests.Reports_corrupt_when_ciphertext_is_tampered',
-    'SimplySignAuto.Agent.Tests.DpapiOtpStoreTests.Saves_and_loads_for_current_windows_user',
-    'SimplySignAuto.Agent.Tests.SigningWorkerTests.Holds_input_handle_without_write_or_delete_sharing_until_signer_finishes',
-    'SimplySignAuto.Agent.Tests.AgentHostTests.Windows_local_mutex_rejects_a_second_owner_for_the_same_sid',
-    'SimplySignAuto.Agent.Tests.LocalJobClientTests.Released_accepted_source_no_longer_blocks_replacing_the_old_source_on_windows',
-    'SimplySignAuto.Agent.Tests.DpapiOtpStoreTests.Reports_missing_for_missing_file',
-    'SimplySignAuto.Agent.Tests.AgentHostTests.Windows_local_mutex_lease_can_be_disposed_from_a_different_thread',
-    'SimplySignAuto.Agent.Tests.AgentHostTests.Windows_session_ending_monitor_can_start_and_stop_its_hidden_window',
-    'SimplySignAuto.EndToEnd.Tests.ConfigureServiceCommandTests.Windows_native_protected_publish_guard_blocks_reinstall_after_verification',
-    'SimplySignAuto.EndToEnd.Tests.InstallCommandTests.Windows_install_acl_rejects_a_correct_dacl_owned_by_the_signing_user',
-    'SimplySignAuto.EndToEnd.Tests.InstallCommandTests.Windows_executor_creates_verifies_and_rolls_back_temporary_native_resources',
-    'SimplySignAuto.EndToEnd.Tests.ConfigureServiceCommandTests.Windows_native_protected_publish_guard_blocks_in_place_write_after_verification',
-    'SimplySignAuto.EndToEnd.Tests.ConfigureServiceCommandTests.Windows_native_protected_configuration_cas_rejects_in_place_content_change',
-    'SimplySignAuto.EndToEnd.Tests.ConfigureServiceCommandTests.Windows_native_protected_configuration_cas_rejects_reinstalled_target',
-    'SimplySignAuto.EndToEnd.Tests.ConfigureServiceCommandTests.Windows_native_protected_configuration_rejects_a_reparse_target_without_touching_its_victim',
-    'SimplySignAuto.EndToEnd.Tests.UninstallSafetyTests.Windows_atomic_isolation_never_follows_a_root_replaced_with_a_directory_link',
-    'SimplySignAuto.Service.Tests.SpoolStoreTests.Windows_local_upload_hardlink_rejection_preserves_external_hash_owner_and_dacl',
-    'SimplySignAuto.Service.Tests.UploadedContentValidatorTests.Native_path_validation_guard_denies_delete_during_the_native_call_window',
-    'SimplySignAuto.Service.Tests.AgentPipeIdentityTests.Windows_pipe_acl_grants_only_system_and_configured_user',
-    'SimplySignAuto.Service.Tests.WindowsSpoolAclPolicyTests.Windows_signing_user_can_delete_only_the_part_it_created',
-    'SimplySignAuto.UI.Tests.Desktop.ExternalScenarioAutomationTests.Jobs_load_exactly_100_then_more_with_active_first_and_terminal_button_policy',
-    'SimplySignAuto.UI.Tests.Desktop.NavigationAutomationTests.Five_pages_have_fixed_unique_names_and_real_selection_navigation',
-    'SimplySignAuto.UI.Tests.Desktop.NavigationAutomationTests.Active_state_disables_relogin_and_settings_use_fake_elevation_only',
-    'SimplySignAuto.UI.Tests.WindowsDesktopIntegrationTests.Wpf_runtime_preserves_theme_icon_tray_and_opens_settings_on_its_visible_main_window',
-    'SimplySignAuto.UI.Tests.Desktop.ExternalScenarioAutomationTests.Overview_exposes_busy_state_and_opens_the_real_jobs_page',
-    'SimplySignAuto.UI.Tests.Desktop.WindowGeometryTests.Real_process_window_is_1024_by_768_landscape_four_by_three',
-    'SimplySignAuto.UI.Tests.Desktop.QuickSignAutomationTests.Copy_can_be_cancelled_before_finalizing_and_original_remains_unchanged',
-    'SimplySignAuto.UI.Tests.Desktop.QuickSignAutomationTests.Exe_and_pdf_selection_switch_controls_and_submit_without_changing_input',
-    'SimplySignAuto.UI.Tests.Desktop.DpiLayoutTests.Activation_primary_action_is_validly_nested_and_reachable_at_all_four_dpi_levels',
-    'SimplySignAuto.UI.Tests.Desktop.QuickSignAutomationTests.Jobs_save_uses_signed_default_and_publishes_only_to_the_chosen_artifact_path',
-    'SimplySignAuto.UI.Tests.WindowsDesktopIntegrationTests.Activation_pipe_is_exclusive_and_accepts_only_the_current_signing_user',
-    'SimplySignAuto.UI.Tests.Desktop.ActivationAutomationTests.Saving_rejects_escape_cancel_and_title_close_then_closes_once_and_clears_secret',
-    'SimplySignAuto.UI.Tests.Desktop.AccessibilityAutomationTests.Every_interactive_element_has_a_stable_non_secret_name',
-    'SimplySignAuto.UI.Tests.Desktop.DpiLayoutTests.Four_dpi_levels_render_all_five_real_pages_inside_minimum_and_default_clients',
-    'SimplySignAuto.UI.Tests.Desktop.ActivationAutomationTests.Import_is_modal_focus_trapped_escape_clears_and_restores_launcher_focus',
-    'SimplySignAuto.UI.Tests.Desktop.AccessibilityAutomationTests.Keyboard_arrows_enter_space_tab_and_escape_drive_the_real_window',
-    'SimplySignAuto.UI.Tests.Desktop.NavigationAutomationTests.Overview_refresh_and_close_hide_keep_fake_heartbeat_alive',
-    'SimplySignAuto.UI.Tests.WindowsDesktopIntegrationTests.A_preexisting_pipe_squatter_cannot_be_claimed_and_never_starts_the_agent',
-    'SimplySignAuto.UI.Tests.Desktop.ExternalScenarioAutomationTests.Quick_sign_exposes_finalizing_before_opening_jobs',
-    'SimplySignAuto.UI.Tests.Desktop.ExternalScenarioAutomationTests.Actual_tray_exit_exits_safe_state_and_refuses_active_and_unknown',
-    'SimplySignAuto.UI.Tests.Desktop.WindowGeometryTests.Target_window_capture_is_not_replaced_by_a_covering_window'
+    'CodeSignAuto.Agent.Tests.DpapiOtpStoreTests.Protects_file_acl_for_current_user_and_system_only',
+    'CodeSignAuto.Agent.Tests.DpapiOtpStoreTests.Reports_corrupt_when_ciphertext_is_tampered',
+    'CodeSignAuto.Agent.Tests.DpapiOtpStoreTests.Saves_and_loads_for_current_windows_user',
+    'CodeSignAuto.Agent.Tests.SigningWorkerTests.Holds_input_handle_without_write_or_delete_sharing_until_signer_finishes',
+    'CodeSignAuto.Agent.Tests.AgentHostTests.Windows_local_mutex_rejects_a_second_owner_for_the_same_sid',
+    'CodeSignAuto.Agent.Tests.LocalJobClientTests.Released_accepted_source_no_longer_blocks_replacing_the_old_source_on_windows',
+    'CodeSignAuto.Agent.Tests.DpapiOtpStoreTests.Reports_missing_for_missing_file',
+    'CodeSignAuto.Agent.Tests.AgentHostTests.Windows_local_mutex_lease_can_be_disposed_from_a_different_thread',
+    'CodeSignAuto.Agent.Tests.AgentHostTests.Windows_session_ending_monitor_can_start_and_stop_its_hidden_window',
+    'CodeSignAuto.EndToEnd.Tests.ConfigureServiceCommandTests.Windows_native_protected_publish_guard_blocks_reinstall_after_verification',
+    'CodeSignAuto.EndToEnd.Tests.InstallCommandTests.Windows_install_acl_rejects_a_correct_dacl_owned_by_the_signing_user',
+    'CodeSignAuto.EndToEnd.Tests.InstallCommandTests.Windows_executor_creates_verifies_and_rolls_back_temporary_native_resources',
+    'CodeSignAuto.EndToEnd.Tests.ConfigureServiceCommandTests.Windows_native_protected_publish_guard_blocks_in_place_write_after_verification',
+    'CodeSignAuto.EndToEnd.Tests.ConfigureServiceCommandTests.Windows_native_protected_configuration_cas_rejects_in_place_content_change',
+    'CodeSignAuto.EndToEnd.Tests.ConfigureServiceCommandTests.Windows_native_protected_configuration_cas_rejects_reinstalled_target',
+    'CodeSignAuto.EndToEnd.Tests.ConfigureServiceCommandTests.Windows_native_protected_configuration_rejects_a_reparse_target_without_touching_its_victim',
+    'CodeSignAuto.EndToEnd.Tests.UninstallSafetyTests.Windows_atomic_isolation_never_follows_a_root_replaced_with_a_directory_link',
+    'CodeSignAuto.Service.Tests.SpoolStoreTests.Windows_local_upload_hardlink_rejection_preserves_external_hash_owner_and_dacl',
+    'CodeSignAuto.Service.Tests.UploadedContentValidatorTests.Native_path_validation_guard_denies_delete_during_the_native_call_window',
+    'CodeSignAuto.Service.Tests.AgentPipeIdentityTests.Windows_pipe_acl_grants_only_system_and_configured_user',
+    'CodeSignAuto.Service.Tests.WindowsSpoolAclPolicyTests.Windows_signing_user_can_delete_only_the_part_it_created',
+    'CodeSignAuto.UI.Tests.Desktop.ExternalScenarioAutomationTests.Jobs_load_exactly_100_then_more_with_active_first_and_terminal_button_policy',
+    'CodeSignAuto.UI.Tests.Desktop.NavigationAutomationTests.Five_pages_have_fixed_unique_names_and_real_selection_navigation',
+    'CodeSignAuto.UI.Tests.Desktop.NavigationAutomationTests.Active_state_disables_relogin_and_settings_use_fake_elevation_only',
+    'CodeSignAuto.UI.Tests.WindowsDesktopIntegrationTests.Wpf_runtime_preserves_theme_icon_tray_and_opens_settings_on_its_visible_main_window',
+    'CodeSignAuto.UI.Tests.Desktop.ExternalScenarioAutomationTests.Overview_exposes_busy_state_and_opens_the_real_jobs_page',
+    'CodeSignAuto.UI.Tests.Desktop.WindowGeometryTests.Real_process_window_is_1024_by_768_landscape_four_by_three',
+    'CodeSignAuto.UI.Tests.Desktop.QuickSignAutomationTests.Copy_can_be_cancelled_before_finalizing_and_original_remains_unchanged',
+    'CodeSignAuto.UI.Tests.Desktop.QuickSignAutomationTests.Exe_and_pdf_selection_switch_controls_and_submit_without_changing_input',
+    'CodeSignAuto.UI.Tests.Desktop.DpiLayoutTests.Activation_primary_action_is_validly_nested_and_reachable_at_all_four_dpi_levels',
+    'CodeSignAuto.UI.Tests.Desktop.QuickSignAutomationTests.Jobs_save_uses_signed_default_and_publishes_only_to_the_chosen_artifact_path',
+    'CodeSignAuto.UI.Tests.WindowsDesktopIntegrationTests.Activation_pipe_is_exclusive_and_accepts_only_the_current_signing_user',
+    'CodeSignAuto.UI.Tests.Desktop.ActivationAutomationTests.Saving_rejects_escape_cancel_and_title_close_then_closes_once_and_clears_secret',
+    'CodeSignAuto.UI.Tests.Desktop.AccessibilityAutomationTests.Every_interactive_element_has_a_stable_non_secret_name',
+    'CodeSignAuto.UI.Tests.Desktop.DpiLayoutTests.Four_dpi_levels_render_all_five_real_pages_inside_minimum_and_default_clients',
+    'CodeSignAuto.UI.Tests.Desktop.ActivationAutomationTests.Import_is_modal_focus_trapped_escape_clears_and_restores_launcher_focus',
+    'CodeSignAuto.UI.Tests.Desktop.AccessibilityAutomationTests.Keyboard_arrows_enter_space_tab_and_escape_drive_the_real_window',
+    'CodeSignAuto.UI.Tests.Desktop.NavigationAutomationTests.Overview_refresh_and_close_hide_keep_fake_heartbeat_alive',
+    'CodeSignAuto.UI.Tests.WindowsDesktopIntegrationTests.A_preexisting_pipe_squatter_cannot_be_claimed_and_never_starts_the_agent',
+    'CodeSignAuto.UI.Tests.Desktop.ExternalScenarioAutomationTests.Quick_sign_exposes_finalizing_before_opening_jobs',
+    'CodeSignAuto.UI.Tests.Desktop.ExternalScenarioAutomationTests.Actual_tray_exit_exits_safe_state_and_refuses_active_and_unknown',
+    'CodeSignAuto.UI.Tests.Desktop.WindowGeometryTests.Target_window_capture_is_not_replaced_by_a_covering_window'
 )
 
 function Fail-Stable {
@@ -366,8 +366,8 @@ function Fail-Stable {
 function Protect-TotpDiagnosticText {
     param([AllowNull()][string]$Text)
     if ($null -eq $Text) { return '' }
-    if ('SimplySignAuto.Acceptance.Contracts.SecretScanPolicy' -as [type]) {
-        return [SimplySignAuto.Acceptance.Contracts.SecretScanPolicy]::Redact(
+    if ('CodeSignAuto.Acceptance.Contracts.SecretScanPolicy' -as [type]) {
+        return [CodeSignAuto.Acceptance.Contracts.SecretScanPolicy]::Redact(
             $Text,
             [string]$script:TotpSecretForRedaction)
     }
@@ -514,7 +514,7 @@ function New-CreateNewText {
 
 function Initialize-ContractSources {
     param([string]$CanonicalRepo)
-    if ('SimplySignAuto.Acceptance.Contracts.AcceptanceModePolicy' -as [type]) {
+    if ('CodeSignAuto.Acceptance.Contracts.AcceptanceModePolicy' -as [type]) {
         throw 'acceptance_contract_invalid'
     }
     $contractPath = Get-CanonicalExistingPath -Path (Join-Path $CanonicalRepo 'scripts\AcceptanceContracts.cs') -Kind Leaf
@@ -529,7 +529,7 @@ function Initialize-ContractSources {
     Add-Type -TypeDefinition $utf8.GetString($jsonBytes) -Language CSharp -ErrorAction Stop
     [System.Array]::Clear($jsonBytes, 0, $jsonBytes.Length)
     $script:InteractiveWindowsNativeTests =
-        [SimplySignAuto.Acceptance.Contracts.NativeTestRoutingPolicy]::GetInteractiveTests()
+        [CodeSignAuto.Acceptance.Contracts.NativeTestRoutingPolicy]::GetInteractiveTests()
 }
 
 function Get-CertificateSha256 {
@@ -629,7 +629,7 @@ function Begin-FreshSetupContinuation {
         $checkpoint.controllerStateFile -cne 'controller-parameters.clixml' -or
         $checkpoint.controllerStateSha256 -cnotmatch '^[0-9a-f]{64}$' -or
         $checkpoint.installInstanceHash -cnotmatch '^[0-9A-F]{64}$' -or
-        $checkpoint.agentTaskSource -cnotmatch '^SimplySignAuto/v1/[0-9a-f]{32}$') {
+        $checkpoint.agentTaskSource -cnotmatch '^CodeSignAuto/v1/[0-9a-f]{32}$') {
         throw 'acceptance_fresh_install_state_invalid'
     }
     $statePath = Get-CanonicalExistingPath `
@@ -689,12 +689,12 @@ function Begin-FreshSetupContinuation {
     if ((Get-WtsClientProtocol $signingSession) -ne 0) {
         throw 'acceptance_fresh_install_session_invalid'
     }
-    $lsaKey = "SimplySignAuto/Acceptance/$runIdLocal/Api"
-    $token = [SimplySignAuto.Acceptance.Contracts.AcceptanceLsaSecret]::Retrieve($lsaKey)
+    $lsaKey = "CodeSignAuto/Acceptance/$runIdLocal/Api"
+    $token = [CodeSignAuto.Acceptance.Contracts.AcceptanceLsaSecret]::Retrieve($lsaKey)
     if ([string]::IsNullOrWhiteSpace($token)) {
         throw 'acceptance_install_token_invalid'
     }
-    [SimplySignAuto.Acceptance.Contracts.AcceptanceLsaSecret]::Remove($lsaKey)
+    [CodeSignAuto.Acceptance.Contracts.AcceptanceLsaSecret]::Remove($lsaKey)
     $script:AcceptanceStartedUtc = $started
     $script:FreshSetupStatePath = $checkpointPath
     [Environment]::SetEnvironmentVariable('SIMPLYSIGN_ACCEPTANCE_FRESH_RUN_ID', $null)
@@ -772,9 +772,9 @@ function Get-ExecutableTrustSnapshot {
     param([string]$Path, [string[]]$TrustedRoots)
     $item = Get-Item -LiteralPath $Path -Force
     $acl = Get-TrustedAclState $Path
-    $identity = [SimplySignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read($Path, $false)
+    $identity = [CodeSignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read($Path, $false)
     $signature = Get-AuthenticodeSignature -LiteralPath $Path
-    return [SimplySignAuto.Acceptance.Contracts.ExecutableTrustSnapshot]::new(
+    return [CodeSignAuto.Acceptance.Contracts.ExecutableTrustSnapshot]::new(
         $item.FullName,
         $identity.Identity,
         (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant(),
@@ -802,9 +802,9 @@ function Add-TrustedExecutableGuard {
         [System.IO.FileShare]::Read)
     try {
         $snapshot = Get-ExecutableTrustSnapshot $Path $TrustedRoots
-        $kind = [SimplySignAuto.Acceptance.Contracts.ExecutableTrustKind]::$TrustKind
+        $kind = [CodeSignAuto.Acceptance.Contracts.ExecutableTrustKind]::$TrustKind
         try {
-            [SimplySignAuto.Acceptance.Contracts.TrustedExecutablePolicy]::Validate(
+            [CodeSignAuto.Acceptance.Contracts.TrustedExecutablePolicy]::Validate(
                 $snapshot, $snapshot, $TrustedRoots, $kind, $ExpectedSha256)
         }
         catch {
@@ -847,7 +847,7 @@ function Assert-TrustedExecutableUnchanged {
     if (-not $ExecutableGuards.ContainsKey($Path)) { throw 'acceptance_executable_untrusted' }
     $guard = $ExecutableGuards[$Path]
     $after = Get-ExecutableTrustSnapshot $Path ([string[]]$guard.TrustedRoots)
-    [SimplySignAuto.Acceptance.Contracts.TrustedExecutablePolicy]::Validate(
+    [CodeSignAuto.Acceptance.Contracts.TrustedExecutablePolicy]::Validate(
         $guard.Snapshot,
         $after,
         [string[]]$guard.TrustedRoots,
@@ -868,7 +868,7 @@ function Close-TrustedExecutableGuard {
     if (-not $ExecutableGuards.ContainsKey($Path)) { return }
     $guard = $ExecutableGuards[$Path]
     try {
-        [SimplySignAuto.Acceptance.Contracts.TrustedExecutablePolicy]::Validate(
+        [CodeSignAuto.Acceptance.Contracts.TrustedExecutablePolicy]::Validate(
             $guard.Snapshot,
             (Get-ExecutableTrustSnapshot $Path ([string[]]$guard.TrustedRoots)),
             [string[]]$guard.TrustedRoots,
@@ -885,7 +885,7 @@ function ConvertFrom-StrictJson {
     if ($Json -isnot [string] -or [string]::IsNullOrWhiteSpace($Json) -or $Json.Length -gt 1048576) {
         throw 'acceptance_json_invalid'
     }
-    [SimplySignAuto.UiAcceptance.StrictJson.Preflight]::ValidateObject($Json, 24, 1048576)
+    [CodeSignAuto.UiAcceptance.StrictJson.Preflight]::ValidateObject($Json, 24, 1048576)
     $value = $Json | ConvertFrom-Json
     if ($null -eq $value -or $value -isnot [System.Management.Automation.PSCustomObject]) {
         throw 'acceptance_json_invalid'
@@ -898,7 +898,7 @@ function Assert-ExactProperties {
     if ($Value -isnot [System.Management.Automation.PSCustomObject]) {
         throw 'acceptance_json_invalid'
     }
-    [SimplySignAuto.Acceptance.Contracts.ArtifactSetPolicy]::ValidateExact(
+    [CodeSignAuto.Acceptance.Contracts.ArtifactSetPolicy]::ValidateExact(
         $Expected,
         @($Value.PSObject.Properties.Name))
 }
@@ -1150,7 +1150,7 @@ function Observe-OneTimeInstallToken {
             -not [string]::Equals($item.FullName, $Path, [System.StringComparison]::OrdinalIgnoreCase)) {
             throw 'acceptance_state_uncertain'
         }
-        $identity = [SimplySignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read($Path, $false)
+        $identity = [CodeSignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read($Path, $false)
         if ($identity.LinkCount -ne 1) { throw 'acceptance_state_uncertain' }
         $script:FreshTokenFirstIdentity = $identity.Identity
         $script:FreshTokenObserved = $true
@@ -1285,8 +1285,8 @@ function Assert-ProtectedAcl {
 
 function Get-AgentTaskExecutionSnapshot {
     param([string]$CanonicalApp)
-    [xml]$taskXml = Export-ScheduledTask -TaskName 'SimplySignAuto.Agent'
-    $trigger = [SimplySignAuto.Acceptance.Contracts.AgentTaskTriggerXmlPolicy]::Read(
+    [xml]$taskXml = Export-ScheduledTask -TaskName 'CodeSignAuto.Agent'
+    $trigger = [CodeSignAuto.Acceptance.Contracts.AgentTaskTriggerXmlPolicy]::Read(
         $taskXml.OuterXml)
     $namespace = [System.Xml.XmlNamespaceManager]::new($taskXml.NameTable)
     $namespace.AddNamespace('t', 'http://schemas.microsoft.com/windows/2004/02/mit/task')
@@ -1304,7 +1304,7 @@ function Get-AgentTaskExecutionSnapshot {
     if (-not [string]::Equals($command, $CanonicalApp, [System.StringComparison]::OrdinalIgnoreCase)) {
         throw 'acceptance_agent_task_invalid'
     }
-    return [SimplySignAuto.Acceptance.Contracts.AgentTaskExecutionSnapshot]::new(
+    return [CodeSignAuto.Acceptance.Contracts.AgentTaskExecutionSnapshot]::new(
         $principalSid.Value,
         $command,
         (Get-TaskNodeText '//t:Actions/t:Exec/t:Arguments'),
@@ -1323,11 +1323,11 @@ function Get-AgentTaskExecutionSnapshot {
 
 function Assert-AgentTaskExact {
     param(
-        [SimplySignAuto.Acceptance.Contracts.AgentTaskExecutionSnapshot]$Expected,
+        [CodeSignAuto.Acceptance.Contracts.AgentTaskExecutionSnapshot]$Expected,
         [string]$CanonicalApp
     )
     $actual = Get-AgentTaskExecutionSnapshot $CanonicalApp
-    [SimplySignAuto.Acceptance.Contracts.AgentTaskExecutionPolicy]::Validate($Expected, $actual)
+    [CodeSignAuto.Acceptance.Contracts.AgentTaskExecutionPolicy]::Validate($Expected, $actual)
 }
 
 function Get-ExactAgentProcess {
@@ -1337,7 +1337,7 @@ function Get-ExactAgentProcess {
         [System.Security.Principal.SecurityIdentifier]$ExpectedSid
     )
     $matches = New-Object System.Collections.Generic.List[object]
-    foreach ($candidate in @(Get-CimInstance Win32_Process -Filter "Name='SimplySignAuto.exe'")) {
+    foreach ($candidate in @(Get-CimInstance Win32_Process -Filter "Name='CodeSignAuto.exe'")) {
         if ([int]$candidate.SessionId -ne $ExpectedSession -or
             -not [string]::Equals(
                 [string]$candidate.ExecutablePath,
@@ -1360,7 +1360,7 @@ function Invoke-AgentCrashRecoveryGate {
         [string]$CanonicalApp,
         [int]$ExpectedSession,
         [System.Security.Principal.SecurityIdentifier]$ExpectedSid,
-        [SimplySignAuto.Acceptance.Contracts.AgentTaskExecutionSnapshot]$ExpectedTask
+        [CodeSignAuto.Acceptance.Contracts.AgentTaskExecutionSnapshot]$ExpectedTask
     )
     Assert-AgentTaskExact $ExpectedTask $CanonicalApp
     $before = Get-ExactAgentProcess $CanonicalApp $ExpectedSession $ExpectedSid
@@ -1379,7 +1379,7 @@ function Invoke-AgentCrashRecoveryGate {
     } while ($watch.Elapsed.TotalSeconds -lt 90)
     if ($null -eq $after) { throw 'acceptance_agent_restart_failed' }
     Assert-AgentTaskExact $ExpectedTask $CanonicalApp
-    $task = Get-ScheduledTask -TaskName 'SimplySignAuto.Agent' -ErrorAction Stop
+    $task = Get-ScheduledTask -TaskName 'CodeSignAuto.Agent' -ErrorAction Stop
     if ($task.State -ne 'Running') { throw 'acceptance_agent_restart_failed' }
 }
 
@@ -1389,7 +1389,7 @@ function Get-AcceptanceTaskSnapshot {
     if (@($current.Actions).Count -ne 1) { throw 'acceptance_task_invalid' }
     $principalSid = [System.Security.Principal.NTAccount]::new(
         [string]$current.Principal.UserId).Translate([System.Security.Principal.SecurityIdentifier])
-    return [SimplySignAuto.Acceptance.Contracts.AcceptanceTaskSnapshot]::new(
+    return [CodeSignAuto.Acceptance.Contracts.AcceptanceTaskSnapshot]::new(
         [string]$current.Description,
         (Get-Sha256Text $principalSid.Value),
         [string]$current.Principal.LogonType,
@@ -1432,7 +1432,7 @@ function Get-BootResumeTaskSnapshot {
     }
     $principalSid = [System.Security.Principal.NTAccount]::new(
         [string]$task.Principal.UserId).Translate([System.Security.Principal.SecurityIdentifier])
-    return [SimplySignAuto.Acceptance.Contracts.BootResumeTaskSnapshot]::new(
+    return [CodeSignAuto.Acceptance.Contracts.BootResumeTaskSnapshot]::new(
         $principalSid.Value,
         [string]$task.Principal.LogonType,
         [string]$task.Principal.RunLevel,
@@ -1451,8 +1451,8 @@ function Initialize-PostRebootCleanupState {
         throw 'acceptance_state_uncertain'
     }
 
-    $script:ResumeTaskName = "SimplySignAuto.Acceptance.Boot.$ValidatedRunId"
-    $script:UnattendedRebootLsaKey = "SimplySignAuto/Acceptance/$ValidatedRunId/Api"
+    $script:ResumeTaskName = "CodeSignAuto.Acceptance.Boot.$ValidatedRunId"
+    $script:UnattendedRebootLsaKey = "CodeSignAuto/Acceptance/$ValidatedRunId/Api"
     $script:UnattendedRebootSecretStored = $true
     $script:UnattendedRebootTaskRegistered = $true
     $script:UnattendedRebootCleanupArmed = $true
@@ -1470,15 +1470,15 @@ function Initialize-PostRebootTaskExpectation {
         $RunId `
         $TimeoutSeconds
     $script:BootResumeExpectedTask = `
-        [SimplySignAuto.Acceptance.Contracts.BootResumeTaskSnapshot]::new(
+        [CodeSignAuto.Acceptance.Contracts.BootResumeTaskSnapshot]::new(
             'S-1-5-18',
             'ServiceAccount',
             'Highest',
             (Get-Sha256Text $PowerShellPath.ToUpperInvariant()),
             (Get-Sha256Text $resumeArguments),
             'AtStartup',
-            'SimplySignAuto/v1',
-            'SimplySignAuto/AcceptanceBoot/v1',
+            'CodeSignAuto/v1',
+            'CodeSignAuto/AcceptanceBoot/v1',
             $TimeoutSeconds,
             1)
 }
@@ -1486,9 +1486,9 @@ function Initialize-PostRebootTaskExpectation {
 function Assert-BootResumeTaskExact {
     param(
         [string]$Name,
-        [SimplySignAuto.Acceptance.Contracts.BootResumeTaskSnapshot]$Expected
+        [CodeSignAuto.Acceptance.Contracts.BootResumeTaskSnapshot]$Expected
     )
-    [SimplySignAuto.Acceptance.Contracts.BootResumeTaskPolicy]::Validate(
+    [CodeSignAuto.Acceptance.Contracts.BootResumeTaskPolicy]::Validate(
         $Expected,
         (Get-BootResumeTaskSnapshot $Name))
 }
@@ -1514,7 +1514,7 @@ function New-ControllerParameterState {
         throw 'acceptance_fresh_install_arguments_invalid'
     }
     $serialized = [System.Management.Automation.PSSerializer]::Serialize($state, 12)
-    if ([SimplySignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive(
+    if ([CodeSignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive(
             $serialized,
             [string]$script:TotpSecretForRedaction)) {
         throw 'acceptance_sensitive_artifact'
@@ -1536,7 +1536,7 @@ function Register-ExactBootResumeTask {
         [string]$ExpectedRunId,
         [int]$BoundSeconds
     )
-    $taskName = "SimplySignAuto.Acceptance.Boot.$ExpectedRunId"
+    $taskName = "CodeSignAuto.Acceptance.Boot.$ExpectedRunId"
     if (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue) {
         throw 'acceptance_boot_task_invalid'
     }
@@ -1562,17 +1562,17 @@ function Register-ExactBootResumeTask {
         -Principal $principal `
         -Trigger $trigger `
         -Settings $settings `
-        -Description 'SimplySignAuto/AcceptanceBoot/v1'
-    $definition.Source = 'SimplySignAuto/v1'
-    $expected = [SimplySignAuto.Acceptance.Contracts.BootResumeTaskSnapshot]::new(
+        -Description 'CodeSignAuto/AcceptanceBoot/v1'
+    $definition.Source = 'CodeSignAuto/v1'
+    $expected = [CodeSignAuto.Acceptance.Contracts.BootResumeTaskSnapshot]::new(
         'S-1-5-18',
         'ServiceAccount',
         'Highest',
         (Get-Sha256Text $CanonicalPowerShell.ToUpperInvariant()),
         (Get-Sha256Text $arguments),
         'AtStartup',
-        'SimplySignAuto/v1',
-        'SimplySignAuto/AcceptanceBoot/v1',
+        'CodeSignAuto/v1',
+        'CodeSignAuto/AcceptanceBoot/v1',
         $BoundSeconds,
         1)
     Register-ScheduledTask -TaskName $taskName -InputObject $definition | Out-Null
@@ -1591,15 +1591,15 @@ function Remove-OneTimeInstallToken {
     Assert-SecretAcl $canonical $SigningSid 'Machine'
     $content = Read-SetupTokenFile $canonical
     try {
-        $token = [SimplySignAuto.Acceptance.Contracts.SetupTokenFilePolicy]::ValidateAndExtract(
+        $token = [CodeSignAuto.Acceptance.Contracts.SetupTokenFilePolicy]::ValidateAndExtract(
             $content)
         $expectedHash = (Get-Sha256Text $content).ToLowerInvariant()
-        $identity = [SimplySignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read($canonical, $false)
+        $identity = [CodeSignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read($canonical, $false)
         $after = Read-SetupTokenFile $canonical
         try { $actualHash = (Get-Sha256Text $after).ToLowerInvariant() }
         finally { $after = $null }
         $item = Get-Item -LiteralPath $canonical -Force
-        if (-not [SimplySignAuto.Acceptance.Contracts.InstallTokenCleanupPolicy]::CanDelete(
+        if (-not [CodeSignAuto.Acceptance.Contracts.InstallTokenCleanupPolicy]::CanDelete(
                 $false,
                 $true,
                 $FreshTokenFirstIdentity,
@@ -1609,7 +1609,7 @@ function Remove-OneTimeInstallToken {
                 (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0),
                 (-not $item.PSIsContainer),
                 [int]$identity.LinkCount) -or
-            -not [SimplySignAuto.Acceptance.Contracts.WindowsFileIdentity]::DeleteOrdinaryFileIfExactWithRetry(
+            -not [CodeSignAuto.Acceptance.Contracts.WindowsFileIdentity]::DeleteOrdinaryFileIfExactWithRetry(
                 $canonical,
                 $identity.Identity,
                 $actualHash,
@@ -1637,7 +1637,7 @@ function Invoke-FreshSetupStage {
         [string]$SafeBaseUrl,
         [System.Collections.IDictionary]$ControllerParameters
     )
-    $expectedUser = "$env:COMPUTERNAME\SimplySignAgent"
+    $expectedUser = "$env:COMPUTERNAME\CodeSignAutoAgent"
     $currentIdentity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
     $administratorSid = [System.Security.Principal.NTAccount]::new($AdministratorUser).Translate(
         [System.Security.Principal.SecurityIdentifier])
@@ -1651,12 +1651,12 @@ function Invoke-FreshSetupStage {
         -not [string]::IsNullOrWhiteSpace($ApiTokenFile)) {
         throw 'acceptance_fresh_install_arguments_invalid'
     }
-    $existingUsers = @(Get-CimInstance Win32_UserAccount -Filter "LocalAccount=True AND Name='SimplySignAgent'")
+    $existingUsers = @(Get-CimInstance Win32_UserAccount -Filter "LocalAccount=True AND Name='CodeSignAutoAgent'")
     if ($existingUsers.Count -ne 0 -or
-        (Test-Path -LiteralPath (Join-Path $env:SystemDrive 'Users\SimplySignAgent')) -or
-        (Test-Path -LiteralPath (Join-Path $env:ProgramData 'SimplySignAuto')) -or
-        $null -ne (Get-Service -Name 'SimplySignAuto.Service' -ErrorAction SilentlyContinue) -or
-        $null -ne (Get-ScheduledTask -TaskName 'SimplySignAuto.Agent' -ErrorAction SilentlyContinue)) {
+        (Test-Path -LiteralPath (Join-Path $env:SystemDrive 'Users\CodeSignAutoAgent')) -or
+        (Test-Path -LiteralPath (Join-Path $env:ProgramData 'CodeSignAuto')) -or
+        $null -ne (Get-Service -Name 'CodeSignAuto.Service' -ErrorAction SilentlyContinue) -or
+        $null -ne (Get-ScheduledTask -TaskName 'CodeSignAuto.Agent' -ErrorAction SilentlyContinue)) {
         throw 'acceptance_fresh_install_not_clean'
     }
 
@@ -1671,7 +1671,7 @@ function Invoke-FreshSetupStage {
     $statePath = Join-Path $rawDirectory 'controller-parameters.clixml'
     $stateHash = New-ControllerParameterState $ControllerParameters $statePath
     Set-AdministratorsOnlyFileAcl $statePath
-    $tokenPath = Join-Path $env:ProgramData 'SimplySignAuto\install-token.txt'
+    $tokenPath = Join-Path $env:ProgramData 'CodeSignAuto\install-token.txt'
     if (Test-Path -LiteralPath $tokenPath) { throw 'acceptance_install_token_exists' }
     $script:FreshInstallTokenPathForCleanup = $tokenPath
     $script:FailureRunDirectory = $runDirectory
@@ -1714,8 +1714,8 @@ function Invoke-FreshSetupStage {
         } catch {
             if ($_.Exception.Message -cne 'acceptance_session_unavailable') { throw }
         }
-        $lsaKey = "SimplySignAuto/Acceptance/$runIdLocal/Api"
-        [SimplySignAuto.Acceptance.Contracts.AcceptanceLsaSecret]::StoreNew($lsaKey, $token)
+        $lsaKey = "CodeSignAuto/Acceptance/$runIdLocal/Api"
+        [CodeSignAuto.Acceptance.Contracts.AcceptanceLsaSecret]::StoreNew($lsaKey, $token)
         $checkpoint = [ordered]@{
             schemaVersion = 1
             phase = 'fresh-install'
@@ -1752,7 +1752,7 @@ function Invoke-FreshSetupStage {
         Restart-Computer -Force -ErrorAction Stop
         exit 194
     } catch {
-        try { [SimplySignAuto.Acceptance.Contracts.AcceptanceLsaSecret]::Remove("SimplySignAuto/Acceptance/$runIdLocal/Api") } catch {}
+        try { [CodeSignAuto.Acceptance.Contracts.AcceptanceLsaSecret]::Remove("CodeSignAuto/Acceptance/$runIdLocal/Api") } catch {}
         if ($null -ne $resume) {
             try {
                 Assert-BootResumeTaskExact $resume.Name $resume.Expected
@@ -1769,13 +1769,13 @@ function Invoke-UnattendedRebootCleanup {
     param([AllowNull()][string]$FirstFailure)
     if (-not $UnattendedRebootCleanupArmed) { return $FirstFailure }
     $identityExact = $RunId -cmatch '^[0-9a-f]{32}$' -and
-        $UnattendedRebootLsaKey -ceq "SimplySignAuto/Acceptance/$RunId/Api" -and
-        $ResumeTaskName -ceq "SimplySignAuto.Acceptance.Boot.$RunId"
+        $UnattendedRebootLsaKey -ceq "CodeSignAuto/Acceptance/$RunId/Api" -and
+        $ResumeTaskName -ceq "CodeSignAuto.Acceptance.Boot.$RunId"
     $cleanupPolicyAvailable = $null -ne (
-        'SimplySignAuto.Acceptance.Contracts.UnattendedRebootCleanupPolicy' -as [type])
+        'CodeSignAuto.Acceptance.Contracts.UnattendedRebootCleanupPolicy' -as [type])
     if (-not $identityExact -or
         ($cleanupPolicyAvailable -and
-            -not [SimplySignAuto.Acceptance.Contracts.UnattendedRebootCleanupPolicy]::IsIdentityExact(
+            -not [CodeSignAuto.Acceptance.Contracts.UnattendedRebootCleanupPolicy]::IsIdentityExact(
                 $RunId,
                 $UnattendedRebootLsaKey,
                 $ResumeTaskName))) {
@@ -1785,7 +1785,7 @@ function Invoke-UnattendedRebootCleanup {
     $secretAbsent = -not $UnattendedRebootSecretStored
     if ($UnattendedRebootSecretStored) {
         try {
-            [SimplySignAuto.Acceptance.Contracts.AcceptanceLsaSecret]::Remove(
+            [CodeSignAuto.Acceptance.Contracts.AcceptanceLsaSecret]::Remove(
                 $UnattendedRebootLsaKey)
             $secretAbsent = $true
         } catch {
@@ -1809,7 +1809,7 @@ function Invoke-UnattendedRebootCleanup {
     }
 
     if ($cleanupPolicyAvailable) {
-        $resolved = [SimplySignAuto.Acceptance.Contracts.UnattendedRebootCleanupPolicy]::Resolve(
+        $resolved = [CodeSignAuto.Acceptance.Contracts.UnattendedRebootCleanupPolicy]::Resolve(
             $FirstFailure,
             $RunId,
             $UnattendedRebootLsaKey,
@@ -1979,7 +1979,7 @@ function Assert-ProductionPurgeTaskExact {
     $namespace = [System.Xml.XmlNamespaceManager]::new($taskXml.NameTable)
     $namespace.AddNamespace('t', 'http://schemas.microsoft.com/windows/2004/02/mit/task')
     $checks = @{
-        '//t:RegistrationInfo/t:Description' = 'SimplySignAuto/Purge/v1'
+        '//t:RegistrationInfo/t:Description' = 'CodeSignAuto/Purge/v1'
         '//t:RegistrationInfo/t:Source' = $OperationId
         '//t:Triggers/t:BootTrigger/t:Enabled' = 'true'
         '//t:Principals/t:Principal/t:UserId' = 'S-1-5-18'
@@ -2031,7 +2031,7 @@ function Assert-InstalledState {
         [System.Security.Principal.SecurityIdentifier]$SigningSid,
         [bool]$FirewallExpected
     )
-    $dataRoot = Get-CanonicalExistingPath (Join-Path $env:ProgramData 'SimplySignAuto') Container
+    $dataRoot = Get-CanonicalExistingPath (Join-Path $env:ProgramData 'CodeSignAuto') Container
     $serviceConfigPath = Get-CanonicalExistingPath (Join-Path $dataRoot 'service.json') Leaf
     Assert-ProtectedAcl $dataRoot $SigningSid 'AdministratorsOnly' $true
     Assert-ProtectedAcl $serviceConfigPath $SigningSid 'AdministratorsOnly' $false
@@ -2047,7 +2047,7 @@ function Assert-InstalledState {
             $configuration.spoolRoot -ine (Join-Path $dataRoot 'spool') -or
         $configuration.listenPort -isnot [int] -or $configuration.listenPort -lt 1 -or
             $configuration.listenPort -gt 65535 -or
-        $configuration.ownerMarker -isnot [string] -or $configuration.ownerMarker -cne 'SimplySignAuto/v1' -or
+        $configuration.ownerMarker -isnot [string] -or $configuration.ownerMarker -cne 'CodeSignAuto/v1' -or
         $configuration.installInstanceId -isnot [string] -or
             $configuration.installInstanceId -cnotmatch '^[0-9a-f]{32}$' -or
         $configuration.executablePath -isnot [string] -or $configuration.executablePath -ine $CanonicalApp -or
@@ -2073,32 +2073,32 @@ function Assert-InstalledState {
     Assert-ProtectedAcl $agentDirectory $SigningSid 'SigningUserData' $true
     Assert-ProtectedAcl $agentConfiguration $SigningSid 'SigningUserRead' $false
 
-    $ownerMarker = "SimplySignAuto/v1/$($configuration.installInstanceId)"
-    $serviceKey = Get-ItemProperty -LiteralPath 'HKLM:\SYSTEM\CurrentControlSet\Services\SimplySignAuto.Service'
+    $ownerMarker = "CodeSignAuto/v1/$($configuration.installInstanceId)"
+    $serviceKey = Get-ItemProperty -LiteralPath 'HKLM:\SYSTEM\CurrentControlSet\Services\CodeSignAuto.Service'
     $expectedImage = '"' + $CanonicalApp + '" service'
     if ($serviceKey.ImagePath -cne $expectedImage -or $serviceKey.ObjectName -ine 'LocalSystem' -or
         [int]$serviceKey.Start -ne 2 -or [int]$serviceKey.DelayedAutoStart -ne 1 -or
-        $serviceKey.DisplayName -cne 'SimplySignAuto.Service' -or
+        $serviceKey.DisplayName -cne 'CodeSignAuto.Service' -or
         $serviceKey.Description -cne $ownerMarker -or
-        $serviceKey.SimplySignAutoInstallOwner -cne $ownerMarker -or
-        (Get-Service -Name 'SimplySignAuto.Service').Status -ne 'Running') {
+        $serviceKey.CodeSignAutoInstallOwner -cne $ownerMarker -or
+        (Get-Service -Name 'CodeSignAuto.Service').Status -ne 'Running') {
         throw 'acceptance_service_registration_invalid'
     }
     $sc = Get-CanonicalExistingPath (Join-Path $env:SystemRoot 'System32\sc.exe') Leaf
-    $recovery = Invoke-BoundedProcessCapture $sc @('qfailure', 'SimplySignAuto.Service') 30 $null
+    $recovery = Invoke-BoundedProcessCapture $sc @('qfailure', 'CodeSignAuto.Service') 30 $null
     $recoveryNumbers = @([regex]::Matches($recovery.Stdout, '(?<![0-9])[0-9]+(?![0-9])') | ForEach-Object { $_.Value })
-    $failureFlag = Invoke-BoundedProcessCapture $sc @('qfailureflag', 'SimplySignAuto.Service') 30 $null
+    $failureFlag = Invoke-BoundedProcessCapture $sc @('qfailureflag', 'CodeSignAuto.Service') 30 $null
     $flagNumbers = @([regex]::Matches($failureFlag.Stdout, '(?<![0-9])[0-9]+(?![0-9])') | ForEach-Object { $_.Value })
     if ($recovery.ExitCode -ne 0 -or ($recoveryNumbers -join ',') -cne '86400,5000,15000,60000' -or
         $failureFlag.ExitCode -ne 0 -or ($flagNumbers -join ',') -cne '1') {
         throw 'acceptance_service_recovery_invalid'
     }
 
-    [xml]$taskXml = Export-ScheduledTask -TaskName 'SimplySignAuto.Agent'
+    [xml]$taskXml = Export-ScheduledTask -TaskName 'CodeSignAuto.Agent'
     $namespace = [System.Xml.XmlNamespaceManager]::new($taskXml.NameTable)
     $namespace.AddNamespace('t', 'http://schemas.microsoft.com/windows/2004/02/mit/task')
     $taskChecks = @{
-        '//t:RegistrationInfo/t:Description' = 'SimplySignAuto/v1'
+        '//t:RegistrationInfo/t:Description' = 'CodeSignAuto/v1'
         '//t:RegistrationInfo/t:Source' = $ownerMarker
         '//t:Triggers/t:LogonTrigger/t:Enabled' = 'true'
         '//t:Triggers/t:LogonTrigger/t:UserId' = $SigningSid.Value
@@ -2118,7 +2118,7 @@ function Assert-InstalledState {
             throw 'acceptance_agent_task_invalid'
         }
     }
-    $expectedAgentTask = [SimplySignAuto.Acceptance.Contracts.AgentTaskExecutionSnapshot]::new(
+    $expectedAgentTask = [CodeSignAuto.Acceptance.Contracts.AgentTaskExecutionSnapshot]::new(
         $SigningSid.Value,
         $CanonicalApp,
         'agent --background',
@@ -2126,7 +2126,7 @@ function Assert-InstalledState {
         'HighestAvailable',
         'LogonTrigger',
         $ownerMarker,
-        'SimplySignAuto/v1',
+        'CodeSignAuto/v1',
         $true,
         $true,
         1,
@@ -2136,7 +2136,7 @@ function Assert-InstalledState {
     $firewallPolicy = $null
     try {
         $firewallPolicy = New-Object -ComObject HNetCfg.FwPolicy2
-        $rules = @($firewallPolicy.Rules | Where-Object { $_.Name -ceq 'SimplySignAuto API' })
+        $rules = @($firewallPolicy.Rules | Where-Object { $_.Name -ceq 'CodeSignAuto API' })
         if (-not $FirewallExpected -and $rules.Count -ne 0) { throw 'acceptance_firewall_invalid' }
         if ($FirewallExpected -and ($rules.Count -ne 1 -or $rules[0].Description -cne $ownerMarker -or
             $rules[0].Grouping -cne $ownerMarker -or [int]$rules[0].Protocol -ne 6 -or
@@ -2161,9 +2161,9 @@ function Assert-InstalledState {
 
 function Test-WtsActive {
     param([int]$SessionId)
-    if (-not ('SimplySignAuto.Acceptance.NativeWts' -as [type])) {
+    if (-not ('CodeSignAuto.Acceptance.NativeWts' -as [type])) {
         Add-Type -TypeDefinition @'
-namespace SimplySignAuto.Acceptance {
+namespace CodeSignAuto.Acceptance {
     public static class NativeWts {
         [System.Runtime.InteropServices.DllImport("wtsapi32.dll", SetLastError=true)]
         static extern bool WTSQuerySessionInformationW(System.IntPtr server, int id, int cls, out System.IntPtr buffer, out int bytes);
@@ -2192,27 +2192,27 @@ namespace SimplySignAuto.Acceptance {
 }
 '@
     }
-    try { return [SimplySignAuto.Acceptance.NativeWts]::IsActive($SessionId) } catch { return $false }
+    try { return [CodeSignAuto.Acceptance.NativeWts]::IsActive($SessionId) } catch { return $false }
 }
 
 function Get-WtsClientProtocol {
     param([int]$SessionId)
     $null = Test-WtsActive $SessionId
-    try { return [SimplySignAuto.Acceptance.NativeWts]::GetClientProtocol($SessionId) }
+    try { return [CodeSignAuto.Acceptance.NativeWts]::GetClientProtocol($SessionId) }
     catch { return -1 }
 }
 
 function Get-UniqueActiveSession {
     param([System.Security.Principal.SecurityIdentifier]$Identity)
-    $candidates = New-Object System.Collections.Generic.List[SimplySignAuto.Acceptance.Contracts.SidSessionCandidate]
+    $candidates = New-Object System.Collections.Generic.List[CodeSignAuto.Acceptance.Contracts.SidSessionCandidate]
     foreach ($process in @(Get-CimInstance Win32_Process -Filter "Name='explorer.exe'")) {
         $owner = Invoke-CimMethod -InputObject $process -MethodName GetOwnerSid
         if ($owner.ReturnValue -ne 0 -or [string]::IsNullOrWhiteSpace([string]$owner.Sid)) { continue }
         $state = if (Test-WtsActive ([int]$process.SessionId)) { 'Active' } else { 'Unavailable' }
-        $candidates.Add([SimplySignAuto.Acceptance.Contracts.SidSessionCandidate]::new(
+        $candidates.Add([CodeSignAuto.Acceptance.Contracts.SidSessionCandidate]::new(
                 [int]$process.SessionId, $state, [string]$owner.Sid))
     }
-    return [SimplySignAuto.Acceptance.Contracts.SidSessionSelectionPolicy]::SelectUniqueActive(
+    return [CodeSignAuto.Acceptance.Contracts.SidSessionSelectionPolicy]::SelectUniqueActive(
         $candidates, $Identity.Value)
 }
 
@@ -2241,14 +2241,14 @@ function Get-ObservedChildProcess {
     }
     if ($matches.Count -gt 1) { throw 'acceptance_child_process_invalid' }
     if ($matches.Count -eq 0) { return $null }
-    $actual = [SimplySignAuto.Acceptance.Contracts.ChildProcessObservation]::new(
+    $actual = [CodeSignAuto.Acceptance.Contracts.ChildProcessObservation]::new(
         [int]$matches[0].ProcessId,
         $ExpectedSid.Value,
         [int]$matches[0].SessionId,
         [string]$matches[0].ExecutablePath,
         $ExpectedRunId,
         $true)
-    [SimplySignAuto.Acceptance.Contracts.ChildProcessObservationPolicy]::Validate($actual, $actual)
+    [CodeSignAuto.Acceptance.Contracts.ChildProcessObservationPolicy]::Validate($actual, $actual)
     return $actual
 }
 
@@ -2311,7 +2311,7 @@ function Assert-TimeSynchronization {
         $latestFailureUtc = [DateTimeOffset]$latestFailure[0].TimeCreated
     }
 
-    $evidence = [SimplySignAuto.Acceptance.Contracts.TimeSynchronizationEvidence]::new(
+    $evidence = [CodeSignAuto.Acceptance.Contracts.TimeSynchronizationEvidence]::new(
         ($service.Status -eq [System.ServiceProcess.ServiceControllerStatus]::Running),
         $time.ExitCode,
         $time.Stdout,
@@ -2319,7 +2319,7 @@ function Assert-TimeSynchronization {
         $latestValidUtc,
         $latestFailureUtc,
         $sourceIsLocalClock)
-    [SimplySignAuto.Acceptance.Contracts.TimeSynchronizationPolicy]::Validate($evidence)
+    [CodeSignAuto.Acceptance.Contracts.TimeSynchronizationPolicy]::Validate($evidence)
 }
 
 function Assert-PssaGate {
@@ -2529,8 +2529,8 @@ function Initialize-InteractiveAclFixture {
     return [pscustomobject]@{
         Path = $path
         SiblingPath = $sibling
-        DirectoryIdentity = [SimplySignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read($path, $true).Identity
-        SiblingIdentity = [SimplySignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read($sibling, $false).Identity
+        DirectoryIdentity = [CodeSignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read($path, $true).Identity
+        SiblingIdentity = [CodeSignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read($sibling, $false).Identity
         SiblingSha256 = (Get-FileHash -LiteralPath $sibling -Algorithm SHA256).Hash.ToLowerInvariant()
     }
 }
@@ -2545,40 +2545,40 @@ function Remove-InteractiveAclFixture {
     )
 
     $item = Get-Item -LiteralPath $Path -Force
-    $directoryIdentity = [SimplySignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read($Path, $true)
+    $directoryIdentity = [CodeSignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read($Path, $true)
     if (-not $item.PSIsContainer -or
         ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0 -or
         $directoryIdentity.Identity -cne $ExpectedDirectoryIdentity) {
         throw 'acceptance_state_uncertain'
     }
-    if ([SimplySignAuto.Acceptance.Contracts.TrustedExecutablePolicy]::IsWithinTrustedRoot(
+    if ([CodeSignAuto.Acceptance.Contracts.TrustedExecutablePolicy]::IsWithinTrustedRoot(
             $SiblingPath,
             @($Path))) {
         throw 'acceptance_state_uncertain'
     }
-    [SimplySignAuto.Acceptance.Contracts.ArtifactSetPolicy]::ValidateExact(
+    [CodeSignAuto.Acceptance.Contracts.ArtifactSetPolicy]::ValidateExact(
         @(),
         @(Get-ChildItem -LiteralPath $Path -Force | ForEach-Object { $_.Name }))
-    $siblingIdentity = [SimplySignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read($SiblingPath, $false)
+    $siblingIdentity = [CodeSignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read($SiblingPath, $false)
     if ($siblingIdentity.Identity -cne $ExpectedSiblingIdentity -or $siblingIdentity.LinkCount -ne 1 -or
         (Get-FileHash -LiteralPath $SiblingPath -Algorithm SHA256).Hash.ToLowerInvariant() -cne $ExpectedSiblingSha256) {
         throw 'acceptance_state_uncertain'
     }
-    [SimplySignAuto.Acceptance.Contracts.SentinelLayoutPolicy]::Validate(
+    [CodeSignAuto.Acceptance.Contracts.SentinelLayoutPolicy]::Validate(
         $Path,
         $SiblingPath,
         $ExpectedSiblingIdentity,
         $siblingIdentity.Identity,
         $ExpectedSiblingSha256,
         (Get-FileHash -LiteralPath $SiblingPath -Algorithm SHA256).Hash.ToLowerInvariant())
-    $directoryAfter = [SimplySignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read($Path, $true)
+    $directoryAfter = [CodeSignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read($Path, $true)
     if ($directoryAfter.Identity -cne $ExpectedDirectoryIdentity -or
         @(Get-ChildItem -LiteralPath $Path -Force).Count -ne 0) {
         throw 'acceptance_state_uncertain'
     }
     Remove-Item -LiteralPath $Path -Force
     if (Test-Path -LiteralPath $Path) { throw 'acceptance_state_uncertain' }
-    if (-not [SimplySignAuto.Acceptance.Contracts.WindowsFileIdentity]::DeleteOrdinaryFileIfExact(
+    if (-not [CodeSignAuto.Acceptance.Contracts.WindowsFileIdentity]::DeleteOrdinaryFileIfExact(
             $SiblingPath,
             $ExpectedSiblingIdentity,
             $ExpectedSiblingSha256) -or
@@ -2598,7 +2598,7 @@ function Assert-TrxAndCollect {
         if ($result.outcome -eq 'Passed') { $null = $PassedTests.Add([string]$result.testName) }
     }
     $raw = Get-Content -LiteralPath $Path -Raw
-    if ([SimplySignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive(
+    if ([CodeSignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive(
             $raw,
             [string]$script:TotpSecretForRedaction)) {
         throw 'acceptance_sensitive_artifact'
@@ -2636,7 +2636,7 @@ function Publish-SafeTrx {
                 $true)
             try { $raw = $reader.ReadToEnd() } finally { $reader.Dispose() }
         } finally { $stream.Dispose() }
-        $safe = [SimplySignAuto.Acceptance.Contracts.TrxArtifactPolicy]::Sanitize(
+        $safe = [CodeSignAuto.Acceptance.Contracts.TrxArtifactPolicy]::Sanitize(
             $raw,
             $ExpectedAssembly,
             [Environment]::MachineName,
@@ -2679,7 +2679,7 @@ function Assert-AuthenticodeSequence {
         $BoundSeconds `
         $null
     if ($verify.ExitCode -ne 0 -or
-        [SimplySignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive(
+        [CodeSignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive(
             $verify.Stdout + $verify.Stderr,
             [string]$script:TotpSecretForRedaction)) {
         throw 'acceptance_authenticode_verify_failed'
@@ -2718,7 +2718,7 @@ function Assert-AuthenticodeSequence {
     }
     $timestampUtc = $observedTimestamp.UtcDateTime.ToString('yyyy-MM-ddTHH:mm:ssZ')
     if ($RequireAcceptanceWindow) {
-        [SimplySignAuto.Acceptance.Contracts.SignatureTimestampPolicy]::Validate(
+        [CodeSignAuto.Acceptance.Contracts.SignatureTimestampPolicy]::Validate(
             $timestampUtc,
             $AcceptanceStartedUtc,
             [DateTimeOffset]::UtcNow,
@@ -2727,15 +2727,15 @@ function Assert-AuthenticodeSequence {
             $signature.TimeStamperCertificate.Subject,
             $TimestampSignerSubjectSuffix)
     } else {
-        [SimplySignAuto.Acceptance.Contracts.SignatureTimestampPolicy]::ValidateSignerIdentity(
+        [CodeSignAuto.Acceptance.Contracts.SignatureTimestampPolicy]::ValidateSignerIdentity(
             $timestampUtc,
             (Get-CertificateSha256 $signature.TimeStamperCertificate),
             $TimestampSignerSha256,
             $signature.TimeStamperCertificate.Subject,
             $TimestampSignerSubjectSuffix)
     }
-    $actual = [SimplySignAuto.Acceptance.Contracts.AuthenticodeSignatureSequence]::ReadSuffixes($Path)
-    [SimplySignAuto.Acceptance.Contracts.RemoteAcceptanceMatrixPolicy]::ValidateSignerSequence(
+    $actual = [CodeSignAuto.Acceptance.Contracts.AuthenticodeSignatureSequence]::ReadSuffixes($Path)
+    [CodeSignAuto.Acceptance.Contracts.RemoteAcceptanceMatrixPolicy]::ValidateSignerSequence(
         $actual,
         $ExpectedSignerSuffixes)
 }
@@ -2764,7 +2764,7 @@ function Assert-PublicCertificateChain {
             $null
         if ($verified.ExitCode -ne 0 -or
             -not [string]::IsNullOrWhiteSpace($verified.Stderr) -or
-            [SimplySignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive(
+            [CodeSignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive(
                 $verified.Stdout + $verified.Stderr,
                 [string]$script:TotpSecretForRedaction)) {
             throw 'acceptance_certificate_chain_invalid'
@@ -2798,12 +2798,12 @@ function Invoke-IndependentPdfValidation {
     $arguments.Add($OutputPath)
     $independent = Invoke-BoundedProcessCapture $CanonicalValidator $arguments.ToArray() 60 $null
     if (-not [string]::IsNullOrWhiteSpace($independent.Stderr) -or
-        [SimplySignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive(
+        [CodeSignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive(
             $independent.Stdout + $independent.Stderr,
             [string]$script:TotpSecretForRedaction)) {
         throw 'acceptance_pdf_dual_validation_failed'
     }
-    [SimplySignAuto.Acceptance.Contracts.PdfDualValidationPolicy]::Validate(
+    [CodeSignAuto.Acceptance.Contracts.PdfDualValidationPolicy]::Validate(
         $ProjectValidatorOk,
         $independent.ExitCode,
         $independent.Stdout,
@@ -2813,7 +2813,7 @@ function Invoke-IndependentPdfValidation {
 
 function Assert-ExactChildren {
     param([string]$Path, [string[]]$Expected)
-    [SimplySignAuto.Acceptance.Contracts.ArtifactSetPolicy]::ValidateExact(
+    [CodeSignAuto.Acceptance.Contracts.ArtifactSetPolicy]::ValidateExact(
         $Expected,
         @(Get-ChildItem -LiteralPath $Path -Force | ForEach-Object { $_.Name }))
 }
@@ -2886,12 +2886,12 @@ function New-SafeEventLogSummary {
         } -MaxEvents 2048 -ErrorAction SilentlyContinue)
     if ($events.Count -eq 2048) { throw 'acceptance_event_log_incomplete' }
     $selected = @($events | Where-Object {
-            ([string]$_.ProviderName).StartsWith('SimplySignAuto', [System.StringComparison]::OrdinalIgnoreCase) -or
-            ([string]$_.Message).IndexOf('SimplySignAuto', [System.StringComparison]::OrdinalIgnoreCase) -ge 0
+            ([string]$_.ProviderName).StartsWith('CodeSignAuto', [System.StringComparison]::OrdinalIgnoreCase) -or
+            ([string]$_.Message).IndexOf('CodeSignAuto', [System.StringComparison]::OrdinalIgnoreCase) -ge 0
         })
     foreach ($eventRecord in $selected) {
         $message = [string]$eventRecord.Message
-        if ([SimplySignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive(
+        if ([CodeSignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive(
                 $message,
                 [string]$script:TotpSecretForRedaction)) {
             throw 'acceptance_sensitive_artifact'
@@ -2935,15 +2935,15 @@ function Invoke-NativeTests {
     param([string]$CanonicalRepo, [string]$CanonicalDotnet, [string]$RunDirectory, [int]$BoundSeconds)
     $native = Join-Path $RunDirectory 'native'
     [System.IO.Directory]::CreateDirectory($native) | Out-Null
-    $restore = Invoke-BoundedProcessCapture $CanonicalDotnet @('restore', (Join-Path $CanonicalRepo 'SimplySignAuto.sln'), '--locked-mode', '--force-evaluate', '-m:1', '-nodeReuse:false') $BoundSeconds $null
+    $restore = Invoke-BoundedProcessCapture $CanonicalDotnet @('restore', (Join-Path $CanonicalRepo 'CodeSignAuto.sln'), '--locked-mode', '--force-evaluate', '-m:1', '-nodeReuse:false') $BoundSeconds $null
     if ($restore.ExitCode -ne 0) { throw 'acceptance_restore_failed' }
     $projects = [ordered]@{
-        core = 'tests\SimplySignAuto.Core.Tests\SimplySignAuto.Core.Tests.csproj'
-        protocol = 'tests\SimplySignAuto.Protocol.Tests\SimplySignAuto.Protocol.Tests.csproj'
-        agent = 'tests\SimplySignAuto.Agent.Tests\SimplySignAuto.Agent.Tests.csproj'
-        service = 'tests\SimplySignAuto.Service.Tests\SimplySignAuto.Service.Tests.csproj'
-        e2e = 'tests\SimplySignAuto.EndToEnd.Tests\SimplySignAuto.EndToEnd.Tests.csproj'
-        ui = 'tests\SimplySignAuto.UI.Tests\SimplySignAuto.UI.Tests.csproj'
+        core = 'tests\CodeSignAuto.Core.Tests\CodeSignAuto.Core.Tests.csproj'
+        protocol = 'tests\CodeSignAuto.Protocol.Tests\CodeSignAuto.Protocol.Tests.csproj'
+        agent = 'tests\CodeSignAuto.Agent.Tests\CodeSignAuto.Agent.Tests.csproj'
+        service = 'tests\CodeSignAuto.Service.Tests\CodeSignAuto.Service.Tests.csproj'
+        e2e = 'tests\CodeSignAuto.EndToEnd.Tests\CodeSignAuto.EndToEnd.Tests.csproj'
+        ui = 'tests\CodeSignAuto.UI.Tests\CodeSignAuto.UI.Tests.csproj'
     }
     $oldAdminIntegration = $env:SIMPLYSIGN_RUN_ADMIN_INTEGRATION
     $env:SIMPLYSIGN_RUN_ADMIN_INTEGRATION = '1'
@@ -2967,7 +2967,7 @@ function Invoke-NativeTests {
                 'e2e' { 'EndToEnd' }
                 default { $entry.Key.Substring(0, 1).ToUpperInvariant() + $entry.Key.Substring(1) }
             }
-            $prefix = "SimplySignAuto.$assemblySegment.Tests."
+            $prefix = "CodeSignAuto.$assemblySegment.Tests."
             foreach ($interactiveTest in @($InteractiveWindowsNativeTests | Where-Object { $_.StartsWith($prefix, [System.StringComparison]::Ordinal) })) {
                 $filters.Add("FullyQualifiedName!=$interactiveTest")
             }
@@ -2977,7 +2977,7 @@ function Invoke-NativeTests {
                 $run = Invoke-BoundedProcessCapture $CanonicalDotnet $arguments $BoundSeconds $null
             } finally {
                 if (Test-Path -LiteralPath $rawTrx -PathType Leaf) {
-                    Publish-SafeTrx $rawTrx $finalTrx "SimplySignAuto.$assemblySegment.Tests.dll" $rawDirectory
+                    Publish-SafeTrx $rawTrx $finalTrx "CodeSignAuto.$assemblySegment.Tests.dll" $rawDirectory
                 } elseif ((Test-Path -LiteralPath $rawDirectory -PathType Container) -and
                     @(Get-ChildItem -LiteralPath $rawDirectory -Force).Count -eq 0) {
                     Remove-Item -LiteralPath $rawDirectory -Force
@@ -3002,9 +3002,9 @@ function Invoke-InteractiveNativeTests {
     )
 
     $projects = [ordered]@{
-        agent = 'tests\SimplySignAuto.Agent.Tests\SimplySignAuto.Agent.Tests.csproj'
-        service = 'tests\SimplySignAuto.Service.Tests\SimplySignAuto.Service.Tests.csproj'
-        ui = 'tests\SimplySignAuto.UI.Tests\SimplySignAuto.UI.Tests.csproj'
+        agent = 'tests\CodeSignAuto.Agent.Tests\CodeSignAuto.Agent.Tests.csproj'
+        service = 'tests\CodeSignAuto.Service.Tests\CodeSignAuto.Service.Tests.csproj'
+        ui = 'tests\CodeSignAuto.UI.Tests\CodeSignAuto.UI.Tests.csproj'
     }
     $resultRoot = Join-Path $InteractiveDirectory 'native'
     [System.IO.Directory]::CreateDirectory($resultRoot) | Out-Null
@@ -3019,7 +3019,7 @@ function Invoke-InteractiveNativeTests {
             } else {
                 $entry.Key.Substring(0, 1).ToUpperInvariant() + $entry.Key.Substring(1)
             }
-            $prefix = "SimplySignAuto.$assemblySegment.Tests."
+            $prefix = "CodeSignAuto.$assemblySegment.Tests."
             $tests = @($InteractiveWindowsNativeTests | Where-Object { $_.StartsWith($prefix, [System.StringComparison]::Ordinal) })
             if ($tests.Count -eq 0) { continue }
             $resultDirectory = Join-Path $resultRoot $entry.Key
@@ -3037,7 +3037,7 @@ function Invoke-InteractiveNativeTests {
                     $rawDirectory, '--filter', $filter, '-m:1', '-nodeReuse:false') $BoundSeconds $null
             } finally {
                 if (Test-Path -LiteralPath $rawTrx -PathType Leaf) {
-                    Publish-SafeTrx $rawTrx $finalTrx "SimplySignAuto.$assemblySegment.Tests.dll" $rawDirectory
+                    Publish-SafeTrx $rawTrx $finalTrx "CodeSignAuto.$assemblySegment.Tests.dll" $rawDirectory
                 } elseif ((Test-Path -LiteralPath $rawDirectory -PathType Container) -and
                     @(Get-ChildItem -LiteralPath $rawDirectory -Force).Count -eq 0) {
                     Remove-Item -LiteralPath $rawDirectory -Force
@@ -3060,7 +3060,7 @@ function Invoke-ChildWork {
     Assert-TrustedRootAcl $canonicalRepo
     Initialize-ContractSources $canonicalRepo
     $windowsSystemPublishers =
-        [SimplySignAuto.Acceptance.Contracts.WindowsSystemPublisherMapPolicy]::Parse(
+        [CodeSignAuto.Acceptance.Contracts.WindowsSystemPublisherMapPolicy]::Parse(
             $WindowsSystemPublisherSha256Map)
     $canonicalRun = Get-CanonicalExistingPath $ArtifactRoot Container
     $canonicalInteractive = Get-CanonicalExistingPath (Join-Path $canonicalRun 'interactive') Container
@@ -3096,7 +3096,7 @@ function Invoke-ChildWork {
     if ($identity.User -ne $expectedIdentity -or $session -ne $ExpectedSessionId -or -not (Test-WtsActive $session)) {
         throw 'acceptance_session_unavailable'
     }
-    $expectedAgentTask = [SimplySignAuto.Acceptance.Contracts.AgentTaskExecutionSnapshot]::new(
+    $expectedAgentTask = [CodeSignAuto.Acceptance.Contracts.AgentTaskExecutionSnapshot]::new(
         $expectedIdentity.Value,
         $canonicalApp,
         'agent --background',
@@ -3104,7 +3104,7 @@ function Invoke-ChildWork {
         'HighestAvailable',
         'LogonTrigger',
         $ExpectedAgentTaskSource,
-        'SimplySignAuto/v1',
+        'CodeSignAuto/v1',
         $true,
         $true,
         1,
@@ -3115,14 +3115,14 @@ function Invoke-ChildWork {
         }
     }
     Assert-AgentTaskExact $expectedAgentTask $canonicalApp
-    $agentTask = Get-ScheduledTask -TaskName 'SimplySignAuto.Agent' -ErrorAction Stop
+    $agentTask = Get-ScheduledTask -TaskName 'CodeSignAuto.Agent' -ErrorAction Stop
     if ($agentTask.State -eq 'Running') {
         Assert-AgentTaskExact $expectedAgentTask $canonicalApp
-        Stop-ScheduledTask -TaskName 'SimplySignAuto.Agent'
+        Stop-ScheduledTask -TaskName 'CodeSignAuto.Agent'
         $stopWatch = [Diagnostics.Stopwatch]::StartNew()
         do {
             Start-Sleep -Milliseconds 250
-            $agentTask = Get-ScheduledTask -TaskName 'SimplySignAuto.Agent'
+            $agentTask = Get-ScheduledTask -TaskName 'CodeSignAuto.Agent'
         } while ($agentTask.State -eq 'Running' -and $stopWatch.Elapsed.TotalSeconds -lt 30)
         if ($agentTask.State -eq 'Running') { throw 'acceptance_agent_stop_timeout' }
     }
@@ -3134,11 +3134,11 @@ function Invoke-ChildWork {
         $aclFixture `
         $ChildTimeoutSeconds
     Assert-AgentTaskExact $expectedAgentTask $canonicalApp
-    Start-ScheduledTask -TaskName 'SimplySignAuto.Agent'
+    Start-ScheduledTask -TaskName 'CodeSignAuto.Agent'
     $agentWatch = [Diagnostics.Stopwatch]::StartNew()
     do {
         Start-Sleep -Milliseconds 250
-        $agentTask = Get-ScheduledTask -TaskName 'SimplySignAuto.Agent'
+        $agentTask = Get-ScheduledTask -TaskName 'CodeSignAuto.Agent'
     } while ($agentTask.State -ne 'Running' -and $agentWatch.Elapsed.TotalSeconds -lt 30)
     if ($agentTask.State -ne 'Running') { throw 'acceptance_agent_start_timeout' }
     $agentBeforeClose = Get-ExactAgentProcess $canonicalApp $session $expectedIdentity
@@ -3186,10 +3186,10 @@ function Invoke-UnattendedRebootResume {
         [string]$RawDirectory,
         $Checkpoint,
         [string]$ResumeTaskName,
-        [SimplySignAuto.Acceptance.Contracts.BootResumeTaskSnapshot]$ExpectedResumeTask
+        [CodeSignAuto.Acceptance.Contracts.BootResumeTaskSnapshot]$ExpectedResumeTask
     )
     $windowsSystemPublishers =
-        [SimplySignAuto.Acceptance.Contracts.WindowsSystemPublisherMapPolicy]::Parse(
+        [CodeSignAuto.Acceptance.Contracts.WindowsSystemPublisherMapPolicy]::Parse(
             $WindowsSystemPublisherSha256Map)
     Assert-ExactProperties $Checkpoint @(
         'schemaVersion', 'phase', 'runId', 'acceptanceStartedUtc', 'bootBeforeUtc',
@@ -3208,7 +3208,7 @@ function Invoke-UnattendedRebootResume {
         $Checkpoint.signingSid -isnot [string] -or
         $Checkpoint.signingSid -notmatch '^S-1-[0-9]+(?:-[0-9]+)+$' -or
         $Checkpoint.agentTaskSource -isnot [string] -or
-        $Checkpoint.agentTaskSource -notmatch '^SimplySignAuto/v1/[0-9a-f]{32}$' -or
+        $Checkpoint.agentTaskSource -notmatch '^CodeSignAuto/v1/[0-9a-f]{32}$' -or
         $Checkpoint.codeInputSha256 -isnot [string] -or
         $Checkpoint.codeInputSha256 -notmatch '^[0-9a-f]{64}$' -or
         $Checkpoint.pdfInputSha256 -isnot [string] -or
@@ -3300,7 +3300,7 @@ function Invoke-UnattendedRebootResume {
     if ($signingSession -le 0 -or $wtsProtocol -ne 0) {
         throw 'acceptance_unattended_reboot_invalid'
     }
-    $expectedAgentTask = [SimplySignAuto.Acceptance.Contracts.AgentTaskExecutionSnapshot]::new(
+    $expectedAgentTask = [CodeSignAuto.Acceptance.Contracts.AgentTaskExecutionSnapshot]::new(
         $signingSid.Value,
         $CanonicalApp,
         'agent --background',
@@ -3308,7 +3308,7 @@ function Invoke-UnattendedRebootResume {
         'HighestAvailable',
         'LogonTrigger',
         [string]$Checkpoint.agentTaskSource,
-        'SimplySignAuto/v1',
+        'CodeSignAuto/v1',
         $true,
         $true,
         1,
@@ -3322,17 +3322,17 @@ function Invoke-UnattendedRebootResume {
         if ($null -ne $agentProcess) { break }
         Start-Sleep -Milliseconds 500
     } while ($agentWatch.Elapsed.TotalSeconds -lt 300)
-    $agentTask = Get-ScheduledTask -TaskName 'SimplySignAuto.Agent' -ErrorAction Stop
+    $agentTask = Get-ScheduledTask -TaskName 'CodeSignAuto.Agent' -ErrorAction Stop
     if ($null -eq $agentProcess -or $agentTask.State -ne 'Running') {
         throw 'acceptance_unattended_reboot_invalid'
     }
 
-    $lsaKey = "SimplySignAuto/Acceptance/$RunId/Api"
+    $lsaKey = "CodeSignAuto/Acceptance/$RunId/Api"
     $bearer = $null
     $client = $null
     try {
-        $bearer = [SimplySignAuto.Acceptance.Contracts.AcceptanceLsaSecret]::Retrieve($lsaKey)
-        $client = [SimplySignAuto.Acceptance.Contracts.PinnedHttpClientFactory]::Create(
+        $bearer = [CodeSignAuto.Acceptance.Contracts.AcceptanceLsaSecret]::Retrieve($lsaKey)
+        $client = [CodeSignAuto.Acceptance.Contracts.PinnedHttpClientFactory]::Create(
             [string]$Checkpoint.tlsCertificatePin,
             $bearer)
         $readyWatch = [Diagnostics.Stopwatch]::StartNew()
@@ -3497,7 +3497,7 @@ function Invoke-UnattendedRebootResume {
                 $pdfEvidence.inputUnchanged -ne $true) {
                 throw 'acceptance_unattended_reboot_invalid'
             }
-            [SimplySignAuto.Acceptance.Contracts.SignatureTimestampPolicy]::Validate(
+            [CodeSignAuto.Acceptance.Contracts.SignatureTimestampPolicy]::Validate(
                 [string]$pdfEvidence.timestampUtc,
                 $acceptanceStarted,
                 [DateTimeOffset]::UtcNow,
@@ -3519,7 +3519,7 @@ function Invoke-UnattendedRebootResume {
             }
         }
 
-        [SimplySignAuto.Acceptance.Contracts.UnattendedRebootEvidencePolicy]::Validate(
+        [CodeSignAuto.Acceptance.Contracts.UnattendedRebootEvidencePolicy]::Validate(
             $bootBefore,
             $bootAfter,
             $signingSession,
@@ -3595,7 +3595,7 @@ function Invoke-RebootResume {
     $canonicalRepo = Get-CanonicalExistingPath $RepoPath Container
     Assert-TrustedRootAcl $canonicalRepo
     Initialize-ContractSources $canonicalRepo
-    $windowsSystemPublishers = [SimplySignAuto.Acceptance.Contracts.WindowsSystemPublisherMapPolicy]::Parse(
+    $windowsSystemPublishers = [CodeSignAuto.Acceptance.Contracts.WindowsSystemPublisherMapPolicy]::Parse(
         $WindowsSystemPublisherSha256Map)
     Initialize-PostRebootTaskExpectation
     $canonicalRun = Get-CanonicalExistingPath $ArtifactRoot Container
@@ -3715,7 +3715,7 @@ function Invoke-RebootResume {
                 throw 'acceptance_fresh_install_resume_failed'
             }
             Assert-BootResumeTaskExact $resumeTaskName $expectedTask
-            $handoffToken = [SimplySignAuto.Acceptance.Contracts.AcceptanceLsaSecret]::Retrieve(
+            $handoffToken = [CodeSignAuto.Acceptance.Contracts.AcceptanceLsaSecret]::Retrieve(
                 $UnattendedRebootLsaKey)
             if ([string]::IsNullOrWhiteSpace($handoffToken)) {
                 throw 'acceptance_fresh_install_resume_failed'
@@ -3800,7 +3800,7 @@ function Invoke-RebootResume {
         throw 'acceptance_purge_hard_stop_invalid'
     }
     $checkpointJson = Get-Content -LiteralPath $checkpointPath -Raw
-    if ([SimplySignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive(
+    if ([CodeSignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive(
             $checkpointJson,
             [string]$script:TotpSecretForRedaction)) {
         throw 'acceptance_sensitive_artifact'
@@ -3827,8 +3827,8 @@ function Invoke-RebootResume {
         throw 'acceptance_purge_boot_invalid'
     }
     $operationId = [string]$checkpoint.operationId
-    $productionTaskName = "SimplySignAuto.Purge.$operationId"
-    $manifestPath = Join-Path $env:ProgramData "SimplySignAuto.Purge.$operationId\manifest.json"
+    $productionTaskName = "CodeSignAuto.Purge.$operationId"
+    $manifestPath = Join-Path $env:ProgramData "CodeSignAuto.Purge.$operationId\manifest.json"
     if ($checkpoint.phase -ceq 'purge-hard-stop') {
         $operationRoot = Get-CanonicalExistingPath (
             [System.IO.Path]::GetDirectoryName($manifestPath)) Container
@@ -3850,7 +3850,7 @@ function Invoke-RebootResume {
         if ($resumeUninstall.ExitCode -ne 0 -or
             -not [string]::IsNullOrWhiteSpace($resumeUninstall.Stderr) -or
             $resumeUninstall.Stdout.Replace("`r`n", "`n") -cne $expectedResumeOutput -or
-            [SimplySignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive(
+            [CodeSignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive(
                 $resumeUninstall.Stdout + $resumeUninstall.Stderr,
                 [string]$script:TotpSecretForRedaction)) {
             throw 'acceptance_purge_hard_stop_invalid'
@@ -3894,8 +3894,8 @@ function Invoke-RebootResume {
     $manifestRemoved = -not (Test-Path -LiteralPath $manifestPath)
     $cleanupTaskRemoved = $null -eq (Get-ScheduledTask -TaskName $productionTaskName -ErrorAction SilentlyContinue)
     $exactOwnedProductRemoved = $sourceRootsIsolated -and
-        $null -eq (Get-Service -Name 'SimplySignAuto.Service' -ErrorAction SilentlyContinue) -and
-        $null -eq (Get-ScheduledTask -TaskName 'SimplySignAuto.Agent' -ErrorAction SilentlyContinue)
+        $null -eq (Get-Service -Name 'CodeSignAuto.Service' -ErrorAction SilentlyContinue) -and
+        $null -eq (Get-ScheduledTask -TaskName 'CodeSignAuto.Agent' -ErrorAction SilentlyContinue)
     $exactOwnedUserRemoved = $null -eq (
         Get-LocalUser -Name ([string]$checkpoint.signingUserName) -ErrorAction SilentlyContinue)
     $exactOwnedProfileRemoved = -not (Test-Path -LiteralPath ([string]$checkpoint.profilePath)) -and
@@ -3931,7 +3931,7 @@ function Invoke-RebootResume {
     if ($null -ne $cleanupFailure) { throw $cleanupFailure }
     $resumeTaskRemoved = $true
     $stagingVolumes = @($checkpoint.stagingRoots | ForEach-Object { [System.IO.Path]::GetPathRoot([string]$_) })
-    [SimplySignAuto.Acceptance.Contracts.PurgeBootEvidencePolicy]::Validate(
+    [CodeSignAuto.Acceptance.Contracts.PurgeBootEvidencePolicy]::Validate(
         $operationId,
         $stagingVolumes,
         $bootBefore,
@@ -3941,7 +3941,7 @@ function Invoke-RebootResume {
         $cleanupTaskRemoved,
         $stagingRootsRemoved,
         $resumeTaskRemoved)
-    [SimplySignAuto.Acceptance.Contracts.PurgeHardStopEvidencePolicy]::Validate(
+    [CodeSignAuto.Acceptance.Contracts.PurgeHardStopEvidencePolicy]::Validate(
         $operationId,
         ([string]$checkpoint.manifestOperationId),
         @($checkpoint.sourcePaths),
@@ -3960,7 +3960,7 @@ function Invoke-RebootResume {
         $pkcs11Preserved,
         $desktopRuntimePreserved,
         $aspNetCoreRuntimePreserved)
-    [SimplySignAuto.Acceptance.Contracts.RemoteAcceptanceMatrixPolicy]::ValidateFailureSessionAndBootMatrix(
+    [CodeSignAuto.Acceptance.Contracts.RemoteAcceptanceMatrixPolicy]::ValidateFailureSessionAndBootMatrix(
         $true, $true, $true, $true, $true, $true, $true, $true, $true, $true, $true)
 
     $pending = ConvertFrom-StrictJson (Get-Content -LiteralPath $pendingSummaryPath -Raw)
@@ -3981,7 +3981,7 @@ function Invoke-RebootResume {
         urlAcl = 'passed'
     })
     $finalSummary = $pending | ConvertTo-Json -Compress -Depth 5
-    if ([SimplySignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive(
+    if ([CodeSignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive(
             $finalSummary,
             [string]$script:TotpSecretForRedaction)) {
         throw 'acceptance_sensitive_artifact'
@@ -4035,7 +4035,7 @@ function Invoke-RebootResume {
         }
         if ($artifact.Extension -in '.json', '.trx', '.xml', '.txt', '.log') {
             $artifactText = Get-Content -LiteralPath $artifact.FullName -Raw
-            if ([SimplySignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive(
+            if ([CodeSignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive(
                     $artifactText,
                     [string]$script:TotpSecretForRedaction)) {
                 throw 'acceptance_sensitive_artifact'
@@ -4079,19 +4079,19 @@ function Prepare-UnattendedRebootStage {
     $CheckpointData['codeInputSha256'] = (Get-FileHash -LiteralPath $codeInput -Algorithm SHA256).Hash.ToLowerInvariant()
     $CheckpointData['pdfInputSha256'] = (Get-FileHash -LiteralPath $pdfInput -Algorithm SHA256).Hash.ToLowerInvariant()
     $checkpointJson = $CheckpointData | ConvertTo-Json -Compress -Depth 6
-    if ([SimplySignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive(
+    if ([CodeSignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive(
             $checkpointJson,
             [string]$script:TotpSecretForRedaction)) {
         throw 'acceptance_sensitive_artifact'
     }
-    $lsaKey = "SimplySignAuto/Acceptance/$ExpectedRunId/Api"
+    $lsaKey = "CodeSignAuto/Acceptance/$ExpectedRunId/Api"
     $script:UnattendedRebootCleanupArmed = $true
     $script:UnattendedRebootLsaKey = $lsaKey
     $script:UnattendedRebootSecretStored = $false
-    $resumeTaskName = "SimplySignAuto.Acceptance.Boot.$ExpectedRunId"
+    $resumeTaskName = "CodeSignAuto.Acceptance.Boot.$ExpectedRunId"
     $script:ResumeTaskName = $resumeTaskName
     try {
-        [SimplySignAuto.Acceptance.Contracts.AcceptanceLsaSecret]::StoreNew($lsaKey, $BearerSecret)
+        [CodeSignAuto.Acceptance.Contracts.AcceptanceLsaSecret]::StoreNew($lsaKey, $BearerSecret)
         $script:UnattendedRebootSecretStored = $true
         New-CreateNewText (Join-Path $rawDirectory 'checkpoint.json') $checkpointJson
         New-CreateNewText (Join-Path $rawDirectory 'summary.pending.json') $PendingSummaryJson
@@ -4121,17 +4121,17 @@ function Prepare-UnattendedRebootStage {
             -Principal $principal `
             -Trigger $trigger `
             -Settings $settings `
-            -Description 'SimplySignAuto/AcceptanceBoot/v1'
-        $definition.Source = 'SimplySignAuto/v1'
-        $expectedTask = [SimplySignAuto.Acceptance.Contracts.BootResumeTaskSnapshot]::new(
+            -Description 'CodeSignAuto/AcceptanceBoot/v1'
+        $definition.Source = 'CodeSignAuto/v1'
+        $expectedTask = [CodeSignAuto.Acceptance.Contracts.BootResumeTaskSnapshot]::new(
             'S-1-5-18',
             'ServiceAccount',
             'Highest',
             (Get-Sha256Text $CanonicalPowerShell.ToUpperInvariant()),
             (Get-Sha256Text $resumeArguments),
             'AtStartup',
-            'SimplySignAuto/v1',
-            'SimplySignAuto/AcceptanceBoot/v1',
+            'CodeSignAuto/v1',
+            'CodeSignAuto/AcceptanceBoot/v1',
             $BoundSeconds,
             1)
         $script:BootResumeExpectedTask = $expectedTask
@@ -4179,7 +4179,7 @@ function Read-ExactPurgeHardStopManifest {
     $operationRoot = Get-CanonicalExistingPath $OperationRoot Container
     Assert-TrustedRootAcl $operationRoot
     if ([System.IO.Path]::GetFileName($operationRoot) -cnotmatch
-        '^SimplySignAuto\.Purge\.(?<id>[0-9a-f]{32})$') {
+        '^CodeSignAuto\.Purge\.(?<id>[0-9a-f]{32})$') {
         throw 'acceptance_purge_hard_stop_invalid'
     }
     $operationId = $Matches['id']
@@ -4190,9 +4190,9 @@ function Read-ExactPurgeHardStopManifest {
         'signingUserSid', 'installInstanceId', 'signingUserOwnership', 'executablePath',
         'executableSha256', 'stagingRoots', 'targets')
     if ($manifest.version -ne 1 -or
-        $manifest.ownerMarker -cne 'SimplySignAuto/Purge/v1' -or
+        $manifest.ownerMarker -cne 'CodeSignAuto/Purge/v1' -or
         $manifest.operationId -cne $operationId -or
-        $manifest.cleanupTaskName -cne "SimplySignAuto.Purge.$operationId" -or
+        $manifest.cleanupTaskName -cne "CodeSignAuto.Purge.$operationId" -or
         $manifest.installOwnerMarker -cne $InstallOwnerMarker -or
         $manifest.signingUserSid -cne $SigningSid -or
         $manifest.installInstanceId -isnot [string] -or
@@ -4212,7 +4212,7 @@ function Read-ExactPurgeHardStopManifest {
     if ($stagingRootValue -cne $stagingRoot -or
         [System.IO.Path]::GetDirectoryName($stagingRoot) -ine $sourceVolume -or
         [System.IO.Path]::GetFileName($stagingRoot) -cne
-            ".SimplySignAuto.quarantine.$operationId.0") {
+            ".CodeSignAuto.quarantine.$operationId.0") {
         throw 'acceptance_purge_hard_stop_invalid'
     }
     $actualSources = [System.Collections.Generic.List[string]]::new()
@@ -4277,7 +4277,7 @@ function Invoke-HardStopUninstallAtFirstStagedMove {
                     -LiteralPath $env:ProgramData `
                     -Directory `
                     -Force `
-                    -Filter 'SimplySignAuto.Purge.*' |
+                    -Filter 'CodeSignAuto.Purge.*' |
                     Where-Object { $BeforeOperations -notcontains $_.Name })
             if ($newOperations.Count -gt 1) { throw 'acceptance_purge_hard_stop_invalid' }
             if ($newOperations.Count -eq 1 -and
@@ -4324,7 +4324,7 @@ function Invoke-HardStopUninstallAtFirstStagedMove {
                     throw 'acceptance_process_cleanup_timeout'
                 }
                 $combined = [string]$stdout.Result + [string]$stderr.Result
-                if ([SimplySignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive(
+                if ([CodeSignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive(
                         $combined,
                         [string]$script:TotpSecretForRedaction)) {
                     throw 'acceptance_sensitive_artifact'
@@ -4388,7 +4388,7 @@ function Prepare-PurgeRebootStage {
     $Checkpoint | Add-Member -NotePropertyName rootUninstallResumed -NotePropertyValue $true
     $Checkpoint | Add-Member -NotePropertyName cleanupTaskReadbackExact -NotePropertyValue $true
     $checkpointJson = $Checkpoint | ConvertTo-Json -Compress -Depth 6
-    if ([SimplySignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive(
+    if ([CodeSignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive(
             $checkpointJson,
             [string]$script:TotpSecretForRedaction)) {
         throw 'acceptance_sensitive_artifact'
@@ -4446,7 +4446,7 @@ function Prepare-PurgeHardStopRebootStage {
     $sourceRoots = @($DataRoot)
     $sourceVolume = [System.IO.Path]::GetPathRoot($DataRoot)
     $beforeOperations = @(
-        Get-ChildItem -LiteralPath $env:ProgramData -Directory -Force -Filter 'SimplySignAuto.Purge.*' |
+        Get-ChildItem -LiteralPath $env:ProgramData -Directory -Force -Filter 'CodeSignAuto.Purge.*' |
             ForEach-Object { $_.Name })
     $bootBefore = Get-CurrentBootUtc
     $canonicalDotnet = Get-CanonicalExistingPath ([string]$PreservationCheckpoint.dotnetPath) Leaf
@@ -4493,7 +4493,7 @@ function Prepare-PurgeHardStopRebootStage {
         cleanupTaskAbsentAtTermination = [bool]$hardStop.CleanupTaskAbsent
         processTreeTerminated = [bool]$hardStop.ProcessTreeTerminated
         profilePath = $profilePath
-        signingUserName = 'SimplySignAgent'
+        signingUserName = 'CodeSignAutoAgent'
         signingSid = $SigningSid
         installOwnerMarker = [string]$PreservationCheckpoint.agentTaskSource
         installInstanceHash = [string]$PreservationCheckpoint.installInstanceHash
@@ -4510,7 +4510,7 @@ function Prepare-PurgeHardStopRebootStage {
         prebootMatrixComplete = $true
     }
     $checkpointJson = $checkpointData | ConvertTo-Json -Compress -Depth 6
-    if ([SimplySignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive(
+    if ([CodeSignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive(
             $checkpointJson,
             [string]$script:TotpSecretForRedaction)) {
         throw 'acceptance_sensitive_artifact'
@@ -4518,7 +4518,7 @@ function Prepare-PurgeHardStopRebootStage {
     New-CreateNewText (Join-Path $rawDirectory 'checkpoint.json') $checkpointJson
     New-CreateNewText (Join-Path $rawDirectory 'summary.pending.json') $PendingSummaryJson
 
-    $resumeTaskName = "SimplySignAuto.Acceptance.Boot.$ExpectedRunId"
+    $resumeTaskName = "CodeSignAuto.Acceptance.Boot.$ExpectedRunId"
     $script:ResumeTaskName = $resumeTaskName
     $script:UnattendedRebootCleanupArmed = $true
     $script:UnattendedRebootSecretStored = $false
@@ -4588,7 +4588,7 @@ try {
     Assert-TrustedRootAcl $canonicalArtifactRoot
     $canonicalDotnet = Get-CanonicalExistingPath $DotnetPath Leaf
     $fixedAppPath = [System.IO.Path]::GetFullPath(
-        (Join-Path $env:ProgramFiles 'SimplySignAuto\SimplySignAuto.exe'))
+        (Join-Path $env:ProgramFiles 'CodeSignAuto\CodeSignAuto.exe'))
     $canonicalSetup = $null
     if ($Mode -ceq 'FreshInstall') {
         if ([string]::IsNullOrWhiteSpace($SetupPath) -or
@@ -4654,13 +4654,13 @@ try {
                 [System.StringComparison]::OrdinalIgnoreCase))
     }
     if (-not $scriptSourceValid -or
-        [System.IO.Path]::GetFileName($canonicalApp) -ine 'SimplySignAuto.exe' -or
+        [System.IO.Path]::GetFileName($canonicalApp) -ine 'CodeSignAuto.exe' -or
         ($null -ne $canonicalSetup -and
             [System.IO.Path]::GetFileName($canonicalSetup) -cnotmatch
-                '^SimplySignAutoSetup-.+-win-x64\.exe$') -or
+                '^CodeSignAutoSetup-.+-win-x64\.exe$') -or
         [System.IO.Path]::GetFileName($canonicalSignTool) -ine 'signtool.exe' -or
         [System.IO.Path]::GetFileName($canonicalSimplySign) -ine 'SimplySignDesktop.exe' -or
-        [System.IO.Path]::GetFileName($canonicalPdfHelper) -ine 'SimplySignPdfSigner.exe' -or
+        [System.IO.Path]::GetFileName($canonicalPdfHelper) -ine 'CodeSignAutoPdfSigner.exe' -or
         [System.IO.Path]::GetFileName($canonicalIndependentPdfValidator) -ine 'pyhanko.exe' -or
         [System.IO.Path]::GetFileName($canonicalDotnet) -ine 'dotnet.exe') { throw 'acceptance_executable_invalid' }
     $contractSourceRepo = $canonicalRepo
@@ -4676,11 +4676,11 @@ try {
     $otpUriForRedaction = Read-SecretFile $canonicalOtp
     try {
         $script:TotpSecretForRedaction =
-            [SimplySignAuto.Acceptance.Contracts.SecretScanPolicy]::ExtractTotpSecret($otpUriForRedaction)
+            [CodeSignAuto.Acceptance.Contracts.SecretScanPolicy]::ExtractTotpSecret($otpUriForRedaction)
     } finally { $otpUriForRedaction = $null }
     $script:DiagnosticStage = 'controller_contracts_loaded'
     $windowsSystemPublishers =
-        [SimplySignAuto.Acceptance.Contracts.WindowsSystemPublisherMapPolicy]::Parse(
+        [CodeSignAuto.Acceptance.Contracts.WindowsSystemPublisherMapPolicy]::Parse(
             $WindowsSystemPublisherSha256Map)
     $canonicalSystemRoot = Get-CanonicalExistingPath $env:SystemRoot Container
     $canonicalProgramFiles = Get-CanonicalExistingPath $env:ProgramFiles Container
@@ -4731,13 +4731,13 @@ try {
     Assert-PssaGate $canonicalRepo
     $PssaClean = $true
     $hasTokenFile = -not [string]::IsNullOrWhiteSpace($ApiTokenFile)
-    $runMode = [SimplySignAuto.Acceptance.Contracts.AcceptanceModePolicy]::Validate($Mode, $hasTokenFile)
+    $runMode = [CodeSignAuto.Acceptance.Contracts.AcceptanceModePolicy]::Validate($Mode, $hasTokenFile)
     if (-not $AllowMachineMutation) { throw 'acceptance_machine_mutation_not_allowed' }
-    if (-not [SimplySignAuto.Acceptance.Contracts.AcceptanceInputPolicy]::IsCertificateSerialNumber(
+    if (-not [CodeSignAuto.Acceptance.Contracts.AcceptanceInputPolicy]::IsCertificateSerialNumber(
             $CodeSignCertificateSerialNumber) -or
-        -not [SimplySignAuto.Acceptance.Contracts.AcceptanceInputPolicy]::IsCertificateSerialNumber(
+        -not [CodeSignAuto.Acceptance.Contracts.AcceptanceInputPolicy]::IsCertificateSerialNumber(
             $DocumentCertificateSerialNumber) -or
-        -not [SimplySignAuto.Acceptance.Contracts.AcceptanceInputPolicy]::IsTimeout($TimeoutSeconds)) { throw 'acceptance_arguments_invalid' }
+        -not [CodeSignAuto.Acceptance.Contracts.AcceptanceInputPolicy]::IsTimeout($TimeoutSeconds)) { throw 'acceptance_arguments_invalid' }
     if (@($PdfBox | Where-Object { [double]::IsNaN($_) -or [double]::IsInfinity($_) }).Count -ne 0 -or
         $PdfBox[0] -ge $PdfBox[2] -or $PdfBox[1] -ge $PdfBox[3]) {
         throw 'acceptance_arguments_invalid'
@@ -4751,7 +4751,7 @@ try {
     }
     $safeBaseUrl = Assert-BaseUrl $BaseUrl
     $configuredTransport = ([Uri]$safeBaseUrl).Scheme
-    if ($runMode -eq [SimplySignAuto.Acceptance.Contracts.AcceptanceRunMode]::FreshInstall) {
+    if ($runMode -eq [CodeSignAuto.Acceptance.Contracts.AcceptanceRunMode]::FreshInstall) {
         $FreshSetupContinuation = Begin-FreshSetupContinuation $canonicalArtifactRoot $canonicalApp
         if ($null -eq $FreshSetupContinuation) {
             Invoke-FreshSetupStage `
@@ -4794,7 +4794,7 @@ try {
     $principalHash = Get-Sha256Text $signingSid.Value
     Assert-SecretAcl $canonicalOtp $signingSid 'AnyRestricted'
     $sessionId = Get-UniqueActiveSession $signingSid
-    if ($runMode -eq [SimplySignAuto.Acceptance.Contracts.AcceptanceRunMode]::FreshInstall) {
+    if ($runMode -eq [CodeSignAuto.Acceptance.Contracts.AcceptanceRunMode]::FreshInstall) {
         if (-not $FreshSetupResumed -or
             -not [string]::IsNullOrWhiteSpace($AgentConfigurationPath) -or
             $OpenFirewall) {
@@ -4830,17 +4830,17 @@ try {
     Assert-RunDirectoryAcl $interactiveDirectory $signingSid $true
     Assert-RunDirectoryAcl $productionUiDirectory $signingSid $true
 
-    $nativeFixtureSourceMode = [SimplySignAuto.Acceptance.Contracts.NativeFixtureSourcePolicy]::Plan(
+    $nativeFixtureSourceMode = [CodeSignAuto.Acceptance.Contracts.NativeFixtureSourcePolicy]::Plan(
         $MsiFixturePath,
         $CatFixturePath,
         $SysFixturePath,
         $DllFixturePath)
-    [SimplySignAuto.Acceptance.Contracts.NativeFixtureSourcePolicy]::ValidateToolPublisherHashes(
+    [CodeSignAuto.Acceptance.Contracts.NativeFixtureSourcePolicy]::ValidateToolPublisherHashes(
         $nativeFixtureSourceMode,
         $MakeCatPublisherSha256,
         $CscPublisherSha256,
         $SystemDriverPublisherSha256)
-    [SimplySignAuto.Acceptance.Contracts.NativeFixtureSourcePolicy]::ValidateFixtureHashes(
+    [CodeSignAuto.Acceptance.Contracts.NativeFixtureSourcePolicy]::ValidateFixtureHashes(
         $nativeFixtureSourceMode,
         $MsiFixtureSha256,
         $CatFixtureSha256,
@@ -4855,12 +4855,12 @@ try {
     $canonicalCatFixture = $null
     $canonicalSysFixture = $null
     $canonicalDllFixture = $null
-    if ($nativeFixtureSourceMode -eq [SimplySignAuto.Acceptance.Contracts.NativeFixtureSourceMode]::ExplicitOverride) {
+    if ($nativeFixtureSourceMode -eq [CodeSignAuto.Acceptance.Contracts.NativeFixtureSourceMode]::ExplicitOverride) {
         $canonicalMsiFixture = Get-CanonicalExistingPath $MsiFixturePath Leaf
         $canonicalCatFixture = Get-CanonicalExistingPath $CatFixturePath Leaf
         $canonicalSysFixture = Get-CanonicalExistingPath $SysFixturePath Leaf
         $canonicalDllFixture = Get-CanonicalExistingPath $DllFixturePath Leaf
-        [SimplySignAuto.Acceptance.Contracts.RemoteAcceptanceMatrixPolicy]::ValidateNativeFixtureSlots(@(
+        [CodeSignAuto.Acceptance.Contracts.RemoteAcceptanceMatrixPolicy]::ValidateNativeFixtureSlots(@(
             [System.IO.Path]::GetExtension($canonicalMsiFixture).ToLowerInvariant(),
             [System.IO.Path]::GetExtension($canonicalCatFixture).ToLowerInvariant(),
             [System.IO.Path]::GetExtension($canonicalSysFixture).ToLowerInvariant(),
@@ -4887,7 +4887,7 @@ try {
         120 `
         $false
 
-    if ($runMode -eq [SimplySignAuto.Acceptance.Contracts.AcceptanceRunMode]::ExistingInstall) {
+    if ($runMode -eq [CodeSignAuto.Acceptance.Contracts.AcceptanceRunMode]::ExistingInstall) {
         $ApiToken = Read-SecretFile $canonicalToken
     }
 
@@ -4917,7 +4917,7 @@ try {
         '-WindowsSystemPublisherSha256Map', $WindowsSystemPublisherSha256Map,
         '-RunId', $runIdLocal,
         '-TimeoutSeconds', [string][Math]::Min(600, $TimeoutSeconds))
-    if ($nativeFixtureSourceMode -eq [SimplySignAuto.Acceptance.Contracts.NativeFixtureSourceMode]::AutoGenerated) {
+    if ($nativeFixtureSourceMode -eq [CodeSignAuto.Acceptance.Contracts.NativeFixtureSourceMode]::AutoGenerated) {
         $fixtureArguments += @(
             '-GenerateNativeFixtures',
             '-MakeCatPublisherSha256', $MakeCatPublisherSha256,
@@ -4944,7 +4944,7 @@ try {
         sys = $SysFixtureSha256
         dll = $DllFixtureSha256
     }
-    if ($nativeFixtureSourceMode -eq [SimplySignAuto.Acceptance.Contracts.NativeFixtureSourceMode]::AutoGenerated) {
+    if ($nativeFixtureSourceMode -eq [CodeSignAuto.Acceptance.Contracts.NativeFixtureSourceMode]::AutoGenerated) {
         $canonicalMsiFixture = Get-CanonicalExistingPath (Join-Path $runDirectory 'fixtures\native-fixture.msi') Leaf
         $canonicalCatFixture = Get-CanonicalExistingPath (Join-Path $runDirectory 'fixtures\native-fixture.cat') Leaf
         $canonicalSysFixture = Get-CanonicalExistingPath (Join-Path $runDirectory 'fixtures\native-fixture.sys') Leaf
@@ -4969,7 +4969,7 @@ try {
             $entry = $matchingEntries[0]
             Assert-ExactProperties $entry @('relativePath', 'kind', 'sha256', 'identity', 'linkCount', 'cleanup')
             $entryPath = Get-CanonicalExistingPath (Join-Path $runDirectory "fixtures\$nativeName") Leaf
-            $entryIdentity = [SimplySignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read($entryPath, $false)
+            $entryIdentity = [CodeSignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read($entryPath, $false)
             if ($entry.kind -isnot [string] -or $entry.kind -cne 'ordinary' -or
                 $entry.cleanup -isnot [bool] -or -not $entry.cleanup -or
                 $entry.linkCount -isnot [int] -or $entry.linkCount -ne 1 -or
@@ -4982,7 +4982,7 @@ try {
                 ([string]$entry.sha256).ToLowerInvariant()
         }
     }
-    [SimplySignAuto.Acceptance.Contracts.RemoteAcceptanceMatrixPolicy]::ValidateNativeFixtureSlots(@(
+    [CodeSignAuto.Acceptance.Contracts.RemoteAcceptanceMatrixPolicy]::ValidateNativeFixtureSlots(@(
         [System.IO.Path]::GetExtension($canonicalMsiFixture).ToLowerInvariant(),
         [System.IO.Path]::GetExtension($canonicalCatFixture).ToLowerInvariant(),
         [System.IO.Path]::GetExtension($canonicalSysFixture).ToLowerInvariant(),
@@ -5023,20 +5023,20 @@ try {
 
     Invoke-NativeTests $canonicalRepo $canonicalDotnet $runDirectory $TimeoutSeconds
 
-    $TaskName = "SimplySignAuto Acceptance Interactive $runIdLocal"
+    $TaskName = "CodeSignAuto Acceptance Interactive $runIdLocal"
     if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) { throw 'acceptance_task_exists' }
-    $description = "SimplySignAuto Acceptance owner=$runIdLocal"
+    $description = "CodeSignAuto Acceptance owner=$runIdLocal"
     $escaped = @($canonicalScript, $canonicalRepo, $runDirectory, $SigningUser, $canonicalDotnet, $DotnetPublisherSha256, $canonicalApp, $AppHostSha256, $canonicalSimplySign, $SimplySignPublisherSha256, $PowerShellPublisherSha256, $WindowsSystemPublisherSha256Map, $runIdLocal, [string]$sessionId, $InstalledState.AgentTask.Source, [string]$TimeoutSeconds) | ForEach-Object { '"' + $_.Replace('"', '""') + '"' }
     $arguments = "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File $($escaped[0]) -RunChild -RepoPath $($escaped[1]) -ArtifactRoot $($escaped[2]) -SigningUser $($escaped[3]) -DotnetPath $($escaped[4]) -DotnetPublisherSha256 $($escaped[5]) -AppHostPath $($escaped[6]) -AppHostSha256 $($escaped[7]) -SimplySignDesktopPath $($escaped[8]) -SimplySignPublisherSha256 $($escaped[9]) -PowerShellPublisherSha256 $($escaped[10]) -WindowsSystemPublisherSha256Map $($escaped[11]) -RunId $($escaped[12]) -ExpectedSessionId $($escaped[13]) -ExpectedAgentTaskSource $($escaped[14]) -ChildTimeoutSeconds $($escaped[15])"
     $action = New-ScheduledTaskAction -Execute $canonicalPowerShell -Argument $arguments
     $taskPrincipal = New-ScheduledTaskPrincipal -UserId $signingSid.Value -LogonType Interactive -RunLevel Highest
     $limit = [TimeSpan]::FromSeconds($TimeoutSeconds)
     $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit $limit -AllowStartIfOnBatteries
-    $ExpectedTask = [SimplySignAuto.Acceptance.Contracts.AcceptanceTaskSnapshot]::new($description, $principalHash, 'InteractiveToken', 'Highest', (Get-Sha256Text $canonicalPowerShell.ToUpperInvariant()), (Get-Sha256Text $arguments), $TimeoutSeconds, 1)
+    $ExpectedTask = [CodeSignAuto.Acceptance.Contracts.AcceptanceTaskSnapshot]::new($description, $principalHash, 'InteractiveToken', 'Highest', (Get-Sha256Text $canonicalPowerShell.ToUpperInvariant()), (Get-Sha256Text $arguments), $TimeoutSeconds, 1)
     Register-ScheduledTask -TaskName $TaskName -Action $action -Principal $taskPrincipal -Settings $settings -Description $description | Out-Null
     $TaskCreated = $true
     $preStartTask = Get-AcceptanceTaskSnapshot $TaskName
-    if (-not [SimplySignAuto.Acceptance.Contracts.TaskOwnershipPolicy]::IsExact($ExpectedTask, $preStartTask)) {
+    if (-not [CodeSignAuto.Acceptance.Contracts.TaskOwnershipPolicy]::IsExact($ExpectedTask, $preStartTask)) {
         throw 'acceptance_task_invalid'
     }
     Start-ScheduledTask -TaskName $TaskName
@@ -5105,7 +5105,7 @@ try {
     if ($ui.ExitCode -ne 0 -or $ui.Stdout.Trim() -cne 'ui_acceptance_pass') { throw 'acceptance_ui_failed' }
     Assert-RunDirectoryAcl $runDirectory $signingSid $false
     Assert-RunDirectoryAcl $uiRoot $signingSid $true
-    [SimplySignAuto.Acceptance.Contracts.UiArtifactAclPolicy]::Validate($false, $true, $true, $true)
+    [CodeSignAuto.Acceptance.Contracts.UiArtifactAclPolicy]::Validate($false, $true, $true, $true)
 
     $ProductionUiDirectory = Get-CanonicalExistingPath $productionUiDirectory Container
     $ProductionUiEvidence = ConvertFrom-StrictJson (
@@ -5115,7 +5115,7 @@ try {
         'pdfInputBefore', 'pdfInputAfter', 'pdfResult', 'productionComposition',
         'readinessVisible', 'hiddenSubmissionCompleted', 'trayRestoreObserved', 'secretScanClean')
     if ($ProductionUiEvidence.schemaVersion -ne 1) { throw 'acceptance_production_ui_invalid' }
-    [SimplySignAuto.Acceptance.Contracts.RemoteAcceptanceMatrixPolicy]::ValidateProductionQuickSign(
+    [CodeSignAuto.Acceptance.Contracts.RemoteAcceptanceMatrixPolicy]::ValidateProductionQuickSign(
         [string]$ProductionUiEvidence.exeInputBefore,
         [string]$ProductionUiEvidence.exeInputAfter,
         [string]$ProductionUiEvidence.exeResult,
@@ -5145,14 +5145,14 @@ try {
     if ($ExpectedWindowsNativeTests.Count -ne 42 -or $missingNative.Count -ne 0) { throw 'acceptance_windows_native_incomplete' }
 
     $jobEvidenceRecords = New-Object System.Collections.Generic.List[object]
-    $client = [SimplySignAuto.Acceptance.Contracts.PinnedHttpClientFactory]::Create($TlsCertificatePin, $ApiToken)
+    $client = [CodeSignAuto.Acceptance.Contracts.PinnedHttpClientFactory]::Create($TlsCertificatePin, $ApiToken)
     try {
         $invalidBearer = $(if ($ApiToken[0] -cne 'A') {
             'A' + $ApiToken.Substring(1)
         } else {
             'B' + $ApiToken.Substring(1)
         })
-        $unauthorizedClient = [SimplySignAuto.Acceptance.Contracts.PinnedHttpClientFactory]::Create(
+        $unauthorizedClient = [CodeSignAuto.Acceptance.Contracts.PinnedHttpClientFactory]::Create(
             $TlsCertificatePin,
             $invalidBearer)
         try {
@@ -5452,7 +5452,7 @@ try {
                 [string]$InputPath,
                 [string]$OutputPath,
                 [string]$EvidenceName,
-                [ValidateSet('CertumDocumentSignature', 'SimplySignAutoSignature')]
+                [ValidateSet('CertumDocumentSignature', 'CodeSignAutoSignature')]
                 [string]$FieldName = 'CertumDocumentSignature'
             )
             if ($EvidenceName -notmatch '^[a-z0-9-]{1,40}$') { throw 'acceptance_pdf_verify_failed' }
@@ -5492,7 +5492,7 @@ try {
                         throw 'acceptance_pdf_verify_failed'
                     }
                 }
-                [SimplySignAuto.Acceptance.Contracts.SignatureTimestampPolicy]::Validate(
+                [CodeSignAuto.Acceptance.Contracts.SignatureTimestampPolicy]::Validate(
                     $evidence.timestampUtc,
                     $AcceptanceStartedUtc,
                     [DateTimeOffset]::UtcNow,
@@ -5582,7 +5582,7 @@ try {
             $transitionWatch.Elapsed.TotalSeconds -lt [Math]::Min(300, $TimeoutSeconds))
         if (-not $postCloseLoginningObserved) { throw 'acceptance_unattended_relogin_invalid' }
         $reloginTransitions = New-Object `
-            'System.Collections.Generic.List[SimplySignAuto.Acceptance.Contracts.ReloginTransitionSnapshot]'
+            'System.Collections.Generic.List[CodeSignAuto.Acceptance.Contracts.ReloginTransitionSnapshot]'
         foreach ($transition in @($closeReadiness.session.transitions)) {
             Assert-ExactProperties $transition @(
                 'sequence', 'state', 'sessionGeneration',
@@ -5602,7 +5602,7 @@ try {
                 throw 'acceptance_unattended_relogin_invalid'
             }
             $reloginTransitions.Add(
-                [SimplySignAuto.Acceptance.Contracts.ReloginTransitionSnapshot]::new(
+                [CodeSignAuto.Acceptance.Contracts.ReloginTransitionSnapshot]::new(
                     [long]$transition.sequence,
                     [string]$transition.state,
                     [long]$transition.sessionGeneration,
@@ -5610,7 +5610,7 @@ try {
                     [int]$transition.attempt))
         }
         $agentBeforeCrash = Get-ExactAgentProcess $canonicalApp $sessionId $signingSid
-        [SimplySignAuto.Acceptance.Contracts.UnattendedReloginEvidencePolicy]::Validate(
+        [CodeSignAuto.Acceptance.Contracts.UnattendedReloginEvidencePolicy]::Validate(
             $reportedAgentPidBeforeClose,
             [int]$agentBeforeCrash.ProcessId,
             $true,
@@ -5654,7 +5654,7 @@ try {
             $productionPdfInput `
             $productionPdfOutput `
             'production-quick-sign' `
-            'SimplySignAutoSignature'
+            'CodeSignAutoSignature'
         $productionPdfSignerSuffix = $DocumentSignerSha256.Substring(56, 8).ToUpperInvariant()
         $jobEvidenceRecords.Add([ordered]@{
                 name = 'authenticode-quick-sign'
@@ -5807,7 +5807,7 @@ try {
                 timestamp = 'tsa-identity-and-window-verified'
             })
 
-        $installedAgentTask = Get-ScheduledTask -TaskName 'SimplySignAuto.Agent' -ErrorAction Stop
+        $installedAgentTask = Get-ScheduledTask -TaskName 'CodeSignAuto.Agent' -ErrorAction Stop
         if ($installedAgentTask.Principal.UserId -ine $SigningUser -or
             $installedAgentTask.Principal.LogonType -ne 'InteractiveToken' -or
             $installedAgentTask.Principal.RunLevel -ne 'Highest' -or
@@ -5825,7 +5825,7 @@ try {
         $agentStopWatch = [Diagnostics.Stopwatch]::StartNew()
         do {
             Start-Sleep -Milliseconds 250
-            $installedAgentTask = Get-ScheduledTask -TaskName 'SimplySignAuto.Agent'
+            $installedAgentTask = Get-ScheduledTask -TaskName 'CodeSignAuto.Agent'
         } while (($installedAgentTask.State -eq 'Running' -or (Test-WtsActive $sessionId)) -and
             $agentStopWatch.Elapsed.TotalSeconds -lt 30)
         if ($installedAgentTask.State -eq 'Running' -or (Test-WtsActive $sessionId)) {
@@ -5834,7 +5834,7 @@ try {
         try {
             $null = Get-UniqueActiveSession $signingSid
             throw 'acceptance_session_disconnect_failed'
-        } catch [SimplySignAuto.Acceptance.Contracts.AcceptanceContractException] {
+        } catch [CodeSignAuto.Acceptance.Contracts.AcceptanceContractException] {
             if ($_.Exception.Message -cne 'acceptance_session_unavailable') { throw }
         }
         $notReadyResponse = $client.GetAsync("$safeBaseUrl/v1/health/ready").GetAwaiter().GetResult()
@@ -5874,11 +5874,11 @@ try {
             $waitingIds.Add($submittedId)
         }
 
-        Restart-Service -Name 'SimplySignAuto.Service' -Force -ErrorAction Stop
+        Restart-Service -Name 'CodeSignAuto.Service' -Force -ErrorAction Stop
         $serviceWatch = [Diagnostics.Stopwatch]::StartNew()
         do {
             Start-Sleep -Milliseconds 250
-            $serviceState = (Get-Service -Name 'SimplySignAuto.Service' -ErrorAction Stop).Status
+            $serviceState = (Get-Service -Name 'CodeSignAuto.Service' -ErrorAction Stop).Status
         } while ($serviceState -ne 'Running' -and $serviceWatch.Elapsed.TotalSeconds -lt 30)
         if ($serviceState -ne 'Running') { throw 'acceptance_service_restart_failed' }
         foreach ($submittedId in $submittedIds) {
@@ -5905,7 +5905,7 @@ try {
             throw 'acceptance_session_recovery_failed'
         }
         Assert-AgentTaskExact $InstalledState.AgentTask $canonicalApp
-        Start-ScheduledTask -TaskName 'SimplySignAuto.Agent'
+        Start-ScheduledTask -TaskName 'CodeSignAuto.Agent'
         $agentRecoveryObserved = $false
         $observedMaximumActive = 0
         $queueWatch = [Diagnostics.Stopwatch]::StartNew()
@@ -5939,7 +5939,7 @@ try {
                     [System.Globalization.DateTimeStyles]::RoundtripKind)
             } |
             ForEach-Object { [string]$_.Key })
-        [SimplySignAuto.Acceptance.Contracts.RemoteAcceptanceMatrixPolicy]::ValidateQueueRecovery(
+        [CodeSignAuto.Acceptance.Contracts.RemoteAcceptanceMatrixPolicy]::ValidateQueueRecovery(
             $submittedIds.ToArray(),
             $waitingIds.ToArray(),
             $completionIds,
@@ -6153,7 +6153,7 @@ try {
             $current = Get-ScheduledTask -TaskName $TaskName -ErrorAction Stop
             $currentPrincipalSid = [System.Security.Principal.NTAccount]::new(
                 [string]$current.Principal.UserId).Translate([System.Security.Principal.SecurityIdentifier])
-            $actual = [SimplySignAuto.Acceptance.Contracts.AcceptanceTaskSnapshot]::new(
+            $actual = [CodeSignAuto.Acceptance.Contracts.AcceptanceTaskSnapshot]::new(
                 [string]$current.Description,
                 (Get-Sha256Text $currentPrincipalSid.Value),
                 [string]$current.Principal.LogonType,
@@ -6162,7 +6162,7 @@ try {
                 (Get-Sha256Text ([string]$current.Actions[0].Arguments)),
                 [int]$current.Settings.ExecutionTimeLimit.TotalSeconds,
                 @($current.Actions).Count)
-            if ([SimplySignAuto.Acceptance.Contracts.TaskOwnershipPolicy]::IsExact($ExpectedTask, $actual)) {
+            if ([CodeSignAuto.Acceptance.Contracts.TaskOwnershipPolicy]::IsExact($ExpectedTask, $actual)) {
                 Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
             } else { $StableFailure = 'acceptance_state_uncertain' }
         } catch {
@@ -6179,11 +6179,11 @@ try {
                 }
                 Assert-SecretAcl $FreshInstallTokenPathForCleanup $signingSid 'Machine'
                 $item = Get-Item -LiteralPath $FreshInstallTokenPathForCleanup -Force
-                $identity = [SimplySignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read(
+                $identity = [CodeSignAuto.Acceptance.Contracts.WindowsFileIdentity]::Read(
                     $FreshInstallTokenPathForCleanup,
                     $false)
                 $hash = (Get-FileHash -LiteralPath $FreshInstallTokenPathForCleanup -Algorithm SHA256).Hash.ToLowerInvariant()
-                if (-not [SimplySignAuto.Acceptance.Contracts.InstallTokenCleanupPolicy]::CanDelete(
+                if (-not [CodeSignAuto.Acceptance.Contracts.InstallTokenCleanupPolicy]::CanDelete(
                         $false,
                         $true,
                         $FreshTokenFirstIdentity,
@@ -6193,7 +6193,7 @@ try {
                         (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0),
                         (-not $item.PSIsContainer),
                         [int]$identity.LinkCount) -or
-                    -not [SimplySignAuto.Acceptance.Contracts.WindowsFileIdentity]::DeleteOrdinaryFileIfExactWithRetry(
+                    -not [CodeSignAuto.Acceptance.Contracts.WindowsFileIdentity]::DeleteOrdinaryFileIfExactWithRetry(
                         $FreshInstallTokenPathForCleanup,
                         $identity.Identity,
                         $hash,
@@ -6299,7 +6299,7 @@ try {
         (Join-Path $SuccessfulRunDirectory 'event-log.json') `
         $SuccessfulRunId `
         $AcceptanceStartedUtc
-    if ([SimplySignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive(
+    if ([CodeSignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive(
             $FinalSummary,
             [string]$script:TotpSecretForRedaction)) {
         throw 'acceptance_sensitive_artifact'
@@ -6321,7 +6321,7 @@ try {
         }
         if ($artifact.Extension -in '.json', '.trx', '.xml', '.txt', '.log') {
             $artifactText = Get-Content -LiteralPath $artifact.FullName -Raw
-            if ([SimplySignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive(
+            if ([CodeSignAuto.Acceptance.Contracts.SecretScanPolicy]::ContainsSensitive(
                     $artifactText,
                     [string]$script:TotpSecretForRedaction)) {
                 throw 'acceptance_sensitive_artifact'
