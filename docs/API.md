@@ -117,6 +117,7 @@ spool 文件。`parameters` part 位于文件前时，这些错误会在读取�
 
 可选 `Idempotency-Key` 请求头为 1–128 个可打印 ASCII 字符。相同 token、相同 key 和相同请求返回原任务；同 token 下，同 key 对应不同请求返回 `409 idempotency_conflict`。
 轮换为不同 token 后使用独立的幂等范围；指定回同一个 token 则继续使用它仍保留的记录。
+管理员清理历史任务会同时删除这些任务的幂等记录，之后相同 key 可创建新任务。
 
 ## Authenticode 参数
 

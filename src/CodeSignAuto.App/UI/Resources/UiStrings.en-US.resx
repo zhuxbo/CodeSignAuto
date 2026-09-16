@@ -319,4 +319,7 @@
   <data name="UninstallErrorCode" xml:space="preserve"><value>Error code: {0}</value></data>
   <data name="ServiceSettingsCustomToken" xml:space="preserve"><value>Custom API token</value></data>
   <data name="ServiceSettingsCustomTokenHint" xml:space="preserve"><value>Leave blank to generate a random token. Use 16–256 characters: letters, digits, or - _ . ~ + / =.</value></data>
+  <data name="JobsClearHistory" xml:space="preserve"><value>Clear completed jobs</value></data>
+  <data name="JobsClearHistoryConfirm" xml:space="preserve"><value>Delete completed job history and result files? Queued and active jobs will be kept. This cannot be undone.</value></data>
+  <data name="JobsCleanupFailed" xml:space="preserve"><value>History cleanup did not finish. Refresh the list and try again.</value></data>
 </root>

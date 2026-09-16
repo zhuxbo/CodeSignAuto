@@ -21,6 +21,9 @@ public interface IServiceManagementSnapshotProvider
         CancellationToken cancellationToken) =>
         Task.FromException<TerminalJobDeltaData>(new InvalidOperationException("management_unavailable"));
 
+    Task<int> ClearJobHistoryAsync(DateTimeOffset completedBeforeUtc, CancellationToken cancellationToken) =>
+        Task.FromException<int>(new InvalidOperationException("management_unavailable"));
+
     ServiceSettingsSummary GetServiceSettings() =>
         throw new InvalidOperationException("management_unavailable");
 }
@@ -30,15 +33,49 @@ public sealed class ServiceManagementSnapshotProvider : IServiceManagementSnapsh
     private readonly IJobStore _jobs;
     private readonly TimeProvider _timeProvider;
     private readonly ServiceSettingsSummary? _settings;
+    private readonly ISpoolStore? _spool;
+    private readonly IJobCompletionNotifier? _notifier;
+    private readonly IUpgradeAdmissionGate _upgradeGate;
 
     public ServiceManagementSnapshotProvider(
         IJobStore jobs,
         TimeProvider timeProvider,
-        ServiceSettingsSummary? settings = null)
+        ServiceSettingsSummary? settings = null,
+        ISpoolStore? spool = null, IJobCompletionNotifier? notifier = null,
+        IUpgradeAdmissionGate? upgradeGate = null)
     {
         _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         _settings = settings;
+        _spool = spool;
+        _notifier = notifier;
+        _upgradeGate = upgradeGate ?? new UpgradeAdmissionGate();
+    }
+
+    public async Task<int> ClearJobHistoryAsync(DateTimeOffset completedBeforeUtc, CancellationToken cancellationToken)
+    {
+        if (_spool is null || _notifier is null || completedBeforeUtc == default ||
+            completedBeforeUtc.Offset != TimeSpan.Zero || completedBeforeUtc > _timeProvider.GetUtcNow())
+        {
+            throw new InvalidOperationException("management_unavailable");
+        }
+
+        await using var admission = await _upgradeGate.TryEnterAsync(cancellationToken).ConfigureAwait(false);
+        if (admission is null)
+        {
+            throw new InvalidOperationException("management_unavailable");
+        }
+
+        var count = 0;
+        while (count < 100 && await _jobs.TryDeleteTerminalAsync(
+            completedBeforeUtc, (job, token) => _spool.DeleteJobAsync(job.Id, token), cancellationToken)
+            .ConfigureAwait(false) is { } deleted)
+        {
+            _notifier.Retire(deleted with { State = JobState.Expired });
+            count++;
+        }
+
+        return count;
     }
 
     public Task<JobPageData> CreateJobPageAsync(

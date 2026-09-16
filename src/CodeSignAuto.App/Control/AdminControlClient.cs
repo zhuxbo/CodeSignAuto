@@ -198,6 +198,18 @@ public sealed class AdminControlClient :
             response.ExpiresAtUtc.Value);
     }
 
+    public async Task<int> ClearJobHistoryAsync(DateTimeOffset completedBeforeUtc, CancellationToken cancellationToken)
+    {
+        var response = await SendAsync<ClearJobHistoryResponse>(
+            new ClearJobHistoryRequest(NewRequestId(), completedBeforeUtc), cancellationToken).ConfigureAwait(false);
+        if (response.ErrorCode is not null)
+        {
+            throw new ManagementUnavailableException(response.CorrelationId ?? Guid.NewGuid());
+        }
+
+        return response.DeletedCount;
+    }
+
     public async Task<JobPageResponse> GetJobPageAsync(
         JobPageCursor? cursor,
         CancellationToken cancellationToken)
@@ -477,6 +489,8 @@ public sealed class AdminControlClient :
         ManagementSnapshotResponse value => value.RequestId,
         AgentControlRequest value => value.RequestId,
         AgentControlResponse value => value.RequestId,
+        ClearJobHistoryRequest value => value.RequestId,
+        ClearJobHistoryResponse value => value.RequestId,
         JobPageRequest value => value.RequestId,
         JobPageResponse value => value.RequestId,
         TerminalJobDeltaRequest value => value.RequestId,

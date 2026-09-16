@@ -9,6 +9,21 @@ namespace CodeSignAuto.UI.Tests;
 public sealed class JobsViewModelTests
 {
     [Fact]
+    public async Task Clear_history_reuses_one_cutoff_for_all_batches_and_refreshes_the_list()
+    {
+        var administration = new AdministrationFake(new JobPageResponse(Guid.NewGuid(), [], null, null, null));
+        administration.CleanupCounts.Enqueue(100);
+        administration.CleanupCounts.Enqueue(3);
+        using var vm = new JobsViewModel(administration, new LocalJobsFake());
+        await vm.ClearHistoryAsync(default);
+        Assert.Equal(2, administration.CleanupCutoffs.Count);
+        Assert.Single(administration.CleanupCutoffs.Distinct());
+        Assert.Equal(1, administration.PageCalls);
+        Assert.True(vm.CanClearHistory);
+        Assert.Null(vm.ErrorCode);
+    }
+
+    [Fact]
     public void Job_rows_use_the_selected_English_resources()
     {
         using var culture = new UiTestCultureScope("en-US");
@@ -172,6 +187,13 @@ public sealed class JobsViewModelTests
     {
         private readonly Queue<JobPageResponse> _pages = new(pages);
         public int PageCalls { get; private set; }
+        public Queue<int> CleanupCounts { get; } = [];
+        public List<DateTimeOffset> CleanupCutoffs { get; } = [];
+        public Task<int> ClearJobHistoryAsync(DateTimeOffset completedBeforeUtc, CancellationToken cancellationToken)
+        {
+            CleanupCutoffs.Add(completedBeforeUtc);
+            return Task.FromResult(CleanupCounts.Dequeue());
+        }
 
         public Task<JobPageResponse> GetJobPageAsync(JobPageCursor? cursor, CancellationToken cancellationToken)
         {

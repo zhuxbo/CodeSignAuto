@@ -303,6 +303,9 @@ public sealed class AdminControlPipeServer : IAdminControlRuntime
                     null),
                 AgentControlRequest control => await ForwardControlAsync(control, cancellationToken)
                     .ConfigureAwait(false),
+                ClearJobHistoryRequest clear => new ClearJobHistoryResponse(clear.RequestId,
+                    await _management.ClearJobHistoryAsync(clear.CompletedBeforeUtc, cancellationToken)
+                        .ConfigureAwait(false), null, null),
                 JobPageRequest page => CreateJobPageResponse(
                     page.RequestId,
                     await _management.CreateJobPageAsync(page.Cursor, cancellationToken)
@@ -404,6 +407,8 @@ public sealed class AdminControlPipeServer : IAdminControlRuntime
                 null,
                 "management_unavailable",
                 correlationId),
+            ClearJobHistoryRequest clear => new ClearJobHistoryResponse(
+                clear.RequestId, 0, "management_unavailable", correlationId),
             JobPageRequest page => new JobPageResponse(
                 page.RequestId, [], null, "management_unavailable", correlationId),
             TerminalJobDeltaRequest delta => new TerminalJobDeltaResponse(

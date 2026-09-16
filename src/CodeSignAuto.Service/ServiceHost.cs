@@ -258,7 +258,10 @@ public static class ServiceHost
         builder.Services.AddSingleton(services => new ServiceManagementSnapshotProvider(
             services.GetRequiredService<IJobStore>(),
             services.GetRequiredService<TimeProvider>(),
-            options.ManagementSettings));
+            options.ManagementSettings,
+            services.GetRequiredService<ISpoolStore>(),
+            services.GetRequiredService<IJobCompletionNotifier>(),
+            services.GetRequiredService<IUpgradeAdmissionGate>()));
         builder.Services.AddSingleton<IServiceManagementSnapshotProvider>(services =>
             services.GetRequiredService<ServiceManagementSnapshotProvider>());
         builder.Services.AddSingleton(services => new AgentPipeServer(

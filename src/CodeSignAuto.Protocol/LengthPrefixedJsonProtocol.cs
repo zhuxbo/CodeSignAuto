@@ -212,6 +212,8 @@ public static class LengthPrefixedJsonProtocol
                 "local_job_rejected" => DeserializePayload<LocalJobRejected>(messagePayload),
                 "local_job_result_request" => DeserializePayload<LocalJobResultRequest>(messagePayload),
                 "local_job_result_metadata" => DeserializePayload<LocalJobResultMetadata>(messagePayload),
+                "clear_job_history_request" => DeserializePayload<ClearJobHistoryRequest>(messagePayload),
+                "clear_job_history_response" => DeserializePayload<ClearJobHistoryResponse>(messagePayload),
                 "job_page_request" => DeserializePayload<JobPageRequest>(messagePayload),
                 "job_page_response" => DeserializePayload<JobPageResponse>(messagePayload),
                 "terminal_job_delta_request" => DeserializePayload<TerminalJobDeltaRequest>(messagePayload),
@@ -289,6 +291,8 @@ public static class LengthPrefixedJsonProtocol
         LocalJobRejected => "local_job_rejected",
         LocalJobResultRequest => "local_job_result_request",
         LocalJobResultMetadata => "local_job_result_metadata",
+        ClearJobHistoryRequest => "clear_job_history_request",
+        ClearJobHistoryResponse => "clear_job_history_response",
         JobPageRequest => "job_page_request",
         JobPageResponse => "job_page_response",
         TerminalJobDeltaRequest => "terminal_job_delta_request",
@@ -312,6 +316,7 @@ public static class LengthPrefixedJsonProtocol
         PrepareSimplySignSessionCommand or PrepareSimplySignSessionResult or
         LocalJobCreateRequest or LocalJobUploadLease or LocalJobUploadCompleted or
         LocalJobAccepted or LocalJobRejected or LocalJobResultRequest or LocalJobResultMetadata or
+        ClearJobHistoryRequest or ClearJobHistoryResponse or
         JobPageRequest or JobPageResponse or TerminalJobDeltaRequest or TerminalJobDeltaResponse or
         ServiceSettingsRequest or ServiceSettingsResponse or
         AdminControlHello or AdminControlAccepted or AgentControlRequest or AgentControlResponse or
@@ -335,6 +340,8 @@ public static class LengthPrefixedJsonProtocol
         contract == typeof(LocalJobRejected) ||
         contract == typeof(LocalJobResultRequest) ||
         contract == typeof(LocalJobResultMetadata) ||
+        contract == typeof(ClearJobHistoryRequest) ||
+        contract == typeof(ClearJobHistoryResponse) ||
         contract == typeof(JobPageRequest) ||
         contract == typeof(JobPageResponse) ||
         contract == typeof(TerminalJobDeltaRequest) ||
@@ -436,6 +443,14 @@ public static class LengthPrefixedJsonProtocol
                 AllowedExtensions.Contains(result.Extension) &&
                 result.Size >= 1 &&
                 IsLowerSha256(result.Sha256),
+            ClearJobHistoryRequest request =>
+                request.RequestId != Guid.Empty && request.CompletedBeforeUtc != default &&
+                request.CompletedBeforeUtc.Offset == TimeSpan.Zero,
+            ClearJobHistoryResponse response =>
+                response.RequestId != Guid.Empty && response.DeletedCount is >= 0 and <= 100 &&
+                (response.ErrorCode is null && response.CorrelationId is null ||
+                    response.ErrorCode == "management_unavailable" && response.DeletedCount == 0 &&
+                    response.CorrelationId is { } cleanupCorrelation && cleanupCorrelation != Guid.Empty),
             JobPageRequest request =>
                 request.RequestId != Guid.Empty,
             JobPageResponse response =>

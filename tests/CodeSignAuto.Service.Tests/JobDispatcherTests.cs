@@ -75,6 +75,7 @@ public sealed class JobDispatcherTests
         Assert.Equal(1, fixture.Notifier.Count);
         Assert.Equal(resultBytes, await File.ReadAllBytesAsync(fixture.Spool.GetResultPath(job.Id, job.Extension)));
         Assert.False(File.Exists(fixture.Spool.GetResultPartPath(job.Id, job.Extension)));
+        Assert.False(File.Exists(fixture.Spool.GetInputPath(job.Id, job.Extension)));
         cancellation.Cancel();
         await run;
     }

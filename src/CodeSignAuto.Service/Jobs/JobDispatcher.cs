@@ -218,6 +218,7 @@ public sealed class JobDispatcher : IJobDispatcherRuntime, IDisposable
                 var succeeded = await _jobs.GetAsync(active.Job.Id, cancellationToken).ConfigureAwait(false);
                 if (succeeded is not null)
                 {
+                    await CleanupSucceededAsync(succeeded, cancellationToken).ConfigureAwait(false);
                     NotifyBestEffort(succeeded);
                 }
             }
@@ -390,6 +391,7 @@ public sealed class JobDispatcher : IJobDispatcherRuntime, IDisposable
                     var succeeded = await _jobs.GetAsync(pending.Id, cancellationToken).ConfigureAwait(false);
                     if (succeeded is not null)
                     {
+                        await CleanupSucceededAsync(succeeded, cancellationToken).ConfigureAwait(false);
                         NotifyBestEffort(succeeded);
                     }
                 }
@@ -425,6 +427,18 @@ public sealed class JobDispatcher : IJobDispatcherRuntime, IDisposable
         if (failed?.State == JobState.Failed)
         {
             NotifyBestEffort(failed);
+        }
+    }
+
+    private async Task CleanupSucceededAsync(Job job, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _spool.DeleteSucceededTransientFilesAsync(job, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or SpoolException)
+        {
+            // Startup/background maintenance retries cleanup after a committed success.
         }
     }
 

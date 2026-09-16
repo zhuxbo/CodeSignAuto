@@ -263,7 +263,7 @@ internal sealed class ManualAgentRunner :
                 retentionHoursProvider: _settingsStore is null
                     ? null
                     : () => _settingsStore.CurrentRetentionHours);
-            var managementProvider = new ServiceManagementSnapshotProvider(jobs, _timeProvider);
+            var managementProvider = new ServiceManagementSnapshotProvider(jobs, _timeProvider, spool: spool, notifier: notifier);
             transport.Configure(localCoordinator, managementProvider);
             using var cleanup = new JobCleanupService(
                 jobs,

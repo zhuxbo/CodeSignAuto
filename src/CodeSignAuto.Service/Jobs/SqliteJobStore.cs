@@ -43,6 +43,15 @@ public interface IJobStore
     Task<IReadOnlyList<Job>> GetAllAsync(CancellationToken cancellationToken = default) =>
         Task.FromException<IReadOnlyList<Job>>(new NotSupportedException());
 
+    Task<IReadOnlyList<JobMaintenanceItem>> GetMaintenanceBatchAsync(
+        long afterRowId, int limit, CancellationToken cancellationToken = default) =>
+        Task.FromException<IReadOnlyList<JobMaintenanceItem>>(new NotSupportedException());
+
+    Task<Job?> TryDeleteTerminalAsync(
+        DateTimeOffset completedBefore, Func<Job, CancellationToken, Task> deleteFiles,
+        CancellationToken cancellationToken = default) =>
+        Task.FromException<Job?>(new NotSupportedException());
+
     Task<Job?> TryExpireNextAsync(
         DateTimeOffset cutoff,
         Func<Job, CancellationToken, Task> deleteJobAsync,
@@ -152,6 +161,10 @@ public interface ILocalUploadLeaseStore
         Job job,
         CancellationToken cancellationToken = default);
 
+    Task<LocalUploadLeaseRecord?> GetUnacceptedLocalLeaseByJobAsync(
+        Guid jobId, CancellationToken cancellationToken = default) =>
+        Task.FromException<LocalUploadLeaseRecord?>(new NotSupportedException());
+
     Task<LocalUploadLeaseRecord?> GetNextExpiredLocalLeaseAsync(
         DateTimeOffset cutoff,
         CancellationToken cancellationToken = default);
@@ -165,6 +178,8 @@ public interface ILocalUploadLeaseStore
         Guid jobId,
         CancellationToken cancellationToken = default);
 }
+
+public sealed record JobMaintenanceItem(long RowId, Job Job);
 
 public sealed record JobQueueSnapshot(int Queued, int Active);
 
@@ -470,6 +485,18 @@ public sealed class SqliteJobStore : IJobStore, ILocalUploadLeaseStore, IDisposa
         return new LocalLeaseAcceptOutcome(stored, true);
     }
 
+    public async Task<LocalUploadLeaseRecord?> GetUnacceptedLocalLeaseByJobAsync(
+        Guid jobId, CancellationToken cancellationToken = default)
+    {
+        await EnsureInitializedAsync(cancellationToken);
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT * FROM local_upload_leases WHERE job_id = $jobId AND accepted_job_id IS NULL LIMIT 1;";
+        command.Parameters.AddWithValue("$jobId", jobId.ToString("D"));
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken) ? ReadLocalLease(reader) : null;
+    }
+
     public async Task<LocalUploadLeaseRecord?> GetNextExpiredLocalLeaseAsync(
         DateTimeOffset cutoff,
         CancellationToken cancellationToken = default)
@@ -724,7 +751,7 @@ public sealed class SqliteJobStore : IJobStore, ILocalUploadLeaseStore, IDisposa
         {
             await using var maximum = connection.CreateCommand();
             maximum.Transaction = (SqliteTransaction)transaction;
-            maximum.CommandText = "SELECT COALESCE(MAX(sequence), 0) FROM terminal_job_events;";
+            maximum.CommandText = "SELECT COALESCE((SELECT seq FROM sqlite_sequence WHERE name = 'terminal_job_events'), 0);";
             snapshotSequence = Convert.ToInt64(
                 await maximum.ExecuteScalarAsync(cancellationToken),
                 CultureInfo.InvariantCulture);
@@ -795,6 +822,77 @@ public sealed class SqliteJobStore : IJobStore, ILocalUploadLeaseStore, IDisposa
         }
 
         return jobs;
+    }
+
+    public async Task<IReadOnlyList<JobMaintenanceItem>> GetMaintenanceBatchAsync(
+        long afterRowId, int limit, CancellationToken cancellationToken = default)
+    {
+        if (afterRowId < 0 || limit is < 1 or > 100)
+        {
+            throw new ArgumentOutOfRangeException(nameof(limit));
+        }
+
+        await EnsureInitializedAsync(cancellationToken);
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT rowid AS maintenance_rowid, * FROM jobs WHERE rowid > $after ORDER BY rowid LIMIT $limit;";
+        command.Parameters.AddWithValue("$after", afterRowId);
+        command.Parameters.AddWithValue("$limit", limit);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var items = new List<JobMaintenanceItem>(limit);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            items.Add(new JobMaintenanceItem(reader.GetInt64(reader.GetOrdinal("maintenance_rowid")), ReadJob(reader)));
+        }
+
+        return items;
+    }
+
+    public async Task<Job?> TryDeleteTerminalAsync(
+        DateTimeOffset completedBefore, Func<Job, CancellationToken, Task> deleteFiles,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(deleteFiles);
+        await EnsureInitializedAsync(cancellationToken);
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var transaction = connection.BeginTransaction(deferred: false);
+        Job? candidate;
+        await using (var select = connection.CreateCommand())
+        {
+            select.Transaction = transaction;
+            select.CommandText = """
+                SELECT * FROM jobs
+                WHERE state IN ($succeeded, $failed, $expired) AND completed_at <= $cutoff
+                ORDER BY state, created_at, id LIMIT 1;
+                """;
+            select.Parameters.AddWithValue("$succeeded", (int)JobState.Succeeded);
+            select.Parameters.AddWithValue("$failed", (int)JobState.Failed);
+            select.Parameters.AddWithValue("$expired", (int)JobState.Expired);
+            select.Parameters.AddWithValue("$cutoff", ToStorageTime(completedBefore));
+            await using var reader = await select.ExecuteReaderAsync(cancellationToken);
+            candidate = await reader.ReadAsync(cancellationToken) ? ReadJob(reader) : null;
+        }
+
+        if (candidate is null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return null;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        // Keep the reservation until files and their database ownership have been removed.
+        await deleteFiles(candidate, CancellationToken.None).ConfigureAwait(false);
+        await using var delete = connection.CreateCommand();
+        delete.Transaction = transaction;
+        delete.CommandText = """
+            DELETE FROM terminal_job_events WHERE job_id = $id;
+            DELETE FROM local_upload_leases WHERE accepted_job_id = $id;
+            DELETE FROM jobs WHERE id = $id;
+            """;
+        delete.Parameters.AddWithValue("$id", candidate.Id.ToString("D"));
+        await delete.ExecuteNonQueryAsync(CancellationToken.None);
+        await transaction.CommitAsync(CancellationToken.None);
+        return candidate;
     }
 
     public async Task<Job?> TryExpireNextAsync(

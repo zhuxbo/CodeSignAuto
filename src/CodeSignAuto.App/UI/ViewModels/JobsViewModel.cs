@@ -67,6 +67,7 @@ public sealed class JobsViewModel : INotifyPropertyChanged, IDisposable
     private JobPageCursor? _nextCursor;
     private bool _hasLoadedPage;
     private bool _isLoading;
+    private int _clearingHistory;
     private string? _errorCode;
     private int _disposed;
 
@@ -130,13 +131,51 @@ public sealed class JobsViewModel : INotifyPropertyChanged, IDisposable
     public string? ErrorText => ErrorCode switch
     {
         null => null,
+        "history_cleanup_failed" => UiCulture.Text("JobsCleanupFailed"),
         "local_destination_identity_unavailable" =>
             UiCulture.Text("JobsErrorDestinationIdentityUnavailable"),
         "local_destination_exists" => UiCulture.Text("JobsErrorDestinationExists"),
         _ => UiCulture.Format("JobsErrorSaveFailed", ErrorCode),
     };
 
-    public bool CanLoadMore => !_hasLoadedPage || _nextCursor is not null;
+    public bool CanLoadMore => _items.Count < MaximumRetainedItems && (!_hasLoadedPage || _nextCursor is not null);
+
+    public bool CanClearHistory => Volatile.Read(ref _clearingHistory) == 0;
+
+    public async Task ClearHistoryAsync(CancellationToken cancellationToken)
+    {
+        ThrowIfDisposed();
+        if (Interlocked.CompareExchange(ref _clearingHistory, 1, 0) != 0)
+        {
+            return;
+        }
+
+        using var operation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.Token);
+        var cutoff = DateTimeOffset.UtcNow;
+        await InvokeUiAsync(() =>
+        {
+            ErrorCode = null;
+            OnPropertyChanged(nameof(CanClearHistory));
+        }, CancellationToken.None).ConfigureAwait(false);
+        try
+        {
+            while (await _administration.ClearJobHistoryAsync(cutoff, operation.Token).ConfigureAwait(false) == 100)
+            {
+                operation.Token.ThrowIfCancellationRequested();
+            }
+
+            await RefreshAsync(operation.Token).ConfigureAwait(false);
+        }
+        catch (ManagementUnavailableException)
+        {
+            await InvokeUiAsync(() => ErrorCode = "history_cleanup_failed", CancellationToken.None).ConfigureAwait(false);
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _clearingHistory, 0);
+            await InvokeUiAsync(() => OnPropertyChanged(nameof(CanClearHistory)), CancellationToken.None).ConfigureAwait(false);
+        }
+    }
 
     public Task RefreshAsync(CancellationToken cancellationToken)
     {

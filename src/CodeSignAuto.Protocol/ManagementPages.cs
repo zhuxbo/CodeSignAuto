@@ -213,3 +213,8 @@ public sealed record ServiceSettingsResponse(
     ServiceSettingsSummary? Summary,
     string? ErrorCode,
     Guid? CorrelationId) : AgentMessage;
+
+public sealed record ClearJobHistoryRequest(Guid RequestId, DateTimeOffset CompletedBeforeUtc) : AgentMessage;
+
+public sealed record ClearJobHistoryResponse(
+    Guid RequestId, int DeletedCount, string? ErrorCode, Guid? CorrelationId) : AgentMessage;

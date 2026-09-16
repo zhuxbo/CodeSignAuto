@@ -68,6 +68,10 @@ public interface ILocalUploadCleanup
 {
     Task<int> CleanupExpiredAsync(CancellationToken cancellationToken);
 
+    async Task<LocalUploadOwnership?> GetOwnershipAsync(Guid jobId, CancellationToken cancellationToken) =>
+        (await GetStartupOwnershipAsync(cancellationToken).ConfigureAwait(false))
+            .FirstOrDefault(item => item.JobId == jobId);
+
     Task<IReadOnlyList<LocalUploadOwnership>> GetStartupOwnershipAsync(
         CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<LocalUploadOwnership>>([]);
@@ -507,7 +511,7 @@ public sealed class LocalJobUploadCoordinator :
     public async Task<int> CleanupExpiredAsync(CancellationToken cancellationToken)
     {
         var count = 0;
-        while (await _leases.GetNextExpiredLocalLeaseAsync(
+        while (count < JobCleanupService.BatchSize && await _leases.GetNextExpiredLocalLeaseAsync(
                 _timeProvider.GetUtcNow(),
                 cancellationToken).ConfigureAwait(false) is { } lease)
         {
@@ -527,6 +531,12 @@ public sealed class LocalJobUploadCoordinator :
         }
 
         return count;
+    }
+
+    public async Task<LocalUploadOwnership?> GetOwnershipAsync(Guid jobId, CancellationToken cancellationToken)
+    {
+        var lease = await _leases.GetUnacceptedLocalLeaseByJobAsync(jobId, cancellationToken).ConfigureAwait(false);
+        return lease is null ? null : new LocalUploadOwnership(lease.JobId, lease.Extension);
     }
 
     public async Task<IReadOnlyList<LocalUploadOwnership>> GetStartupOwnershipAsync(

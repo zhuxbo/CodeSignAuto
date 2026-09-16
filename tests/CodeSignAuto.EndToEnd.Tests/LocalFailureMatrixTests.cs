@@ -139,6 +139,7 @@ public sealed class LocalFailureMatrixTests
                 var orphan = Path.Combine(first.Spool.Root, Guid.NewGuid().ToString("N"));
                 Directory.CreateDirectory(orphan);
                 await File.WriteAllTextAsync(Path.Combine(orphan, "sentinel.txt"), "orphan-preserved");
+                Directory.SetLastWriteTimeUtc(orphan, clock.GetUtcNow().AddHours(-2).UtcDateTime);
             }
 
             await using (var second = await EndToEndHarness.StartAsync(

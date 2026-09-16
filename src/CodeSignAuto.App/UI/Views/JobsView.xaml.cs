@@ -29,6 +29,31 @@ public partial class JobsView : System.Windows.Controls.UserControl
         }
     }
 
+    private async void OnClearHistory(object sender, System.Windows.RoutedEventArgs eventArgs)
+    {
+        if (DataContext is not JobsViewModel viewModel || !viewModel.CanClearHistory)
+        {
+            return;
+        }
+
+        var confirmed = System.Windows.MessageBox.Show(
+            System.Windows.Window.GetWindow(this), UiCulture.Text("JobsClearHistoryConfirm"),
+            UiCulture.Text("JobsClearHistory"), System.Windows.MessageBoxButton.YesNo,
+            System.Windows.MessageBoxImage.Warning, System.Windows.MessageBoxResult.No);
+        if (confirmed != System.Windows.MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        try
+        {
+            await viewModel.ClearHistoryAsync(CancellationToken.None).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
     private async void OnLoadMore(object sender, System.Windows.RoutedEventArgs eventArgs)
     {
         if (DataContext is not JobsViewModel viewModel)

@@ -18,6 +18,34 @@ namespace CodeSignAuto.EndToEnd.Tests;
 public sealed class ManualSigningFlowTests
 {
     [Fact]
+    public async Task Manual_history_cleanup_reports_unsafe_directory_and_can_retry_without_losing_the_job()
+    {
+        await using var fixture = new Fixture(blockSigner: false);
+        var run = fixture.Start();
+        await fixture.WaitUntilReadyAsync();
+        var source = await fixture.WriteSourceAsync("cleanup.exe");
+        var jobId = await fixture.Runner.LocalJobs.CreateAndUploadAsync(source, Parameters(), null, default);
+        await fixture.WaitForSucceededAsync([jobId]);
+        var unknown = Directory.CreateDirectory(Path.Combine(fixture.Paths.SpoolPath, jobId.ToString("N"), "unknown"));
+        var administration = Assert.IsAssignableFrom<IAgentAdministrationClient>(fixture.Runner.Management);
+        using var viewModel = new CodeSignAuto.App.UI.ViewModels.JobsViewModel(administration, fixture.Runner.LocalJobs);
+
+        await viewModel.ClearHistoryAsync(default);
+        Assert.Equal("history_cleanup_failed", viewModel.ErrorCode);
+        Assert.True(viewModel.CanClearHistory);
+        Assert.Contains((await administration.GetJobPageAsync(null, default)).Items, item => item.JobId == jobId);
+        Assert.True(Directory.Exists(unknown.FullName));
+        Directory.Delete(unknown.FullName);
+        await viewModel.ClearHistoryAsync(default);
+        Assert.Null(viewModel.ErrorCode);
+        Assert.Empty(viewModel.Items);
+        Assert.False(Directory.Exists(Path.Combine(fixture.Paths.SpoolPath, jobId.ToString("N"))));
+        Assert.True(File.Exists(source));
+        fixture.Stop();
+        await run.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
     public async Task Manual_local_jobs_use_one_dispatcher_worker_and_keep_verified_results_for_saving()
     {
         await using var fixture = new Fixture(blockSigner: false);

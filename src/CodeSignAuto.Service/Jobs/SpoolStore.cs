@@ -44,6 +44,10 @@ public interface ISpoolStore
     void ValidateLocalUploadArtifacts(Guid jobId, string extension) =>
         throw new NotSupportedException();
 
+    void ValidateRoot() => _ = ValidateAndListJobDirectories();
+
+    IEnumerable<SpoolJobDirectory> EnumerateJobDirectories() => ValidateAndListJobDirectories();
+
     IReadOnlyList<SpoolJobDirectory> ValidateAndListJobDirectories() =>
         throw new NotSupportedException();
 
@@ -682,12 +686,19 @@ public sealed class SpoolStore : ISpoolStore
 
     public string GetResultPath(Guid jobId, string extension) => GetJobFilePath(jobId, "result", extension, createDirectory: true);
 
-    public IReadOnlyList<SpoolJobDirectory> ValidateAndListJobDirectories()
+    public void ValidateRoot()
     {
         Directory.CreateDirectory(_root);
         ProtectRoot();
         AssertNotReparsePoint(_root);
-        var directories = new List<SpoolJobDirectory>();
+    }
+
+    public IReadOnlyList<SpoolJobDirectory> ValidateAndListJobDirectories() =>
+        EnumerateJobDirectories().ToArray();
+
+    public IEnumerable<SpoolJobDirectory> EnumerateJobDirectories()
+    {
+        ValidateRoot();
         foreach (var path in Directory.EnumerateFileSystemEntries(_root, "*", SearchOption.TopDirectoryOnly))
         {
             AssertNotReparsePoint(path);
@@ -697,13 +708,9 @@ public sealed class SpoolStore : ISpoolStore
             }
 
             var name = Path.GetFileName(path);
-            directories.Add(new SpoolJobDirectory(
-                Guid.TryParseExact(name, "N", out var jobId) ? jobId : null,
-                path,
-                name));
+            yield return new SpoolJobDirectory(
+                Guid.TryParseExact(name, "N", out var jobId) ? jobId : null, path, name);
         }
-
-        return directories;
     }
 
     public Task DeleteStalePartsAsync(Job job, DateTimeOffset cutoff, CancellationToken cancellationToken = default)

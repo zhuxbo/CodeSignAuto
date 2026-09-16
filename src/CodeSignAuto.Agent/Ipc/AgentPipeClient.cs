@@ -158,6 +158,9 @@ public interface IAgentManagementTransport
 
     Task<ManagementSnapshot> GetManagementSnapshotAsync(CancellationToken cancellationToken);
 
+    Task<int> ClearJobHistoryAsync(DateTimeOffset completedBeforeUtc, CancellationToken cancellationToken) =>
+        Task.FromException<int>(new ManagementUnavailableException(Guid.NewGuid()));
+
     Task<JobPageResponse> GetJobPageAsync(JobPageCursor? cursor, CancellationToken cancellationToken) =>
         Task.FromException<JobPageResponse>(new ManagementUnavailableException(Guid.NewGuid()));
 

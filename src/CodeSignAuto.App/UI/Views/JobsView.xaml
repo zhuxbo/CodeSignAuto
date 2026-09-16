@@ -22,11 +22,13 @@
                    Margin="0,5,0,0"
                    Foreground="{DynamicResource TextSecondaryBrush}" />
       </StackPanel>
-      <Button Grid.Column="1"
-              Content="{localization:UiString ActionRefresh}"
-              Click="OnRefresh"
-              VerticalAlignment="Bottom"
-              AutomationProperties.Name="{localization:UiString JobsRefreshAutomation}" />
+      <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Bottom">
+        <Button Content="{localization:UiString JobsClearHistory}"
+                IsEnabled="{Binding CanClearHistory}" Click="OnClearHistory" Margin="0,0,8,0"
+                AutomationProperties.Name="{localization:UiString JobsClearHistory}" />
+        <Button Content="{localization:UiString ActionRefresh}" Click="OnRefresh"
+                AutomationProperties.Name="{localization:UiString JobsRefreshAutomation}" />
+      </StackPanel>
     </Grid>
 
     <Border Style="{DynamicResource StatusPanelStyle}"

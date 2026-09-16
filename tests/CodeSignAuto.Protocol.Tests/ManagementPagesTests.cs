@@ -6,6 +6,25 @@ namespace CodeSignAuto.Protocol.Tests;
 public sealed class ManagementPagesTests
 {
     [Fact]
+    public async Task History_cleanup_contract_roundtrips_and_rejects_unbounded_or_invalid_requests()
+    {
+        var request = new ClearJobHistoryRequest(Guid.NewGuid(), DateTimeOffset.UtcNow);
+        await using var stream = new MemoryStream();
+        await LengthPrefixedJsonProtocol.WriteAsync(stream, request, default);
+        stream.Position = 0;
+        Assert.Equal(request, await LengthPrefixedJsonProtocol.ReadAsync<ClearJobHistoryRequest>(stream, default));
+        var response = new ClearJobHistoryResponse(request.RequestId, 100, null, null);
+        await using var reply = new MemoryStream();
+        await LengthPrefixedJsonProtocol.WriteAsync(reply, response, default);
+        reply.Position = 0;
+        Assert.Equal(response, await LengthPrefixedJsonProtocol.ReadAsync<ClearJobHistoryResponse>(reply, default));
+        await Assert.ThrowsAsync<ProtocolException>(() =>
+            LengthPrefixedJsonProtocol.WriteAsync(new MemoryStream(), response with { DeletedCount = 101 }, default));
+        await Assert.ThrowsAsync<ProtocolException>(() =>
+            LengthPrefixedJsonProtocol.WriteAsync(new MemoryStream(), request with { CompletedBeforeUtc = default }, default));
+    }
+
+    [Fact]
     public async Task Job_page_roundtrip_exposes_only_the_safe_fixed_contract()
     {
         var requestId = Guid.Parse("11111111-1111-1111-1111-111111111111");

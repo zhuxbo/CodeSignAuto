@@ -9,6 +9,21 @@ namespace CodeSignAuto.UI.Tests;
 
 public sealed class AdminControlClientTests
 {
+    [Fact]
+    public async Task History_cleanup_sends_the_fixed_cutoff_and_reads_the_deleted_count()
+    {
+        var requestId = Guid.NewGuid();
+        var cutoff = DateTimeOffset.UtcNow;
+        var connection = await ScriptedClientStream.CreateAsync(
+            new AdminControlAccepted(AdminControlContract.ProtocolVersion),
+            new ClearJobHistoryResponse(requestId, 9, null, null));
+        using var client = new AdminControlClient(
+            _ => ValueTask.FromResult<Stream>(connection), new FixedClientIdentity(),
+            requestIdFactory: () => requestId, serverIdentityVerifier: new AcceptingServerIdentityVerifier());
+        Assert.Equal(9, await client.ClearJobHistoryAsync(cutoff, default));
+        Assert.Equal(new ClearJobHistoryRequest(requestId, cutoff), await ReadRequestAsync(connection.Written));
+    }
+
     [Theory]
     [InlineData(false, "S-1-5-18", 0)]
     [InlineData(true, "S-1-5-21-1000", 0)]

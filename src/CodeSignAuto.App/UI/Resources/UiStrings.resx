@@ -319,4 +319,7 @@
   <data name="UninstallErrorCode" xml:space="preserve"><value>错误代码：{0}</value></data>
   <data name="ServiceSettingsCustomToken" xml:space="preserve"><value>指定 API Token</value></data>
   <data name="ServiceSettingsCustomTokenHint" xml:space="preserve"><value>留空将生成随机 Token。指定值需为 16–256 个字符，可使用英文字母、数字及 - _ . ~ + / =。</value></data>
+  <data name="JobsClearHistory" xml:space="preserve"><value>清理已结束任务</value></data>
+  <data name="JobsClearHistoryConfirm" xml:space="preserve"><value>删除已结束任务的历史记录和结果文件？正在排队或签名的任务将保留。此操作无法撤销。</value></data>
+  <data name="JobsCleanupFailed" xml:space="preserve"><value>历史清理未完成，请刷新列表后重试。</value></data>
 </root>

@@ -708,6 +708,7 @@ public sealed class RecoveryAndCleanupTests
         var orphanPath = Path.Combine(spool.Root, orphanId.ToString("N"));
         Directory.CreateDirectory(orphanPath);
         await File.WriteAllTextAsync(Path.Combine(orphanPath, "orphan.txt"), "preserve");
+        Directory.SetLastWriteTimeUtc(orphanPath, DateTime.UtcNow.AddHours(-2));
         var quarantine = Path.Combine(Path.GetDirectoryName(spool.Root)!, "quarantine");
         var collision = Path.Combine(quarantine, orphanId.ToString("N"));
         Directory.CreateDirectory(collision);
@@ -715,7 +716,9 @@ public sealed class RecoveryAndCleanupTests
         var service = new JobCleanupService(jobs, spool, notifier, TimeProvider.System, NullLogger<JobCleanupService>.Instance);
 
         await service.RecoverStartupAsync(CancellationToken.None);
+        await service.RunMaintenanceBatchAsync(CancellationToken.None);
         await service.RecoverStartupAsync(CancellationToken.None);
+        await service.RunMaintenanceBatchAsync(CancellationToken.None);
         var corruptNotification = await notifier.WaitAsync(corrupt.Id, CancellationToken.None);
 
         Assert.Equal(JobState.Failed, corruptNotification.State);
@@ -793,7 +796,9 @@ public sealed class RecoveryAndCleanupTests
             NullLogger<JobCleanupService>.Instance);
 
         await service.RecoverStartupAsync(CancellationToken.None);
+        await service.RunMaintenanceBatchAsync(CancellationToken.None);
         await service.RecoverStartupAsync(CancellationToken.None);
+        await service.RunMaintenanceBatchAsync(CancellationToken.None);
         var recovered = await jobs.GetAsync(created.Id);
 
         Assert.Equal(JobState.Queued, recovered!.State);
@@ -823,6 +828,7 @@ public sealed class RecoveryAndCleanupTests
             NullLogger<JobCleanupService>.Instance);
 
         await service.RecoverStartupAsync(CancellationToken.None);
+        await service.RunMaintenanceBatchAsync(CancellationToken.None);
 
         Assert.True(File.Exists(stalePart));
         Assert.Equal(JobState.Verifying, (await jobs.GetAsync(created.Id))!.State);
@@ -847,6 +853,7 @@ public sealed class RecoveryAndCleanupTests
             NullLogger<JobCleanupService>.Instance);
 
         await service.RecoverStartupAsync(CancellationToken.None);
+        await service.RunMaintenanceBatchAsync(CancellationToken.None);
 
         Assert.False(File.Exists(part));
     }
@@ -1217,6 +1224,95 @@ public sealed class RecoveryAndCleanupTests
             jobs.ReleaseRecovery();
             timeProvider.ReleaseTimerCreation();
         }
+    }
+
+    [Fact]
+    public async Task History_cleanup_removes_old_terminal_jobs_but_preserves_active_and_newer_jobs()
+    {
+        using var fixture = new FileFixture();
+        var jobs = fixture.CreateStore();
+        var spool = new SpoolStore(fixture.SpoolPath);
+        var old = await CreateSucceededJobAsync(jobs, spool, "%PDF-old"u8.ToArray());
+        var initialDelta = await jobs.GetTerminalJobDeltaAsync(null, null);
+        var cutoff = DateTimeOffset.UtcNow;
+        await Task.Delay(20);
+        var newer = await CreateSucceededJobAsync(jobs, spool, "%PDF-new"u8.ToArray());
+        var active = await jobs.CreateAsync(CreateJob());
+        await jobs.ClaimNextAsync(Guid.NewGuid());
+        var queued = await jobs.CreateAsync(CreateJob());
+        var management = new ServiceManagementSnapshotProvider(jobs, TimeProvider.System,
+            spool: spool, notifier: new JobCompletionNotifier(jobs));
+
+        Assert.Equal(1, await management.ClearJobHistoryAsync(cutoff, default));
+        Assert.Null(await jobs.GetAsync(old.Id));
+        Assert.False(Directory.Exists(Path.Combine(spool.Root, old.Id.ToString("N"))));
+        Assert.Equal(JobState.Succeeded, (await jobs.GetAsync(newer.Id))!.State);
+        Assert.Equal(JobState.Signing, (await jobs.GetAsync(active.Id))!.State);
+        Assert.Equal(JobState.Queued, (await jobs.GetAsync(queued.Id))!.State);
+        Assert.Equal(0, await management.ClearJobHistoryAsync(cutoff, default));
+        var delta = await jobs.GetTerminalJobDeltaAsync(initialDelta.Watermark, null);
+        Assert.Equal(newer.Id, Assert.Single(delta.Items).Item.JobId);
+    }
+
+    [Fact]
+    public async Task History_delete_failure_preserves_record_and_idempotency_and_retry_succeeds()
+    {
+        using var fixture = new FileFixture();
+        var jobs = fixture.CreateStore();
+        var created = await jobs.CreateAsync(CreateJob(DateTimeOffset.UtcNow.AddHours(-1)), "test-principal", "history-key");
+        await jobs.TryExpireNextAsync(DateTimeOffset.UtcNow, (_, _) => Task.CompletedTask);
+        var cutoff = DateTimeOffset.UtcNow;
+        await Assert.ThrowsAsync<IOException>(() => jobs.TryDeleteTerminalAsync(cutoff,
+            (_, _) => Task.FromException(new IOException("test deletion failure"))));
+        Assert.Equal(created.Id, (await jobs.GetByIdempotencyKeyAsync("test-principal", "history-key"))!.Id);
+        Assert.NotNull(await jobs.GetAsync(created.Id));
+        Assert.NotNull(await jobs.TryDeleteTerminalAsync(cutoff, (_, _) => Task.CompletedTask));
+        Assert.Null(await jobs.GetByIdempotencyKeyAsync("test-principal", "history-key"));
+        Assert.Null(await jobs.GetAsync(created.Id));
+    }
+
+    [Fact]
+    public async Task History_cleanup_is_rejected_while_upgrade_is_draining()
+    {
+        using var fixture = new FileFixture();
+        var jobs = fixture.CreateStore();
+        var spool = new SpoolStore(fixture.SpoolPath);
+        var completed = await CreateSucceededJobAsync(jobs, spool, "%PDF-keep"u8.ToArray());
+        var gate = new UpgradeAdmissionGate();
+        var management = new ServiceManagementSnapshotProvider(jobs, TimeProvider.System,
+            spool: spool, notifier: new JobCompletionNotifier(jobs), upgradeGate: gate);
+        Assert.True(await gate.DrainAsync(TimeSpan.FromSeconds(1), default));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => management.ClearJobHistoryAsync(DateTimeOffset.UtcNow, default));
+        Assert.NotNull(await jobs.GetAsync(completed.Id));
+        Assert.True(File.Exists(spool.GetResultPath(completed.Id, completed.Extension)));
+    }
+
+    [Fact]
+    public async Task History_cleanup_is_bounded_and_does_not_rewind_terminal_watermark()
+    {
+        using var fixture = new FileFixture();
+        var jobs = fixture.CreateStore();
+        var spool = new SpoolStore(fixture.SpoolPath);
+        for (var index = 0; index < 101; index++)
+        {
+            await jobs.CreateAsync(CreateJob(DateTimeOffset.UtcNow.AddHours(-1)));
+            await jobs.TryExpireNextAsync(DateTimeOffset.UtcNow, (_, _) => Task.CompletedTask);
+        }
+
+        var before = await jobs.GetTerminalJobDeltaAsync(null, null);
+        var cutoff = DateTimeOffset.UtcNow;
+        var management = new ServiceManagementSnapshotProvider(jobs, TimeProvider.System,
+            spool: spool, notifier: new JobCompletionNotifier(jobs));
+        Assert.Equal(100, await management.ClearJobHistoryAsync(cutoff, default));
+        Assert.Single(await jobs.GetAllAsync());
+        Assert.Equal(1, await management.ClearJobHistoryAsync(cutoff, default));
+        Assert.Empty(await jobs.GetAllAsync());
+        var after = await jobs.GetTerminalJobDeltaAsync(before.Watermark, null);
+        Assert.Equal(before.Watermark, after.Watermark);
+        await CreateSucceededJobAsync(jobs, spool, "%PDF-later"u8.ToArray());
+        var next = await jobs.GetTerminalJobDeltaAsync(after.Watermark, null);
+        Assert.Single(next.Items);
+        Assert.True(next.Watermark.Sequence > after.Watermark.Sequence);
     }
 
     private static async Task<Job> CreateSucceededJobAsync(SqliteJobStore jobs, SpoolStore spool, byte[] result)

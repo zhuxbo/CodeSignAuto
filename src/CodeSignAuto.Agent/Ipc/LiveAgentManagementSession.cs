@@ -127,6 +127,13 @@ public sealed class LiveAgentManagementSession :
         return ExecuteTrackedClearOtpAndLogoutAsync(cancellationToken);
     }
 
+    public Task<int> ClearJobHistoryAsync(DateTimeOffset completedBeforeUtc, CancellationToken cancellationToken)
+    {
+        BeginOperation();
+        return ExecuteAdministrationAsync(
+            token => _transport.ClearJobHistoryAsync(completedBeforeUtc, token), cancellationToken);
+    }
+
     public Task<JobPageResponse> GetJobPageAsync(
         JobPageCursor? cursor,
         CancellationToken cancellationToken)

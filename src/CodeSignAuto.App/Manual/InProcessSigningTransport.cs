@@ -195,6 +195,23 @@ internal sealed class InProcessSigningTransport :
         return management.CreateAsync(health, cancellationToken);
     }
 
+    public async Task<int> ClearJobHistoryAsync(DateTimeOffset completedBeforeUtc, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var (management, _) = GetManagementState(cancellationToken);
+            return await management.ClearJobHistoryAsync(completedBeforeUtc, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            throw new ManagementUnavailableException(Guid.NewGuid());
+        }
+    }
+
     public async Task<JobPageResponse> GetJobPageAsync(
         JobPageCursor? cursor,
         CancellationToken cancellationToken)

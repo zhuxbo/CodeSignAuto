@@ -14,6 +14,45 @@ public sealed class AdminControlPipeTests
     private const string AdministratorSid = "S-1-5-21-1000";
 
     [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task History_cleanup_requires_verified_administrator_and_correlates_its_response(bool administrator)
+    {
+        var management = new RecordingHistoryManagement();
+        var request = new ClearJobHistoryRequest(Guid.NewGuid(), DateTimeOffset.UtcNow);
+        var identity = new AdminControlIdentity(321, 7, AdministratorSid, administrator, IsLocal: true);
+        var server = new AdminControlPipeServer(management, new UnusedAgentControl(),
+            new DisconnectedAgentHealthStatusSource(), new UnusedLocalJobs(), new FixedIdentityVerifier(identity));
+        await using var connection = new DuplexCaptureStream(await EncodeAsync(Hello(), request));
+        if (!administrator)
+        {
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() => server.ProcessConnectionAsync(connection, default));
+            Assert.Null(management.Cutoff);
+            return;
+        }
+
+        await server.ProcessConnectionAsync(connection, default);
+        await using var written = new MemoryStream(connection.WrittenBytes);
+        Assert.IsType<AdminControlAccepted>(await LengthPrefixedJsonProtocol.ReadAsync<AgentMessage>(written, default));
+        var response = await LengthPrefixedJsonProtocol.ReadAsync<ClearJobHistoryResponse>(written, default);
+        Assert.Equal(request.RequestId, response.RequestId);
+        Assert.Equal(17, response.DeletedCount);
+        Assert.Equal(request.CompletedBeforeUtc, management.Cutoff);
+    }
+
+    private sealed class RecordingHistoryManagement : IServiceManagementSnapshotProvider
+    {
+        public DateTimeOffset? Cutoff { get; private set; }
+        public Task<int> ClearJobHistoryAsync(DateTimeOffset completedBeforeUtc, CancellationToken cancellationToken)
+        {
+            Cutoff = completedBeforeUtc;
+            return Task.FromResult(17);
+        }
+        public Task<ManagementSnapshot> CreateAsync(AgentHealthSnapshot health, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+    }
+
+    [Theory]
     [InlineData(false, true, 7)]
     [InlineData(true, false, 7)]
     [InlineData(true, true, 0)]

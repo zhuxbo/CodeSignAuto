@@ -43,6 +43,9 @@ public interface IAgentAdministrationSession : IAgentManagementSession
 
     Task<JobPageResponse> GetJobPageAsync(JobPageCursor? cursor, CancellationToken cancellationToken);
 
+    Task<int> ClearJobHistoryAsync(DateTimeOffset completedBeforeUtc, CancellationToken cancellationToken) =>
+        Task.FromException<int>(new ManagementUnavailableException(Guid.NewGuid()));
+
     Task<TerminalJobDeltaResponse> GetTerminalJobDeltaAsync(
         TerminalJobWatermark? watermark,
         TerminalJobCursor? cursor,
@@ -58,6 +61,9 @@ public interface IAgentAdministrationClient
         Task.FromException<ManagementSnapshot>(new ManagementUnavailableException(Guid.NewGuid()));
 
     Task<JobPageResponse> GetJobPageAsync(JobPageCursor? cursor, CancellationToken cancellationToken);
+
+    Task<int> ClearJobHistoryAsync(DateTimeOffset completedBeforeUtc, CancellationToken cancellationToken) =>
+        Task.FromException<int>(new ManagementUnavailableException(Guid.NewGuid()));
 
     Task<TerminalJobDeltaResponse> GetTerminalJobDeltaAsync(
         TerminalJobWatermark? watermark,
@@ -202,6 +208,10 @@ public sealed class AgentManagementBridge :
             : Task.FromException<PrepareSimplySignSessionResult>(
                 new ManagementUnavailableException(Guid.NewGuid()));
     }
+
+    public Task<int> ClearJobHistoryAsync(DateTimeOffset completedBeforeUtc, CancellationToken cancellationToken) =>
+        ExecuteAdministrationAsync(
+            (session, token) => session.ClearJobHistoryAsync(completedBeforeUtc, token), cancellationToken);
 
     public Task<JobPageResponse> GetJobPageAsync(
         JobPageCursor? cursor,

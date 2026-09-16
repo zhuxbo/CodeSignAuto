@@ -34,6 +34,8 @@ public sealed class AsyncJobFlowTests
         Assert.Equal(input.Length, command.InputSize);
         Assert.Equal(inputHash, command.InputSha256);
         _ = await harness.WaitForStateAsync(created.JobId, "verifying");
+        Assert.Equal(input, await File.ReadAllBytesAsync(inputPath));
+        Assert.Equal(inputWriteTime, File.GetLastWriteTimeUtc(inputPath));
         harness.Agent.ReleaseBeforeTerminal();
 
         var succeeded = await harness.WaitForStateAsync(created.JobId, "succeeded");
@@ -43,8 +45,6 @@ public sealed class AsyncJobFlowTests
         var expected = input.Concat(FakeAgent.SafeTrailer).ToArray();
         Assert.Equal(expected, downloaded);
         Assert.Equal(Convert.ToHexString(SHA256.HashData(expected)).ToLowerInvariant(), succeeded.ResultSha256);
-        Assert.Equal(input, await File.ReadAllBytesAsync(inputPath));
-        Assert.Equal(inputWriteTime, File.GetLastWriteTimeUtc(inputPath));
 
         var persistedAfterSigning = Assert.IsType<Job>(await harness.Jobs.GetAsync(created.JobId));
         Assert.Equal("api", persistedAfterSigning.Source);
