@@ -51,6 +51,17 @@ public partial class ActivationImportDialog : System.Windows.Window
                 DialogResult = true;
             }
         }
+
+        if (!saved && IsLoaded && _viewModel.ErrorText is { Length: > 0 } errorText)
+        {
+            System.Windows.MessageBox.Show(
+                this,
+                errorText,
+                UiCulture.Text("ActivationImportTitle"),
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Error);
+            SecretInput.Focus();
+        }
     }
 
     private void OnCancel(object sender, System.Windows.RoutedEventArgs eventArgs) => CancelAndClose();

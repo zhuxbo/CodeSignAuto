@@ -40,7 +40,9 @@
                    AutomationProperties.Name="{Binding DisplaySummary}" />
         <TextBlock Text="{Binding ErrorText}"
                    Margin="0,5,0,0"
-                   Foreground="{DynamicResource TextSecondaryBrush}"
+                   Foreground="{DynamicResource ErrorBrush}"
+                   FontWeight="SemiBold"
+                   TextWrapping="Wrap"
                    AutomationProperties.Name="{Binding ErrorText}" />
 
         <Border Margin="0,14,0,0"

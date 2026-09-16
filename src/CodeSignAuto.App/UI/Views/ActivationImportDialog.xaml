@@ -4,7 +4,8 @@
         xmlns:localization="clr-namespace:CodeSignAuto.App.UI.Localization"
         Title="{localization:UiString ActivationImportTitle}"
         Width="560"
-        Height="260"
+        MinHeight="260"
+        SizeToContent="Height"
         ResizeMode="NoResize"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
@@ -32,13 +33,20 @@
              SpellCheck.IsEnabled="False"
              AutomationProperties.Name="{localization:UiString ActivationImportContent}"
              AutomationProperties.HelpText="{localization:UiString ActivationImportHelp}" />
-    <TextBlock Grid.Row="2"
-               x:Name="SaveStatus"
-               Margin="0,10,0,0"
-               Text="{localization:UiString ActivationImportStorageNotice}"
-               Foreground="{DynamicResource TextSecondaryBrush}"
-               TextWrapping="Wrap"
-               AutomationProperties.Name="{localization:UiString ActivationImportStatus}" />
+    <StackPanel Grid.Row="2" Margin="0,10,0,10">
+      <TextBlock x:Name="SaveStatus"
+                 Text="{localization:UiString ActivationImportStorageNotice}"
+                 Foreground="{DynamicResource TextSecondaryBrush}"
+                 TextWrapping="Wrap"
+                 AutomationProperties.Name="{localization:UiString ActivationImportStatus}" />
+      <TextBlock Text="{Binding ErrorText}"
+                 Margin="0,5,0,0"
+                 Foreground="{DynamicResource ErrorBrush}"
+                 FontWeight="SemiBold"
+                 TextWrapping="Wrap"
+                 AutomationProperties.Name="{Binding ErrorText}"
+                 AutomationProperties.LiveSetting="Assertive" />
+    </StackPanel>
     <StackPanel Grid.Row="3"
                 Orientation="Horizontal"
                 HorizontalAlignment="Right">
