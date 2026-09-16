@@ -9,7 +9,12 @@ namespace CodeSignAuto.App.Commands;
 internal sealed record ServiceConfigurationEditRequest(
     int ListenPort,
     int RetentionHours,
-    bool RotateToken);
+    bool RotateToken,
+    string? ApiToken = null)
+{
+    public override string ToString() =>
+        $"ServiceConfigurationEditRequest {{ ListenPort = {ListenPort}, RetentionHours = {RetentionHours}, RotateToken = {RotateToken} }}";
+}
 
 internal sealed record ServiceConfigurationEditResult(
     ServiceSettingsSummary Summary,
@@ -22,7 +27,6 @@ internal sealed record ServiceConfigurationEditResult(
 
 internal sealed class SensitiveOneTimeApiToken : IDisposable
 {
-    private const int TokenCharacters = 43;
     private char[]? _value;
     private int _materializationCount;
 
@@ -30,13 +34,30 @@ internal sealed class SensitiveOneTimeApiToken : IDisposable
     {
         ArgumentNullException.ThrowIfNull(value);
         _value = value;
-        if (value.Length != TokenCharacters ||
-            value.Any(static character => character is not (
-                >= 'A' and <= 'Z' or >= 'a' and <= 'z' or >= '0' and <= '9' or '-' or '_')))
+        if (!IsValid(value))
         {
             Dispose();
             throw new ConfigureServiceException("configure_service_failed");
         }
+    }
+
+    internal static bool IsValid(ReadOnlySpan<char> value)
+    {
+        if (value.Length is < 16 or > 256)
+        {
+            return false;
+        }
+
+        foreach (var character in value)
+        {
+            if (character is not (>= 'A' and <= 'Z' or >= 'a' and <= 'z' or
+                >= '0' and <= '9' or '-' or '_' or '.' or '~' or '+' or '/' or '='))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     internal bool WasMaterialized => Volatile.Read(ref _materializationCount) != 0;
@@ -208,7 +229,9 @@ internal sealed class ServiceConfigurationEditor : IServiceConfigurationEditor
             var summary = _platform.CreateSettingsSummary(updated);
             if (request.RotateToken)
             {
-                oneTimeToken = _tokenFactory.Create();
+                oneTimeToken = string.IsNullOrEmpty(request.ApiToken)
+                    ? _tokenFactory.Create()
+                    : new SensitiveOneTimeApiToken(request.ApiToken.ToCharArray());
                 updated = ServiceConfigurationLoader.Validate(updated with
                 {
                     TokenHash = oneTimeToken.ComputeHash(),
@@ -229,7 +252,9 @@ internal sealed class ServiceConfigurationEditor : IServiceConfigurationEditor
     private static void ValidateRequest(ServiceConfigurationEditRequest request)
     {
         if (request.ListenPort is < 1 or > 65535 ||
-            request.RetentionHours is < 0 or > 168)
+            request.RetentionHours is < 0 or > 168 ||
+            !string.IsNullOrEmpty(request.ApiToken) &&
+            (!request.RotateToken || !SensitiveOneTimeApiToken.IsValid(request.ApiToken)))
         {
             throw new ConfigureServiceException("configure_service_input_invalid");
         }

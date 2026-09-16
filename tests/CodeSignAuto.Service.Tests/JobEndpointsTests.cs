@@ -21,6 +21,26 @@ namespace CodeSignAuto.Service.Tests;
 
 public sealed class JobEndpointsTests
 {
+
+    [Fact]
+    public async Task rotated_token_has_independent_idempotency_scope()
+    {
+        await using var factory = await TestServiceFactory.StartAsync();
+        using var client = factory.CreateAuthenticatedClient();
+        using var firstRequest = TestUploads.PdfRequest("%PDF-first");
+        firstRequest.Headers.Add("Idempotency-Key", "audit-rotation-key");
+        using var firstResponse = await client.SendAsync(firstRequest);
+        Assert.Equal(HttpStatusCode.Accepted, firstResponse.StatusCode);
+        var newToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        factory.Services.GetRequiredService<Microsoft.Extensions.Options.IOptionsMonitor<BearerTokenAuthenticationOptions>>()
+            .Get(BearerTokenAuthenticationHandler.SchemeName).TokenHash = SHA256.HashData(Encoding.UTF8.GetBytes(newToken));
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", newToken);
+        using var secondRequest = TestUploads.PdfRequest("%PDF-second");
+        secondRequest.Headers.Add("Idempotency-Key", "audit-rotation-key");
+        using var secondResponse = await client.SendAsync(secondRequest);
+        Assert.Equal(HttpStatusCode.Accepted, secondResponse.StatusCode);
+    }
+
     private static readonly DateTimeOffset CapabilityNow =
         DateTimeOffset.Parse("2026-08-15T08:00:00Z");
 

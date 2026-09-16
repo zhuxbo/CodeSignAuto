@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -317,7 +318,7 @@ public static class JobEndpoints
             }
 
             var isIdempotencyReplay = idempotencyKey is not null &&
-                await jobs.GetByIdempotencyKeyAsync("api", idempotencyKey, context.RequestAborted)
+                await jobs.GetByIdempotencyKeyAsync(context.User.FindFirstValue(ClaimTypes.NameIdentifier)!, idempotencyKey, context.RequestAborted)
                     .ConfigureAwait(false) is not null;
 
             var reader = new MultipartReader(boundary, context.Request.Body)
@@ -408,7 +409,7 @@ public static class JobEndpoints
                 return new(null, finalProblem);
             }
 
-            var stored = await jobs.CreateAsync(requested, idempotencyKey is null ? null : "api", idempotencyKey, context.RequestAborted);
+            var stored = await jobs.CreateAsync(requested, idempotencyKey is null ? null : context.User.FindFirstValue(ClaimTypes.NameIdentifier)!, idempotencyKey, context.RequestAborted);
             if (stored.Id == jobId)
             {
                 retainSpool = true;

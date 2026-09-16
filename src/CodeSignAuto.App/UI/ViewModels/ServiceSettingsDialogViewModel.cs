@@ -105,6 +105,7 @@ internal sealed class ServiceSettingsDialogViewModel : INotifyPropertyChanged, I
     private string _listenPortText;
     private string _retentionHoursText;
     private bool _rotateToken;
+    private string? _apiToken;
     private ServiceSettingsDialogState _state = ServiceSettingsDialogState.Editing;
     private string? _errorCode;
     private string? _oneTimeApiToken;
@@ -169,6 +170,12 @@ internal sealed class ServiceSettingsDialogViewModel : INotifyPropertyChanged, I
     {
         get => _rotateToken;
         set => SetField(ref _rotateToken, value);
+    }
+
+    public string? ApiToken
+    {
+        get => _apiToken;
+        set => SetField(ref _apiToken, value);
     }
 
     public ServiceSettingsDialogState State
@@ -244,6 +251,7 @@ internal sealed class ServiceSettingsDialogViewModel : INotifyPropertyChanged, I
         try
         {
             var request = CreateRequest();
+            await ApplyOnUiAsync(() => ApiToken = null).ConfigureAwait(false);
             if (request is null)
             {
                 await SetFailureAsync("configure_service_input_invalid").ConfigureAwait(false);
@@ -358,14 +366,18 @@ internal sealed class ServiceSettingsDialogViewModel : INotifyPropertyChanged, I
         ClearOneTimeToken();
     }
 
-    public void ClearSensitiveResult() => ClearOneTimeToken();
+    public void ClearSensitiveResult()
+    {
+        ApiToken = null;
+        ClearOneTimeToken();
+    }
 
     public void Dispose()
     {
         if (Interlocked.Exchange(ref _disposed, 1) == 0)
         {
             _lifetime.Cancel();
-            ClearOneTimeToken();
+            ClearSensitiveResult();
             _lifetime.Dispose();
         }
     }
@@ -387,7 +399,8 @@ internal sealed class ServiceSettingsDialogViewModel : INotifyPropertyChanged, I
         return new ServiceConfigurationEditRequest(
             listenPort,
             retentionHours,
-            RotateToken);
+            RotateToken,
+            RotateToken ? ApiToken : null);
     }
 
     private static bool TryParseAsciiInteger(string? text, out int value)

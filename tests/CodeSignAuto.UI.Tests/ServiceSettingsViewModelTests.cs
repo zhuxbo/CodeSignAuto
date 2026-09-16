@@ -13,6 +13,20 @@ namespace CodeSignAuto.UI.Tests;
 public sealed class ServiceSettingsViewModelTests
 {
     [Fact]
+    public async Task Custom_token_is_forwarded_only_for_rotation_and_cleared_after_apply()
+    {
+        var token = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(24));
+        var editor = new EditorFake(new ServiceConfigurationEditResult(Summary(), null));
+        using var vm = DialogViewModel(Summary(), editor: editor);
+        vm.RotateToken = true;
+        vm.ApiToken = token;
+        Assert.True(await vm.ApplyAsync(default));
+        Assert.True(editor.LastRequest!.ApiToken == token);
+        Assert.Null(vm.ApiToken);
+        Assert.DoesNotContain(token, vm.ToString());
+    }
+
+    [Fact]
     public void Dialog_uses_the_selected_English_resources()
     {
         using var culture = new UiTestCultureScope("en-US");
@@ -403,6 +417,7 @@ public sealed class ServiceSettingsViewModelTests
         Func<CancellationToken, Task>? beforeReturn = null) : IServiceConfigurationEditor
     {
         public int ApplyCalls { get; private set; }
+        public ServiceConfigurationEditRequest? LastRequest { get; private set; }
         public TaskCompletionSource Entered { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -411,6 +426,7 @@ public sealed class ServiceSettingsViewModelTests
             CancellationToken cancellationToken)
         {
             ApplyCalls++;
+            LastRequest = request;
             Entered.TrySetResult();
             if (beforeReturn is not null)
             {

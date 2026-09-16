@@ -14,8 +14,15 @@ public partial class ServiceSettingsDialog : System.Windows.Window
         DataContext = viewModel;
     }
 
+    private void OnTokenChanged(object sender, System.Windows.RoutedEventArgs eventArgs) =>
+        _viewModel.ApiToken = ApiTokenInput.Password;
+
     private async void OnApply(object sender, System.Windows.RoutedEventArgs eventArgs)
-        => _ = await _viewModel.ApplyAsync(CancellationToken.None).ConfigureAwait(true);
+    {
+        var applying = _viewModel.ApplyAsync(CancellationToken.None);
+        ApiTokenInput.Clear();
+        _ = await applying.ConfigureAwait(true);
+    }
 
     private void OnCopyToken(object sender, System.Windows.RoutedEventArgs eventArgs) =>
         _ = _viewModel.CopyOneTimeToken();
@@ -41,6 +48,7 @@ public partial class ServiceSettingsDialog : System.Windows.Window
 
     private void OnClosed(object? sender, EventArgs eventArgs)
     {
+        ApiTokenInput.Clear();
         _viewModel.ClearSensitiveResult();
     }
 }

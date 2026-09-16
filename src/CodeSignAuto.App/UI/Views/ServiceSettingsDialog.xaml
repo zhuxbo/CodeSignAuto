@@ -4,7 +4,7 @@
         xmlns:localization="clr-namespace:CodeSignAuto.App.UI.Localization"
         Title="{localization:UiString ServiceSettingsEditTitle}"
         Width="620"
-        Height="520"
+        Height="620"
         MinWidth="560"
         MinHeight="460"
         ShowInTaskbar="False"
@@ -50,17 +50,32 @@
                      AutomationProperties.Name="{localization:UiString ServiceSettingsRetentionDescription}" />
         </StackPanel>
 
-        <CheckBox Grid.Row="2" Grid.Column="1"
-                  Margin="0,14,0,0"
-                  IsChecked="{Binding RotateToken}"
-                  Content="{localization:UiString ServiceSettingsRotateToken}"
-                  AutomationProperties.Name="{localization:UiString ServiceSettingsRotateToken}" />
+        <StackPanel Grid.Row="2" Grid.Column="1" Margin="0,14,0,0">
+          <CheckBox IsChecked="{Binding RotateToken}"
+                    Content="{localization:UiString ServiceSettingsRotateToken}"
+                    AutomationProperties.Name="{localization:UiString ServiceSettingsRotateToken}" />
+          <PasswordBox x:Name="ApiTokenInput" Margin="0,8,0,0" MaxLength="256"
+                       IsEnabled="{Binding RotateToken}" PasswordChanged="OnTokenChanged"
+                       AutomationProperties.Name="{localization:UiString ServiceSettingsCustomToken}" />
+          <TextBlock Text="{localization:UiString ServiceSettingsCustomTokenHint}"
+                     Margin="0,4,0,0" TextWrapping="Wrap"
+                     Foreground="{DynamicResource TextSecondaryBrush}" />
+        </StackPanel>
       </Grid>
 
       <Border Margin="0,18,0,0"
               Padding="12"
               Background="{DynamicResource SelectionBrush}"
               CornerRadius="8">
+        <Border.Style>
+          <Style TargetType="Border">
+            <Style.Triggers>
+              <DataTrigger Binding="{Binding State}" Value="Editing">
+                <Setter Property="Visibility" Value="Collapsed" />
+              </DataTrigger>
+            </Style.Triggers>
+          </Style>
+        </Border.Style>
         <StackPanel>
           <TextBlock Text="{Binding StateText}"
                      FontWeight="SemiBold"

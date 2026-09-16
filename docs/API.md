@@ -115,7 +115,8 @@ Agent 连接和 heartbeat 仍有效，但 SimplySign 进程或对应能力处于
 参数结构、文件类型和证书错误会直接返回 problem JSON，不创建任务，也不留下
 spool 文件。`parameters` part 位于文件前时，这些错误会在读取文件内容前返回。
 
-可选 `Idempotency-Key` 请求头为 1–128 个可打印 ASCII 字符。相同 token、相同 key 和相同请求返回原任务；同 key 对应不同请求返回 `409 idempotency_conflict`。
+可选 `Idempotency-Key` 请求头为 1–128 个可打印 ASCII 字符。相同 token、相同 key 和相同请求返回原任务；同 token 下，同 key 对应不同请求返回 `409 idempotency_conflict`。
+轮换为不同 token 后使用独立的幂等范围；指定回同一个 token 则继续使用它仍保留的记录。
 
 ## Authenticode 参数
 

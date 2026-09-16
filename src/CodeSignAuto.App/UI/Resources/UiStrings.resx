@@ -317,4 +317,6 @@
   <data name="UninstallErrorState" xml:space="preserve"><value>安装状态不完整或已发生变化，无法安全卸载。重启不会修复此问题；请保留安装目录，并提供 %LocalAppData%\CodeSignAuto\logs\uninstall.log。</value></data>
   <data name="UninstallErrorGeneric" xml:space="preserve"><value>卸载未完成。请重启 Windows 后重试；如仍失败，请记录错误代码。</value></data>
   <data name="UninstallErrorCode" xml:space="preserve"><value>错误代码：{0}</value></data>
+  <data name="ServiceSettingsCustomToken" xml:space="preserve"><value>指定 API Token</value></data>
+  <data name="ServiceSettingsCustomTokenHint" xml:space="preserve"><value>留空将生成随机 Token。指定值需为 16–256 个字符，可使用英文字母、数字及 - _ . ~ + / =。</value></data>
 </root>

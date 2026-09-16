@@ -15,6 +15,34 @@ namespace CodeSignAuto.EndToEnd.Tests;
 public sealed class ConfigureServiceCommandTests
 {
     [Fact]
+    public async Task Custom_token_is_hashed_without_invoking_random_factory()
+    {
+        var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
+        var factory = new RecordingConfigurationTokenFactory();
+        var platform = new PlatformFake { Configuration = Configuration() };
+        var request = new ServiceConfigurationEditRequest(8080, 24, true, token);
+        var result = await new ServiceConfigurationEditor(platform, factory).ApplyAsync(request, default);
+        Assert.True(result.OneTimeApiToken == token);
+        Assert.Equal(Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(token))), platform.Applied!.TokenHash);
+        Assert.Equal(0, factory.CreateCalls);
+        Assert.DoesNotContain(token, request.ToString());
+    }
+
+    [Theory]
+    [InlineData("too-short")]
+    [InlineData("has whitespace in token")]
+    [InlineData("invalid,comma,in,token")]
+    public async Task Invalid_custom_token_is_rejected_before_platform_access(string token)
+    {
+        var platform = new PlatformFake();
+        var error = await Assert.ThrowsAsync<ConfigureServiceException>(() =>
+            new ServiceConfigurationEditor(platform).ApplyAsync(new(8080, 24, true, token), default));
+        Assert.Equal("configure_service_input_invalid", error.Code);
+        Assert.Equal(0, platform.LoadCalls);
+        Assert.Equal(0, platform.ApplyCalls);
+    }
+
+    [Fact]
     public void Windows_rename_information_buffer_includes_the_native_filename_member_and_zero_tail()
     {
         var target = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "service.json"));

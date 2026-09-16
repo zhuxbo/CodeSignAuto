@@ -42,7 +42,7 @@ public sealed class BearerTokenAuthenticationHandler : AuthenticationHandler<Bea
             return Task.FromResult(AuthenticateResult.Fail("invalid bearer token"));
         }
 
-        var identity = new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, "api")], SchemeName);
+        var identity = new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, Convert.ToHexStringLower(actual))], SchemeName);
         return Task.FromResult(AuthenticateResult.Success(
             new AuthenticationTicket(new ClaimsPrincipal(identity), SchemeName)));
     }
