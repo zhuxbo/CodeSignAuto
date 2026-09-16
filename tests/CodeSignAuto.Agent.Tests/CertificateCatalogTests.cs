@@ -11,6 +11,34 @@ namespace CodeSignAuto.Agent.Tests;
 
 public sealed class CertificateCatalogTests : IDisposable
 {
+
+    [Fact]
+    public async Task public_certificate_without_private_key_is_not_ready()
+    {
+        var der = CreateCertificate("CN=Public Certificate", [0x40],
+            Now.AddDays(-1), Now.AddDays(30), codeSigning: true, digitalSignature: true);
+        var catalog = CreateCatalog(new CatalogSource(CatalogJson(Record(
+            der, privateKeyMatch: "missing", privateKeyIdHex: null))));
+        using var gate = new SigningOperationGate();
+        await using var manager = new SimplySignSessionManager(new ProcessOnlyDriver(), gate, catalog);
+        var snapshot = await manager.CheckAsync(SessionTrigger.ManualRefresh, default);
+        Assert.Empty(catalog.Current!.BySerialNumber);
+        Assert.Equal("private_key_missing", Assert.Single(catalog.DisplaySummaries).UnavailableReason);
+        Assert.False(snapshot.Ready);
+    }
+
+    private sealed class ProcessOnlyDriver : ISimplySignSessionDriver
+    {
+        public int VerifiedSessionId => 7;
+        public DateTimeOffset UtcNow => Now;
+        public SimplySignProcessState CheckProcessOnly() => new(true, 7);
+        public Task CloseAsync(CancellationToken token) => throw new NotSupportedException();
+        public Task<CodeSignAuto.Core.Otp.OtpauthProfile> LoadOtpAsync(CancellationToken token) => throw new NotSupportedException();
+        public Task<long> StartLoginAsync(CodeSignAuto.Core.Otp.OtpauthProfile profile, CancellationToken token) => throw new NotSupportedException();
+        public Task WaitForCounterAfterAsync(CodeSignAuto.Core.Otp.OtpauthProfile profile, long counter, CancellationToken token) => throw new NotSupportedException();
+        public Task DelayAsync(TimeSpan delay, CancellationToken token) => throw new NotSupportedException();
+    }
+
     private static readonly DateTimeOffset Now = new(2026, 8, 12, 4, 0, 0, TimeSpan.Zero);
     private readonly List<X509Certificate2> _certificates = [];
 

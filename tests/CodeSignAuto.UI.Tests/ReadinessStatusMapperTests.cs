@@ -5,6 +5,16 @@ namespace CodeSignAuto.UI.Tests;
 
 public sealed class ReadinessStatusMapperTests
 {
+
+    [Fact]
+    public void missing_authenticode_backend_is_not_ready()
+    {
+        var status = ReadinessStatusMapper.Map(Snapshot(
+            CapabilitySnapshot.NotConfigured(), PdfToolFailure("pdf_support_not_installed"),
+            certificates: [Summary("Code", "52A1B4C9", true, false)]));
+        Assert.False(status.AuthenticodeReady);
+    }
+
     [Fact]
     public void Overview_authenticode_is_ready_when_any_certificate_is_usable()
     {

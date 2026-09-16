@@ -12,6 +12,16 @@ public sealed class SimplySignSessionManagerTests
     private const int SessionId = 7;
 
     [Fact]
+    public async Task Login_polling_does_not_report_ready_when_the_catalog_has_no_private_key()
+    {
+        var catalog = new ControlledCatalog { HasPrivateKey = false };
+        await using var manager = CreateManager(new ControlledDriver(), catalog);
+        var snapshot = await manager.EnsureReadyAsync(SessionTrigger.BeforeSign, default);
+        Assert.False(snapshot.Ready);
+        Assert.True(catalog.RefreshCalls > 1);
+    }
+
+    [Fact]
     public void Capability_cache_projects_every_public_catalog_summary_to_heartbeat()
     {
         var catalog = new ControlledCatalog
@@ -617,6 +627,7 @@ public sealed class SimplySignSessionManagerTests
         private long _generation;
 
         public int FailuresRemaining { get; set; }
+        public bool HasPrivateKey { get; init; } = true;
         public bool YieldOnRefresh { get; init; }
         public int RefreshCalls { get; private set; }
         public int InvalidateCalls { get; private set; }
@@ -646,6 +657,10 @@ public sealed class SimplySignSessionManagerTests
                 }
 
                 Current = Snapshot(++_generation);
+                if (!HasPrivateKey)
+                {
+                    Current = Current with { BySerialNumber = new Dictionary<string, IReadOnlyList<SigningCertificate>>() };
+                }
                 return Current;
             }
             finally
@@ -813,7 +828,12 @@ public sealed class SimplySignSessionManagerTests
         new(
             generation,
             DateTimeOffset.UnixEpoch + TimeSpan.FromSeconds(generation),
-            new Dictionary<string, IReadOnlyList<SigningCertificate>>(StringComparer.Ordinal));
+            new Dictionary<string, IReadOnlyList<SigningCertificate>>(StringComparer.Ordinal)
+                {
+                    ["52A1B4C9"] = [new SigningCertificate(
+                        "Test certificate", "52A1B4C9", @"C:\test\module.dll", 1, "test-token", "01", "01",
+                        new string('a', 40), DateTimeOffset.UnixEpoch, DateTimeOffset.MaxValue, true, true)],
+                });
 
     private static OtpauthProfile Profile() => new(
         "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZA",

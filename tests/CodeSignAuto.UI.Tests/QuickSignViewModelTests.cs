@@ -9,6 +9,23 @@ namespace CodeSignAuto.UI.Tests;
 
 public sealed class QuickSignViewModelTests
 {
+
+    [Theory]
+    [InlineData("NaN")]
+    [InlineData("Infinity")]
+    [InlineData("1e999")]
+    public async Task non_finite_pdf_coordinates_disable_submit(string value)
+    {
+        using var fixture = new Fixture();
+        using var viewModel = new QuickSignViewModel(
+            new RecordingLocalJobClient(),
+            new MutableManagementClient(Snapshot(certificates:
+            [ Summary("Document", "6F09D233", authenticode: false, pdf: true) ])), _ => { });
+        await viewModel.SelectFileAsync(fixture.Write("document.pdf", "%PDF-audit"u8.ToArray()));
+        viewModel.PdfLeft = value;
+        Assert.False(viewModel.SubmitCommand.CanExecute(null));
+    }
+
     [Fact]
     public void Empty_selection_uses_the_selected_English_resources()
     {

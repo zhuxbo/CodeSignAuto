@@ -68,7 +68,7 @@ public static class ReadinessStatusMapper
         }
 
         var infrastructureReady = reasons.Count == 0;
-        var authenticodeReady = infrastructureReady && snapshot.Certificates.Any(
+        var authenticodeReady = infrastructureReady && snapshot.Authenticode.Configured && snapshot.Certificates.Any(
             static certificate => certificate.CatalogCurrent && certificate.AuthenticodeUsable);
         var pdfExtensionMissing = !snapshot.Pdf.Configured ||
             string.Equals(

@@ -476,9 +476,15 @@ public sealed class SimplySignSessionManager : ISimplySignSessionManager
         {
             _ = await _catalog.RefreshAsync(cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
-            if (!IsCurrentGeneration(generation) || _catalog.Current is null)
+            if (!IsCurrentGeneration(generation) || _catalog.Current is not { } catalog)
             {
                 return GetSnapshot();
+            }
+
+            if (!catalog.BySerialNumber.Values.Any(static certificates => certificates.Count > 0))
+            {
+                return Publish(SimplySignSessionState.LoginRequired, "login_required",
+                    current.Attempt, nextRetryAtUtc: null, generation, ProcessState(current));
             }
 
             return PublishReady(generation, current.Attempt);
@@ -632,7 +638,9 @@ public sealed class SimplySignSessionManager : ISimplySignSessionManager
             try
             {
                 _ = await _catalog.RefreshAsync(cancellationToken).ConfigureAwait(false);
-                if (_catalog.Current is not null && IsCurrentGeneration(generation))
+                if (_catalog.Current is { } catalog &&
+                    catalog.BySerialNumber.Values.Any(static certificates => certificates.Count > 0) &&
+                    IsCurrentGeneration(generation))
                 {
                     return PublishReady(generation, attempt);
                 }

@@ -1462,7 +1462,12 @@ public sealed class AgentManagementTests
             Current = new CertificateCatalogSnapshot(
                 ++_generation,
                 DateTimeOffset.UnixEpoch + TimeSpan.FromTicks(_generation),
-                new Dictionary<string, IReadOnlyList<SigningCertificate>>(StringComparer.Ordinal));
+                new Dictionary<string, IReadOnlyList<SigningCertificate>>(StringComparer.Ordinal)
+                {
+                    ["52A1B4C9"] = [new SigningCertificate(
+                        "Test certificate", "52A1B4C9", @"C:\test\module.dll", 1, "test-token", "01", "01",
+                        new string('a', 40), DateTimeOffset.UnixEpoch, DateTimeOffset.MaxValue, true, true)],
+                });
             return Current;
         }
 

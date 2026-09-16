@@ -574,7 +574,9 @@ public sealed class QuickSignViewModel : INotifyPropertyChanged, IDisposable
             !double.TryParse(PdfLeft, NumberStyles.Float, CultureInfo.InvariantCulture, out var left) ||
             !double.TryParse(PdfBottom, NumberStyles.Float, CultureInfo.InvariantCulture, out var bottom) ||
             !double.TryParse(PdfRight, NumberStyles.Float, CultureInfo.InvariantCulture, out var right) ||
-            !double.TryParse(PdfTop, NumberStyles.Float, CultureInfo.InvariantCulture, out var top))
+            !double.TryParse(PdfTop, NumberStyles.Float, CultureInfo.InvariantCulture, out var top) ||
+            !double.IsFinite(left) || !double.IsFinite(bottom) ||
+            !double.IsFinite(right) || !double.IsFinite(top))
         {
             return false;
         }
