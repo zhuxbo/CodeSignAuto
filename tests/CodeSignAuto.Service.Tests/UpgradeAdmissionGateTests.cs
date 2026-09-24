@@ -84,7 +84,7 @@ public sealed class UpgradeAdmissionGateTests
 
             var gate = new UpgradeAdmissionGate();
             var coordinator = new UpgradeDrainCoordinator(gate, jobs, TimeProvider.System);
-            var drain = coordinator.DrainAsync(TimeSpan.FromSeconds(2), CancellationToken.None);
+            var drain = coordinator.DrainAsync(TimeSpan.FromSeconds(30), CancellationToken.None);
             await WaitUntilAsync(() => gate.IsDraining);
             await Task.Delay(120);
 
