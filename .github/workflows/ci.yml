@@ -87,7 +87,7 @@ jobs:
         run: dotnet build CodeSignAuto.sln -c Release --no-restore -m:1 -nodeReuse:false
 
       - name: Run .NET tests
-        shell: pwsh
+        shell: powershell
         run: |
           dotnet test CodeSignAuto.sln -c Release --no-build --no-restore --logger trx --results-directory artifacts/ci/test-results -m:1 -nodeReuse:false
           if ($LASTEXITCODE -ne 0) { throw 'ci_dotnet_tests_failed' }
