@@ -24,7 +24,7 @@
       </StackPanel>
       <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Bottom">
         <Button Content="{localization:UiString JobsClearHistory}"
-                IsEnabled="{Binding CanClearHistory}" Click="OnClearHistory" Margin="0,0,8,0"
+                IsEnabled="{Binding CanClearHistory}" Click="OnClearHistory"
                 AutomationProperties.Name="{localization:UiString JobsClearHistory}" />
         <Button Content="{localization:UiString ActionRefresh}" Click="OnRefresh"
                 AutomationProperties.Name="{localization:UiString JobsRefreshAutomation}" />
