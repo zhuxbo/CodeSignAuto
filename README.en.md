@@ -455,6 +455,12 @@ Do not paste the secret into logs, tickets, command lines, or screenshots.
 
 ## Build release installers
 
+The independent `CI` workflow runs Windows builds, .NET tests, PDF helper tests and lint,
+and frozen executable validation on pushes to `main`, pull requests targeting `main`,
+and manual dispatches. It requires no signing credentials. Before publishing, confirm
+CI passed for the target commit, create its `v<version>` tag, and manually run the
+`Release` workflow on that tag with `version` set without the `v` prefix.
+
 Build-machine requirements:
 
 - a clean, complete, non-shallow Git worktree;

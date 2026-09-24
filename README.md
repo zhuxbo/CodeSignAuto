@@ -456,6 +456,11 @@ $process.ExitCode
 
 ## 构建发布包
 
+独立 `CI` 工作流在 `main` 推送、面向 `main` 的 PR 和手动触发时运行 Windows 构建、
+.NET 测试、PDF helper 测试与 lint，以及冻结程序验证，无需签名凭据。
+发布前先确认目标提交的 CI 通过，再创建 `v<版本>` 标签，并在该标签上手动运行
+`Release` 工作流，`version` 填不带 `v` 的版本号。
+
 构建机要求：
 
 - 干净、完整、非 shallow 的 Git 工作树；

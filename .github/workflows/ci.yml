@@ -1,0 +1,130 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Windows build and tests
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Check repository release hygiene
+        shell: pwsh
+        run: pwsh -NoLogo -NoProfile -File scripts/pre-release-check.ps1
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          python-version: "3.12"
+          enable-cache: false
+
+      - name: Provision pinned PDF test font
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $fontUri = 'https://raw.githubusercontent.com/notofonts/noto-cjk/Sans2.004/Sans/Variable/TTF/Subset/NotoSansSC-VF.ttf'
+          $expectedLength = 17773132
+          $expectedSha256 = 'd68bafcb48a2707749396aa12bbbd833cb70401f3a9a689fd2902c7e0d295964'
+          $downloadPath = Join-Path $env:RUNNER_TEMP 'NotoSansSC-VF.ttf'
+          $fontPath = Join-Path $env:WINDIR 'Fonts\NotoSansSC-VF.ttf'
+          $curl = Join-Path $env:SystemRoot 'System32\curl.exe'
+
+          & $curl @(
+            '--fail', '--silent', '--show-error', '--location',
+            '--proto', '=https', '--proto-redir', '=https',
+            '--connect-timeout', '15', '--max-time', '120',
+            '--output', $downloadPath, $fontUri)
+          if ($LASTEXITCODE -ne 0) {
+            throw 'ci_pdf_test_font_download_failed'
+          }
+          $download = Get-Item -LiteralPath $downloadPath -Force
+          $downloadSha256 = (Get-FileHash -LiteralPath $downloadPath -Algorithm SHA256).Hash.ToLowerInvariant()
+          if (($download.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or
+              $download.Length -ne $expectedLength -or
+              $downloadSha256 -cne $expectedSha256) {
+            throw 'ci_pdf_test_font_integrity_invalid'
+          }
+          if (Test-Path -LiteralPath $fontPath) {
+            throw 'ci_pdf_test_font_destination_conflict'
+          }
+          [IO.File]::Copy($downloadPath, $fontPath, $false)
+          $installed = Get-Item -LiteralPath $fontPath -Force
+          $installedSha256 = (Get-FileHash -LiteralPath $fontPath -Algorithm SHA256).Hash.ToLowerInvariant()
+          if (($installed.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or
+              $installed.Length -ne $expectedLength -or
+              $installedSha256 -cne $expectedSha256) {
+            throw 'ci_pdf_test_font_install_invalid'
+          }
+
+      - name: Restore locked dependencies
+        shell: pwsh
+        run: dotnet restore CodeSignAuto.sln --locked-mode -p:NuGetAudit=true -p:NuGetAuditMode=all -m:1 -nodeReuse:false
+
+      - name: Build solution
+        shell: pwsh
+        run: dotnet build CodeSignAuto.sln -c Release --no-restore -m:1 -nodeReuse:false
+
+      - name: Run .NET tests
+        shell: pwsh
+        run: |
+          dotnet test CodeSignAuto.sln -c Release --no-build --no-restore --logger trx --results-directory artifacts/ci/test-results -m:1 -nodeReuse:false
+          if ($LASTEXITCODE -ne 0) { throw 'ci_dotnet_tests_failed' }
+          $results = @(Get-ChildItem artifacts/ci/test-results -Filter *.trx)
+          if ($results.Count -ne 6) { throw 'ci_test_results_missing' }
+          foreach ($result in $results) {
+            [xml]$trx = Get-Content -LiteralPath $result.FullName -Raw
+            $counters = $trx.TestRun.ResultSummary.Counters
+            if ([int]$counters.executed -le 0 -or
+                [int]$counters.passed -ne [int]$counters.executed -or
+                [int]$counters.failed -ne 0 -or
+                [int]$counters.error -ne 0 -or
+                [int]$counters.aborted -ne 0 -or
+                [int]$counters.timeout -ne 0) {
+              throw 'ci_test_result_failed'
+            }
+          }
+
+      - name: Install locked PDF dependencies
+        working-directory: tools/pdf-signer
+        run: uv sync --frozen
+
+      - name: Test PDF helper
+        working-directory: tools/pdf-signer
+        run: uv run --frozen pytest -q
+
+      - name: Lint PDF helper
+        working-directory: tools/pdf-signer
+        run: uv run --frozen ruff check .
+
+      - name: Build frozen PDF helper
+        working-directory: tools/pdf-signer
+        run: uv run --frozen pyinstaller --clean --noconfirm pdf-signer.spec
+
+      - name: Test frozen PDF helper
+        shell: pwsh
+        working-directory: tools/pdf-signer
+        run: |
+          $env:SIMPLYSIGN_FROZEN_HELPER_PATH = (Resolve-Path dist/CodeSignAutoPdfSigner.exe).Path
+          uv run --frozen pytest -q tests/test_sign_command.py -k frozen_executable_validates_real_pades_and_probe_surface
