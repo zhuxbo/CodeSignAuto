@@ -11,10 +11,12 @@ CodeSignAuto 提供 Authenticode 代码签名、可选 PDF/PAdES 签名、本机
 
 目标系统必须为 x64，并保持系统时间可靠同步。
 
-- Windows 10 22H2；
+- Windows 10 1809–22H2；
 - 受支持的 Windows 10 Enterprise / IoT Enterprise LTSC；
-- Windows 11；
+- Windows 11 21H2（build 22000）及以上；
 - Windows Server 2019、2022 或 2025 Standard/Datacenter Desktop Experience。
+
+安装器允许上述旧版本通过系统检查，不代表这些版本仍获微软支持或已逐一完成实机签名验收；安装仍须通过运行时与依赖检查。
 
 ### 必需组件与下载地址
 

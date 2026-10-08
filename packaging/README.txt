@@ -2,9 +2,9 @@ CodeSignAuto installation and release notes
 ==============================================
 
 Read OPERATIONS.md before installation. This package targets Windows Server
-2019, 2022 or 2025 Standard/Datacenter Desktop Experience, Windows 10 22H2,
-supported Windows 10 Enterprise/IoT Enterprise LTSC releases, and supported
-Windows 11 releases on x64. Domain members are supported, but domain
+2019, 2022 or 2025 Standard/Datacenter Desktop Experience, Windows 10 1809–22H2,
+supported Windows 10 Enterprise/IoT Enterprise LTSC releases, and
+Windows 11 21H2 (build 22000) or later on x64. Domain members are supported, but domain
 controllers are rejected. The framework-dependent application requires stable
 .NET Windows Desktop Runtime and ASP.NET Core Runtime major version 10 or later.
 Python is not required.

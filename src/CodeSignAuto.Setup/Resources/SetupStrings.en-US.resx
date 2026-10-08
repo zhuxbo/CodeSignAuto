@@ -48,7 +48,7 @@ ASP.NET Core Runtime: https://dotnet.microsoft.com/en-us/download/dotnet/10.0
 Download: https://support.certum.eu/en/software/procertum-smartsign/</value></data>
   <data name="ErrorSimplySignPkcs11Missing" xml:space="preserve"><value>C:\Windows\System32\SimplySignPKCS.dll was not found. Repair or reinstall Certum SimplySign Desktop (Windows 64-bit).
 Download: https://support.certum.eu/en/software/procertum-smartsign/</value></data>
-  <data name="ErrorOsUnsupported" xml:space="preserve"><value>This Windows version or edition combination is not supported. Supported systems include x64 Windows 10 22H2, supported Windows 10 LTSC and Windows 11 versions, and Windows Server 2019/2022/2025 with Desktop Experience.</value></data>
+  <data name="ErrorOsUnsupported" xml:space="preserve"><value>This Windows version or edition combination is not supported. Supported systems include x64 Windows 10 1809–22H2, supported Windows 10 LTSC editions, Windows 11 21H2 (build 22000) or later, and Windows Server 2019/2022/2025 with Desktop Experience.</value></data>
   <data name="ErrorDesktopExperienceRequired" xml:space="preserve"><value>The automatic-signing service requires Windows Server Desktop Experience. Server Core is not supported.</value></data>
   <data name="ErrorArchitectureUnsupported" xml:space="preserve"><value>CodeSignAuto supports only x64 Windows. Run the 64-bit installer on a 64-bit operating system.</value></data>
   <data name="ErrorAdministratorRequired" xml:space="preserve"><value>Administrator privileges are required. Right-click Setup, select “Run as administrator”, and try again.</value></data>

@@ -47,11 +47,8 @@ internal static class WindowsSupportPolicy
 
     private static bool IsSupportedClient(uint sku, int buildNumber) => buildNumber switch
     {
-        14393 or 17763 => sku is 125 or 126 or 129 or 130,
-        19044 => sku is 125 or 126 or 129 or 130 or 191 or 207,
-        19045 => true,
-        22631 => sku is 4 or 27 or 72 or 84 or 140 or 141 or 171 or 172 or 175,
-        26100 or 26200 or 28000 => sku is
+        14393 => sku is 125 or 126 or 129 or 130,
+        17763 or 18362 or 18363 or 19041 or 19042 or 19043 or 19044 or 19045 or >= 22000 => sku is
             4 or 27 or 48 or 49 or 72 or 84 or 98 or 99 or 100 or 101 or 121 or 122 or
             125 or 126 or 129 or 130 or 138 or 139 or 140 or 141 or 161 or 162 or 164 or
             165 or 171 or 172 or 175 or 188 or 191 or 202 or 203 or 207,

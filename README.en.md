@@ -11,10 +11,12 @@ WPF manual signing, and unattended Windows Server signing through an HTTP API.
 
 The target must be x64 and have a reliably synchronized system clock.
 
-- Windows 10 22H2;
+- Windows 10 1809–22H2;
 - supported Windows 10 Enterprise / IoT Enterprise LTSC editions;
-- Windows 11;
+- Windows 11 21H2 (build 22000) or later;
 - Windows Server 2019, 2022, or 2025 Standard/Datacenter Desktop Experience.
+
+The installer accepts these older releases; this does not imply current Microsoft support or individual real-machine signing validation. Runtime and dependency checks still apply.
 
 ### Required components and downloads
 

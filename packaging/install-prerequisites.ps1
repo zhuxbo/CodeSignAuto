@@ -632,20 +632,15 @@ function Test-SupportedMachine {
             }
 
             $enterpriseLtscSkus = @(125, 126, 129, 130)
-            $iotEnterpriseLtscSkus = @(191, 207)
-            $windows10 =
-                ($build -in @(14393, 17763) -and $operatingSystemSku -in $enterpriseLtscSkus) -or
-                ($build -eq 19044 -and $operatingSystemSku -in ($enterpriseLtscSkus + $iotEnterpriseLtscSkus)) -or
-                ($build -eq 19045)
-
-            $enterpriseSkus = @(4, 27, 72, 84, 140, 141, 171, 172, 175)
-            $windows11Skus = @(
+            $desktopSkus = @(
                 4, 27, 48, 49, 72, 84, 98, 99, 100, 101, 121, 122,
                 125, 126, 129, 130, 138, 139, 140, 141, 161, 162, 164,
                 165, 171, 172, 175, 188, 191, 202, 203, 207)
-            $windows11 =
-                ($build -eq 22631 -and $operatingSystemSku -in $enterpriseSkus) -or
-                ($build -in @(26100, 26200, 28000) -and $operatingSystemSku -in $windows11Skus)
+            $windows10 =
+                ($build -eq 14393 -and $operatingSystemSku -in $enterpriseLtscSkus) -or
+                ($build -in @(17763, 18362, 18363, 19041, 19042, 19043, 19044, 19045) -and
+                    $operatingSystemSku -in $desktopSkus)
+            $windows11 = $build -ge 22000 -and $operatingSystemSku -in $desktopSkus
             if (-not $windows10 -and -not $windows11) {
                 Stop-PrerequisiteCheck 'preflight' 'os_unsupported'
             }
