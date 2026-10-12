@@ -593,6 +593,29 @@ public sealed class CoverageGateTests
     }
 
     [Theory]
+    [InlineData("trx-exception-name")]
+    [InlineData("trx-storage-case")]
+    [InlineData("trx-fixture-name")]
+    public async Task Real_trx_metadata_does_not_trigger_sensitive_output(string scenario)
+    {
+        var repository = CreateRepositorySkeleton();
+        var outputParent = Directory.CreateTempSubdirectory("SSA-COVERAGE-METADATA-").FullName;
+        try
+        {
+            var run = await CoverageRunCoordinator.RunAsync(
+                repository, outputParent, "dotnet-under-test",
+                new RecordingCoverageProjectRunner(scenario), CancellationToken.None);
+
+            Assert.Equal(5, CoverageGate.EvaluateManifest(run.ManifestPath).Count);
+        }
+        finally
+        {
+            Directory.Delete(repository, recursive: true);
+            Directory.Delete(outputParent, recursive: true);
+        }
+    }
+
+    [Theory]
     [InlineData("stdout")]
     [InlineData("stderr")]
     [InlineData("trx")]
@@ -601,6 +624,10 @@ public sealed class CoverageGateTests
     [InlineData("trx-root-name")]
     [InlineData("trx-root-run-user")]
     [InlineData("coverage")]
+    [InlineData("trx-exception-output")]
+    [InlineData("trx-path-output")]
+    [InlineData("trx-sid-output")]
+    [InlineData("trx-exception-name-secret")]
     public async Task One_shot_runner_fails_when_a_real_captured_artifact_contains_a_sensitive_marker(string artifact)
     {
         var repository = CreateRepositorySkeleton();
@@ -1068,6 +1095,43 @@ public sealed class CoverageGateTests
             ProjectFiles.Add(run.ProjectFile.Replace(Path.DirectorySeparatorChar, '/'));
             Directory.CreateDirectory(run.ResultsDirectory);
             var trx = Trx(run.ProjectName, sensitiveArtifact);
+            if (sensitiveArtifact is "trx-exception-name" or "trx-exception-name-secret")
+            {
+                var name = "Example(error: System.InvalidOperationException: fixture failure)";
+                if (sensitiveArtifact == "trx-exception-name-secret")
+                {
+                    name = "Example(error: System.InvalidOperationException(SSA_SYNTHETIC_TOKEN_MARKER): fixture failure)";
+                }
+                trx = trx.Replace("clean definition", name, StringComparison.Ordinal)
+                    .Replace("clean result", name, StringComparison.Ordinal);
+            }
+            if (sensitiveArtifact == "trx-fixture-name")
+            {
+                var name = @"Example(path: C:\fixture\sample.exe, sid: S-1-5-18)";
+                trx = trx.Replace("clean definition", name, StringComparison.Ordinal)
+                    .Replace("clean result", name, StringComparison.Ordinal);
+            }
+            if (sensitiveArtifact == "trx-storage-case")
+            {
+                var storage = Path.Combine(run.RepositoryRoot, run.ProjectName + ".dll");
+                if (OperatingSystem.IsWindows())
+                {
+                    storage = storage.ToLowerInvariant();
+                }
+                trx = trx.Replace("/controlled/" + run.ProjectName + ".dll", storage, StringComparison.Ordinal);
+            }
+            var diagnostic = sensitiveArtifact switch
+            {
+                "trx-exception-output" => "System.InvalidOperationException: unexpected failure",
+                "trx-path-output" => @"C:\private\sample.exe",
+                "trx-sid-output" => "S-1-5-18",
+                _ => null,
+            };
+            if (diagnostic is not null)
+            {
+                trx = trx.Replace("<StdOut>clean</StdOut>",
+                    "<StdOut>" + diagnostic + "</StdOut>", StringComparison.Ordinal);
+            }
             File.WriteAllText(Path.Combine(run.ResultsDirectory, run.TrxFileName), trx);
             var collector = Directory.CreateDirectory(Path.Combine(run.ResultsDirectory, "collector"));
             File.WriteAllText(

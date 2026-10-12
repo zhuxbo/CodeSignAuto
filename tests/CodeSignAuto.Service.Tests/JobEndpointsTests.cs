@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using CodeSignAuto.Core.Jobs;
 using CodeSignAuto.Service;
 using CodeSignAuto.Service.Api;
@@ -1189,6 +1190,7 @@ internal sealed class TestServiceFactory : IAsyncDisposable
     {
         var root = Path.Combine(Path.GetTempPath(), "CodeSignAuto.Tests", Guid.NewGuid().ToString("N"));
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });
+        builder.Logging.ClearProviders();
         builder.WebHost.UseTestServer();
         ServiceHost.Configure(builder, new ServiceHostOptions(
             SHA256.HashData(Encoding.UTF8.GetBytes(Token)),
@@ -1213,6 +1215,7 @@ internal sealed class TestServiceFactory : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         Client.Dispose();
+        await _application.StopAsync();
         await _application.DisposeAsync();
         if (Directory.Exists(_root))
         {

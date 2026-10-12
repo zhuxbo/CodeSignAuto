@@ -40,7 +40,7 @@ internal sealed record CoverageRunLimits(
 {
     public static CoverageRunLimits Default { get; } = new(
         TimeSpan.FromMinutes(10),
-        TimeSpan.FromMinutes(2),
+        TimeSpan.FromMinutes(5),
         TimeSpan.FromSeconds(10));
 
     public void Validate()

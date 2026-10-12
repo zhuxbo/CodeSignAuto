@@ -18,6 +18,7 @@ jobs:
     timeout-minutes: 45
     permissions:
       contents: write
+      actions: read
     env:
       MAIN_SETUP: artifacts/release/CodeSignAutoSetup-${{ inputs.version }}-win-x64.exe
       PDF_SETUP: artifacts/release/CodeSignAutoPdfSetup-${{ inputs.version }}-win-x64.exe
@@ -29,6 +30,31 @@ jobs:
         with:
           ref: ${{ github.ref }}
           fetch-depth: 0
+
+      - name: Require successful CI for release commit
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $commit = git rev-parse HEAD
+          if ($LASTEXITCODE -ne 0 -or $commit -notmatch '^[0-9a-f]{40}$') {
+            throw 'release_commit_invalid'
+          }
+          $pages = gh api --paginate --slurp "repos/$env:GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$commit&branch=main&per_page=100"
+          if ($LASTEXITCODE -ne 0) { throw 'release_ci_lookup_failed' }
+          $runs = @(($pages | ConvertFrom-Json) | ForEach-Object { $_.workflow_runs } | Where-Object {
+            $_.head_sha -ceq $commit -and
+            $_.head_branch -ceq 'main' -and
+            $_.head_repository.full_name -ceq $env:GITHUB_REPOSITORY -and
+            $_.event -in @('push', 'workflow_dispatch')
+          } | Sort-Object -Property id -Descending)
+          if ($runs.Count -eq 0) { throw 'release_ci_missing' }
+          $latest = $runs[0]
+          if ($latest.status -cne 'completed' -or $latest.conclusion -cne 'success') {
+            throw 'release_ci_not_successful'
+          }
+          Write-Host "release_ci_ok commit=$commit run=$($latest.id)"
 
       - name: Check repository release hygiene
         shell: pwsh

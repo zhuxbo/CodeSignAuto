@@ -184,10 +184,11 @@ public sealed class SimplySignSessionStateTests
     }
 
     [Theory]
-    [InlineData("otpauth://totp/profile?secret=AAAAAAAA")]
-    [InlineData("failed because token serial 1234567890")]
-    public void Snapshot_rejects_non_allowlisted_reason(string reason)
+    [InlineData("otp-uri")]
+    [InlineData("diagnostic-text")]
+    public void Snapshot_rejects_non_allowlisted_reason(string scenario)
     {
+        var reason = scenario == "otp-uri" ? "otpauth://totp/profile?secret=AAAAAAAA" : "failed because token serial 1234567890";
         Assert.Throws<ArgumentException>(() => ReadySnapshot(reasonCode: reason));
     }
 

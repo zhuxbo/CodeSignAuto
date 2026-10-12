@@ -13,10 +13,14 @@ public static partial class SensitiveOutputScanner
         params string[] exactSecrets) =>
         FindCore(text, allowedAbsoluteRoots, exactSecrets);
 
+    internal static IReadOnlyList<string> FindTestDisplayName(string text) =>
+        FindCore(text, [], [], testDisplayName: true);
+
     private static IReadOnlyList<string> FindCore(
         string text,
         IReadOnlyList<string> allowedAbsoluteRoots,
-        IReadOnlyList<string> exactSecrets)
+        IReadOnlyList<string> exactSecrets,
+        bool testDisplayName = false)
     {
         ArgumentNullException.ThrowIfNull(text);
         ArgumentNullException.ThrowIfNull(allowedAbsoluteRoots);
@@ -30,19 +34,25 @@ public static partial class SensitiveOutputScanner
             }
 
             var canonical = Path.GetFullPath(allowed);
-            scanned = scanned.Replace(canonical, "[allowed-root]", StringComparison.Ordinal);
-            scanned = scanned.Replace(canonical.Replace('\\', '/'), "[allowed-root]", StringComparison.Ordinal);
+            var comparison = OperatingSystem.IsWindows()
+                ? StringComparison.OrdinalIgnoreCase
+                : StringComparison.Ordinal;
+            scanned = scanned.Replace(canonical, "[allowed-root]", comparison);
+            scanned = scanned.Replace(canonical.Replace('\\', '/'), "[allowed-root]", comparison);
         }
 
         var findings = new List<string>();
         AddIfMatch(findings, "authorization", AuthorizationPattern(), scanned);
         AddIfMatch(findings, "otpauth", OtpauthPattern(), scanned);
         AddIfMatch(findings, "otp", OtpPattern(), scanned);
-        AddIfMatch(findings, "sid", SidPattern(), scanned);
-        AddIfMatch(findings, "absolute_path", AbsolutePathPattern(), scanned);
+        if (!testDisplayName)
+        {
+            AddIfMatch(findings, "sid", SidPattern(), scanned);
+            AddIfMatch(findings, "absolute_path", AbsolutePathPattern(), scanned);
+            AddIfMatch(findings, "native_exception", NativeExceptionPattern(), scanned);
+        }
         AddIfMatch(findings, "private_key", PrivateKeyPattern(), scanned);
         AddIfMatch(findings, "synthetic_marker", SyntheticMarkerPattern(), scanned);
-        AddIfMatch(findings, "native_exception", NativeExceptionPattern(), scanned);
         if (exactSecrets.Any(secret => !string.IsNullOrEmpty(secret) && scanned.Contains(secret, StringComparison.Ordinal)))
         {
             findings.Add("exact_secret");

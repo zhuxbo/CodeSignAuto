@@ -459,9 +459,12 @@ $process.ExitCode
 ## 构建发布包
 
 独立 `CI` 工作流在 `main` 推送、面向 `main` 的 PR 和手动触发时运行 Windows 构建、
-.NET 测试、PDF helper 测试与 lint，以及冻结程序验证，无需签名凭据。
+.NET 测试及覆盖率门禁、PDF helper 测试与 lint，以及冻结程序验证，无需签名凭据。
+行覆盖率要求：Core、Service、Protocol 各 ≥85%，Agent ≥75%，UI ViewModels ≥80%。
 发布前先确认目标提交的 CI 通过，再创建 `v<版本>` 标签，并在该标签上手动运行
-`Release` 工作流，`version` 填不带 `v` 的版本号。
+`Release` 工作流，`version` 填不带 `v` 的版本号。发布流程在签名前强制检查标签提交
+在本仓库 `main` 上最新一次 CI（推送或手动触发）已完成且成功；缺失、运行中、
+失败或查询失败均阻止发布，PR 的 CI 结果不能替代该检查。
 
 构建机要求：
 

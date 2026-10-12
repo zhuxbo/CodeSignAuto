@@ -55,11 +55,12 @@ public sealed class ControlMessagesTests
     }
 
     [Theory]
-    [InlineData("refresh", "otpauth://totp/a?secret=A")]
-    [InlineData("import_otp", null)]
-    [InlineData("unknown", null)]
-    public async Task Control_request_rejects_invalid_operation_and_otp_pair(string operation, string? otpUri)
+    [InlineData("refresh", true)]
+    [InlineData("import_otp", false)]
+    [InlineData("unknown", false)]
+    public async Task Control_request_rejects_invalid_operation_and_otp_pair(string operation, bool includesOtp)
     {
+        var otpUri = includesOtp ? "otpauth://totp/a?secret=A" : null;
         var json = "{\"version\":3,\"type\":\"agent_control_request\",\"payload\":{" +
             $"\"requestId\":\"{Guid.NewGuid():D}\",\"operation\":\"{operation}\",\"otpUri\":" +
             (otpUri is null ? "null" : $"\"{otpUri}\"") + "}}";

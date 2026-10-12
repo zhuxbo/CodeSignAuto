@@ -1425,6 +1425,7 @@ public sealed class RecoveryAndCleanupTests
         public async ValueTask DisposeAsync()
         {
             Client.Dispose();
+            await application.StopAsync();
             await application.DisposeAsync();
             if (Directory.Exists(root))
             {

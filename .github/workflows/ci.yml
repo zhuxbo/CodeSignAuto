@@ -86,25 +86,12 @@ jobs:
         shell: pwsh
         run: dotnet build CodeSignAuto.sln -c Release --no-restore -m:1 -nodeReuse:false
 
-      - name: Run .NET tests
+      - name: Run .NET tests and enforce coverage
         shell: powershell
         run: |
-          dotnet test CodeSignAuto.sln -c Release --no-build --no-restore --logger trx --results-directory artifacts/ci/test-results -m:1 -nodeReuse:false
-          if ($LASTEXITCODE -ne 0) { throw 'ci_dotnet_tests_failed' }
-          $results = @(Get-ChildItem artifacts/ci/test-results -Filter *.trx)
-          if ($results.Count -ne 6) { throw 'ci_test_results_missing' }
-          foreach ($result in $results) {
-            [xml]$trx = Get-Content -LiteralPath $result.FullName -Raw
-            $counters = $trx.TestRun.ResultSummary.Counters
-            if ([int]$counters.executed -le 0 -or
-                [int]$counters.passed -ne [int]$counters.executed -or
-                [int]$counters.failed -ne 0 -or
-                [int]$counters.error -ne 0 -or
-                [int]$counters.aborted -ne 0 -or
-                [int]$counters.timeout -ne 0) {
-              throw 'ci_test_result_failed'
-            }
-          }
+          $dotnet = (Get-Command dotnet -CommandType Application -ErrorAction Stop).Source
+          & $dotnet tools/CodeSignAuto.CoverageGate/bin/Release/net10.0-windows/CodeSignAuto.CoverageGate.dll --run "$env:GITHUB_WORKSPACE" "$env:GITHUB_WORKSPACE/artifacts/ci/coverage" $dotnet
+          if ($LASTEXITCODE -ne 0) { throw 'ci_coverage_gate_failed' }
 
       - name: Install locked PDF dependencies
         working-directory: tools/pdf-signer

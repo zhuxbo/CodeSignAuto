@@ -453,7 +453,12 @@ public static class CoverageGate
 
         output = string.Join("\n", document.Descendants()
             .SelectMany(static element => element.Attributes())
-            .Select(static attribute => attribute.Value)
+            // 测试名称含路径、SID 和异常对象等参数；凭据扫描仍覆盖这些名称。
+            .Select(static attribute =>
+                (attribute.Parent?.Name.LocalName, attribute.Name.LocalName) is
+                    ("UnitTest", "name") or ("UnitTestResult", "testName")
+                    ? ScanTestDisplayName(attribute.Value)
+                    : attribute.Value)
             .Concat(document.DescendantNodes().Select(static node => node switch
             {
                 XText text => text.Value,
@@ -462,6 +467,16 @@ public static class CoverageGate
                 _ => null,
             }))
             .Where(static value => !string.IsNullOrWhiteSpace(value)));
+    }
+
+    private static string ScanTestDisplayName(string name)
+    {
+        if (SensitiveOutputScanner.FindTestDisplayName(name).Count != 0)
+        {
+            throw Error("coverage_sensitive_output");
+        }
+
+        return string.Empty;
     }
 
     private static void ValidateCoverageIdentity(
