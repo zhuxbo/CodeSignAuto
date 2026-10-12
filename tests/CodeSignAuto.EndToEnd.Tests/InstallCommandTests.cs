@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -1994,6 +1995,20 @@ public sealed class InstallCommandTests
             Assert.True(applied.Created);
             Assert.True(WindowsDesktopShortcut.IsExact(action));
 
+            var security = new FileInfo(shortcutPath).GetAccessControl();
+            Assert.True(security.AreAccessRulesProtected);
+            var rules = security.GetAccessRules(true, true, typeof(SecurityIdentifier))
+                .Cast<FileSystemAccessRule>().ToArray();
+            var users = Assert.Single(rules, rule => rule.IdentityReference.Value == "S-1-5-32-545");
+            Assert.Equal(AccessControlType.Allow, users.AccessControlType);
+            Assert.Equal(FileSystemRights.ReadAndExecute | FileSystemRights.Synchronize, users.FileSystemRights);
+            Assert.Equal(3, rules.Length);
+            Assert.All(rules.Where(rule => rule != users), rule =>
+            {
+                Assert.Contains(rule.IdentityReference.Value, new[] { "S-1-5-18", "S-1-5-32-544" });
+                Assert.Equal(FileSystemRights.FullControl, rule.FileSystemRights);
+            });
+
             await executor.RollbackAsync(applied, CancellationToken.None);
             Assert.False(File.Exists(shortcutPath));
         }
@@ -2011,6 +2026,63 @@ public sealed class InstallCommandTests
             {
                 Directory.Delete(root);
             }
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void Windows_desktop_shortcut_ownership_accepts_legacy_but_rejects_user_write_access(
+        bool legacyAcl,
+        bool writableByUsers)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var root = Path.Combine(Path.GetTempPath(), "CodeSignAuto.Shortcut.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var target = Path.Combine(root, "CodeSignAuto.exe");
+        var shortcutPath = Path.Combine(root, "CodeSignAuto.lnk");
+        File.WriteAllBytes(target, [0x4d, 0x5a]);
+        var signingUser = new SecurityIdentifier(InstallFixture.SigningSid);
+        var action = new CreateDesktopShortcut(shortcutPath, target, TestInstallOwnerMarker);
+        var removal = new RemoveOwnedDesktopShortcut(shortcutPath, target, signingUser.Value, TestInstallOwnerMarker);
+        var native = new WindowsUninstallNative();
+        try
+        {
+            WindowsDesktopShortcut.CreateExact(action, signingUser);
+            if (legacyAcl)
+            {
+                WindowsInstallAcl.ApplyFile(shortcutPath, InstallAclProfile.AdministratorsOnly, signingUser);
+                Assert.Throws<InstallException>(() =>
+                    WindowsDesktopShortcut.VerifyExact(action, signingUser, "desktop_shortcut_failed"));
+            }
+            if (writableByUsers)
+            {
+                var security = new FileInfo(shortcutPath).GetAccessControl();
+                security.AddAccessRule(new FileSystemAccessRule(
+                    new SecurityIdentifier(WellKnownSidType.BuiltinUsersSid, null),
+                    FileSystemRights.Modify,
+                    AccessControlType.Allow));
+                new FileInfo(shortcutPath).SetAccessControl(security);
+                Assert.Throws<InstallException>(() => native.VerifyDesktopShortcutOwnership(removal));
+                Assert.Throws<InstallException>(() => native.RemoveDesktopShortcut(removal));
+                Assert.True(File.Exists(shortcutPath));
+            }
+            else
+            {
+                native.VerifyDesktopShortcutOwnership(removal);
+                native.RemoveDesktopShortcut(removal);
+                Assert.False(File.Exists(shortcutPath));
+            }
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
         }
     }
 

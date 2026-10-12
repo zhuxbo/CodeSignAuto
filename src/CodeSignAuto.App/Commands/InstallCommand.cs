@@ -46,6 +46,7 @@ public enum InstallAclProfile
     SigningUserModify,
     SigningUserRead,
     SigningUserData,
+    DesktopShortcutRead,
 }
 
 public enum InstallContent

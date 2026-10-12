@@ -35,7 +35,7 @@ internal static class WindowsDesktopShortcut
             Write(temporary);
             WindowsInstallAcl.ApplyFile(
                 temporary.Path,
-                InstallAclProfile.AdministratorsOnly,
+                InstallAclProfile.DesktopShortcutRead,
                 signingUser);
             VerifyExact(temporary, signingUser, "desktop_shortcut_failed");
             File.Move(temporary.Path, action.Path);
@@ -78,15 +78,27 @@ internal static class WindowsDesktopShortcut
     public static void VerifyExact(
         CreateDesktopShortcut action,
         SecurityIdentifier signingUser,
-        string errorCode)
+        string errorCode,
+        bool allowLegacyAcl = false)
     {
         try
         {
             using var stream = NoFollowFile.OpenRead(action.Path, FileShare.Read, 4096);
-            WindowsInstallAcl.VerifyFile(
-                action.Path,
-                InstallAclProfile.AdministratorsOnly,
-                signingUser);
+            try
+            {
+                WindowsInstallAcl.VerifyFile(
+                    action.Path,
+                    InstallAclProfile.DesktopShortcutRead,
+                    signingUser);
+            }
+            catch (InstallException error) when (allowLegacyAcl && error.Code == "acl_verification_failed")
+            {
+                // 旧版本只允许管理员读取；升级和卸载仍需验证其精确所有权。
+                WindowsInstallAcl.VerifyFile(
+                    action.Path,
+                    InstallAclProfile.AdministratorsOnly,
+                    signingUser);
+            }
             if (!PlatformLocalFileIdentityProvider.Instance.TryGetIdentity(
                     stream.SafeFileHandle,
                     out var identity) ||
@@ -109,7 +121,8 @@ internal static class WindowsDesktopShortcut
     public static void RemoveExact(
         CreateDesktopShortcut action,
         string errorCode,
-        SecurityIdentifier? signingUser = null)
+        SecurityIdentifier? signingUser = null,
+        bool allowLegacyAcl = false)
     {
         if (!File.Exists(action.Path))
         {
@@ -120,7 +133,7 @@ internal static class WindowsDesktopShortcut
         {
             if (signingUser is not null)
             {
-                VerifyExact(action, signingUser, errorCode);
+                VerifyExact(action, signingUser, errorCode, allowLegacyAcl);
             }
             else if (!IsExact(action))
             {

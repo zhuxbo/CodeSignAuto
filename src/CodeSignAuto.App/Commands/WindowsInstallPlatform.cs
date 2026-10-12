@@ -1198,6 +1198,13 @@ internal static class WindowsInstallAcl
         {
             rules.Add(Rule(signingUser, FileSystemRights.Modify, inheritance));
         }
+        else if (profile == InstallAclProfile.DesktopShortcutRead)
+        {
+            rules.Add(Rule(
+                new SecurityIdentifier(WellKnownSidType.BuiltinUsersSid, null),
+                FileSystemRights.ReadAndExecute,
+                inheritance));
+        }
         else if (profile == InstallAclProfile.SigningUserRead)
         {
             rules.Add(Rule(signingUser, FileSystemRights.ReadAndExecute, inheritance));

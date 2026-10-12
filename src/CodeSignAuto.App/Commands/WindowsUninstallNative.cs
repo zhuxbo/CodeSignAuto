@@ -193,7 +193,8 @@ internal sealed class WindowsUninstallNative : IWindowsUninstallNative
         WindowsDesktopShortcut.VerifyExact(
             new CreateDesktopShortcut(action.Path, action.TargetPath, action.OwnerMarker),
             new SecurityIdentifier(action.SigningUserSid),
-            "owned_resource_mismatch");
+            "owned_resource_mismatch",
+            allowLegacyAcl: true);
     }
 
     public void VerifyManualActivationOwnership(RemoveOwnedManualActivation action) =>
@@ -229,7 +230,8 @@ internal sealed class WindowsUninstallNative : IWindowsUninstallNative
         WindowsDesktopShortcut.RemoveExact(
             new CreateDesktopShortcut(action.Path, action.TargetPath, action.OwnerMarker),
             "uninstall_state_uncertain",
-            new SecurityIdentifier(action.SigningUserSid));
+            new SecurityIdentifier(action.SigningUserSid),
+            allowLegacyAcl: true);
     }
 
     public void RemoveManualActivation(RemoveOwnedManualActivation action) =>

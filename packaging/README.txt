@@ -78,8 +78,9 @@ Standard install
    state, SimplySign Desktop and PKCS#11. Missing SimplySign prerequisites stop
    setup without creating a user.
 4. Manual mode creates protected per-administrator local job data, the public
-   shortcut, receipt and registration. It creates no Service, user, AutoLogon,
-   task or API token. ProgramData contains only install.json, not service
+   shortcut, receipt and registration. Users can read the public shortcut;
+   modifying or deleting it requires administrator rights. It creates no Service,
+   user, AutoLogon, task or API token. ProgramData contains only install.json, not service
    configuration, a job database or spool. Open CodeSignAuto directly, import
    activation and submit local jobs. History and signed results are retained.
 5. Service mode creates the low-privilege CodeSignAutoAgent account and profile,
