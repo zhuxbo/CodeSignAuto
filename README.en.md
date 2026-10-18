@@ -356,7 +356,8 @@ curl --fail-with-body \
 ```
 
 Requests accept multipart uploads only, not server-local paths or remote URLs. The
-single-file limit is 512 MiB.
+default single-file limit is 512 MiB. Service settings allow 0–5120 MiB; 0 means
+unlimited. Applying the settings restarts the service.
 
 ## Retention, settings, and uninstall
 
@@ -365,7 +366,7 @@ single-file limit is 512 MiB.
 | Mode | Default | Configurable range |
 | --- | --- | --- |
 | Manual signing | 168 hours | 0–168 hours |
-| Automatic signing service | 24 hours | 0–168 hours |
+| Automatic signing service | 24 hours | 0–720 hours |
 
 `0` means permanent retention. Active jobs are never expired.
 

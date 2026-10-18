@@ -413,7 +413,7 @@ public static class LengthPrefixedJsonProtocol
             LocalJobCreateRequest request =>
                 request.RequestId != Guid.Empty &&
                 IsCanonicalOriginalName(request.OriginalName, request.Extension) &&
-                request.DeclaredSize is >= 1 and <= 512L * 1024 * 1024 &&
+                request.DeclaredSize is >= 1 &&
                 request.CanonicalParametersJson is { Length: >= 2 and <= 32_768 } &&
                 !HasUnsafeControl(request.CanonicalParametersJson),
             LocalJobUploadLease lease =>
@@ -427,7 +427,7 @@ public static class LengthPrefixedJsonProtocol
                 completed.RequestId != Guid.Empty &&
                 completed.JobId != Guid.Empty &&
                 IsLowerLease(completed.LeaseId) &&
-                completed.ActualSize is >= 1 and <= 512L * 1024 * 1024 &&
+                completed.ActualSize is >= 1 &&
                 IsLowerSha256(completed.Sha256),
             LocalJobAccepted accepted =>
                 accepted.RequestId != Guid.Empty && accepted.JobId != Guid.Empty,

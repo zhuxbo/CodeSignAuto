@@ -730,7 +730,7 @@ public sealed class AdminDesktopApplication
             Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
                 "CodeSignAuto",
-                "spool"));
+                "spool"), maximumUploadMegabytes: 0);
         await using var runtime = _runtimeFactory.Create();
         var settingsDialogs = runtime as IServiceSettingsDialogServiceProvider
             ?? throw new InvalidOperationException("service_settings_dialog_unavailable");

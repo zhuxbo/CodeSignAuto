@@ -23,6 +23,39 @@ namespace CodeSignAuto.Service.Tests;
 public sealed class JobEndpointsTests
 {
 
+    [Theory]
+    [InlineData(1, 1048576, HttpStatusCode.Accepted)]
+    [InlineData(1, 1048577, HttpStatusCode.RequestEntityTooLarge)]
+    [InlineData(0, 1048577, HttpStatusCode.Accepted)]
+    public async Task File_section_enforces_exact_limit(int megabytes, int size, HttpStatusCode expected)
+    {
+        await using var factory = await TestServiceFactory.StartAsync(maximumUploadMegabytes: megabytes);
+        using var client = factory.CreateAuthenticatedClient();
+        using var request = TestUploads.PdfRequest(content: "%PDF-1.7\n" + new string(' ', size - 9));
+        using var response = await client.SendAsync(request);
+        Assert.Equal(expected, response.StatusCode);
+        if (expected == HttpStatusCode.RequestEntityTooLarge)
+        {
+            Assert.Empty(factory.SpoolJobDirectories());
+        }
+    }
+
+    [Theory]
+    [InlineData(0, long.MaxValue)]
+    [InlineData(512, 536870912L)]
+    [InlineData(5120, 5368709120L)]
+    public async Task Upload_uses_configured_file_limit(int megabytes, long expectedBytes)
+    {
+        var spool = new RejectingSpoolStore();
+        await using var factory = await TestServiceFactory.StartAsync(
+            services => services.AddSingleton<ISpoolStore>(spool),
+            maximumUploadMegabytes: megabytes);
+        using var client = factory.CreateAuthenticatedClient();
+        using var response = await client.SendAsync(TestUploads.PdfRequest());
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge, response.StatusCode);
+        Assert.Equal(expectedBytes, spool.MaxBytes);
+    }
+
     [Fact]
     public async Task rotated_token_has_independent_idempotency_scope()
     {
@@ -48,7 +81,7 @@ public sealed class JobEndpointsTests
     [Theory]
     [InlineData(0, null)]
     [InlineData(1, 1)]
-    [InlineData(168, 168)]
+    [InlineData(720, 720)]
     public void Retention_policy_returns_the_exact_nullable_expiry(
         int retentionHours,
         int? expectedHours)
@@ -64,7 +97,7 @@ public sealed class JobEndpointsTests
 
     [Theory]
     [InlineData(-1)]
-    [InlineData(169)]
+    [InlineData(721)]
     public void Retention_policy_rejects_out_of_range_hours(int retentionHours)
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => new JobRetentionPolicy(retentionHours));
@@ -72,7 +105,7 @@ public sealed class JobEndpointsTests
 
     [Theory]
     [InlineData(1)]
-    [InlineData(168)]
+    [InlineData(720)]
     public async Task Configured_retention_controls_api_job_expiry(int retentionHours)
     {
         var now = DateTimeOffset.Parse("2026-08-09T08:00:00Z");
@@ -1186,7 +1219,8 @@ internal sealed class TestServiceFactory : IAsyncDisposable
 
     public static async Task<TestServiceFactory> StartAsync(
         Action<IServiceCollection>? configureServices = null,
-        int retentionHours = 24)
+        int retentionHours = 24,
+        int maximumUploadMegabytes = 512)
     {
         var root = Path.Combine(Path.GetTempPath(), "CodeSignAuto.Tests", Guid.NewGuid().ToString("N"));
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });
@@ -1199,6 +1233,7 @@ internal sealed class TestServiceFactory : IAsyncDisposable
         {
             ProductVersionIdentity = "1.0.0",
             RetentionHours = retentionHours,
+            MaximumUploadMegabytes = maximumUploadMegabytes,
         });
         builder.Services.AddSingleton<IUploadedContentValidator>(UnitTestUploadedContentValidator.Instance);
         builder.Services.AddSingleton<IAgentHealthStatusSource>(services =>

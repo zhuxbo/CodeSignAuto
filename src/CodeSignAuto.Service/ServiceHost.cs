@@ -30,6 +30,8 @@ public sealed record ServiceHostOptions(byte[] TokenHash, string DatabasePath, s
 {
     public int RetentionHours { get; init; } = 24;
 
+    public int MaximumUploadMegabytes { get; init; } = 512;
+
     public string? SigningUserSid { get; init; }
 
     public ISpoolAclPolicy? SpoolAclPolicy { get; init; }
@@ -208,11 +210,13 @@ public static class ServiceHost
             throw new ArgumentException("Bearer token hash must be a SHA-256 value.", nameof(options));
         }
 
-        if (options.RetentionHours is < 0 or > 168)
+        if (options.RetentionHours is < 0 or > 720)
         {
             throw new ArgumentOutOfRangeException(nameof(options));
         }
 
+        _ = UploadSizeLimit.EffectiveBytes(options.MaximumUploadMegabytes);
+        builder.Services.AddSingleton(options);
         ConfigureSafeLogging(builder.Logging);
 
         builder.Services
@@ -289,6 +293,7 @@ public static class ServiceHost
             services.GetRequiredService<TimeProvider>(),
             options.SigningUserSid,
             retentionHours: options.RetentionHours,
+            maximumUploadMegabytes: options.MaximumUploadMegabytes,
             upgradeGate: services.GetRequiredService<IUpgradeAdmissionGate>()));
         builder.Services.AddSingleton<ILocalJobRequestHandler>(services =>
             services.GetRequiredService<LocalJobUploadCoordinator>());
@@ -427,6 +432,7 @@ public static class ServiceHost
             runtime.Configuration.SpoolRoot)
         {
             RetentionHours = runtime.Configuration.RetentionHours,
+            MaximumUploadMegabytes = runtime.Configuration.MaximumUploadMegabytes,
             SigningUserSid = runtime.Configuration.SigningUserSid,
             SpoolAclPolicy = spoolAclPolicyFactory(runtime.Configuration.SigningUserSid),
             ManagementSettings = CreateSettingsSummary(runtime, productVersion),
@@ -457,7 +463,7 @@ public static class ServiceHost
     {
         return new ServiceSettingsSummary(
             runtime.Configuration.ListenPort,
-            ServiceSettingsSummary.FixedMaximumUploadBytes,
+            runtime.Configuration.MaximumUploadMegabytes * UploadSizeLimit.BytesPerMegabyte,
             runtime.Configuration.RetentionHours,
             productVersion.Identity);
     }
@@ -491,7 +497,9 @@ public static class ServiceHost
 
     private static void ConfigureListeners(KestrelServerOptions server, ServiceRuntimeSettings runtime)
     {
-        server.Limits.MaxRequestBodySize = JobEndpoints.MaxRequestBodyBytes;
+        server.Limits.MaxRequestBodySize = runtime.Configuration.MaximumUploadMegabytes == 0
+            ? null
+            : UploadSizeLimit.EffectiveBytes(runtime.Configuration.MaximumUploadMegabytes) + JobEndpoints.MaxMultipartOverheadBytes;
         if (runtime.AllowHttpLoopback)
         {
             server.Listen(IPAddress.Loopback, 5080);

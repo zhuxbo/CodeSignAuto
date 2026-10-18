@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Net.Http.Headers;
+using Microsoft.Extensions.DependencyInjection;
 using CodeSignAuto.Core.Jobs;
 using CodeSignAuto.Protocol;
 using CodeSignAuto.Service.Ipc;
@@ -298,7 +299,10 @@ public static class JobEndpoints
         var spoolMutationStarted = false;
         try
         {
-            if (context.Request.ContentLength is > MaxRequestBodyBytes)
+            var maxFileBytes = UploadSizeLimit.EffectiveBytes(
+                context.RequestServices.GetRequiredService<ServiceHostOptions>().MaximumUploadMegabytes);
+            if (maxFileBytes != long.MaxValue &&
+                context.Request.ContentLength > maxFileBytes + MaxMultipartOverheadBytes)
             {
                 return new(null, Problem(
                     context,
@@ -367,7 +371,7 @@ public static class JobEndpoints
                     }
 
                     spoolMutationStarted = true;
-                    written = await WriteMultipartFileAsync(spool, jobId, extension, section.Body, context.RequestAborted);
+                    written = await WriteMultipartFileAsync(spool, jobId, extension, section.Body, maxFileBytes, context.RequestAborted);
                 }
                 else
                 {
@@ -711,12 +715,13 @@ public static class JobEndpoints
         Guid jobId,
         string extension,
         Stream stream,
+        long maxFileBytes,
         CancellationToken cancellationToken)
     {
         try
         {
-            await using var limited = new MultipartFileSectionStream(stream, MaxFileBytes);
-            return await spool.WriteInputAsync(jobId, extension, limited, MaxFileBytes, cancellationToken);
+            await using var limited = new MultipartFileSectionStream(stream, maxFileBytes);
+            return await spool.WriteInputAsync(jobId, extension, limited, maxFileBytes, cancellationToken);
         }
         catch (SpoolException exception) when (exception.Code == "invalid_extension")
         {
@@ -788,7 +793,7 @@ public sealed record JobRetentionPolicy
 {
     public JobRetentionPolicy(int hours)
     {
-        if (hours is < 0 or > 168)
+        if (hours is < 0 or > 720)
         {
             throw new ArgumentOutOfRangeException(nameof(hours));
         }

@@ -18,7 +18,7 @@ public sealed class JobsPageTests
         var created = await store.CreateAsync(CreateJob());
         var summary = new ServiceSettingsSummary(
             7080,
-            ServiceSettingsSummary.FixedMaximumUploadBytes,
+            ServiceSettingsSummary.DefaultMaximumUploadBytes,
             24,
             "1.0.0");
         var provider = new ServiceManagementSnapshotProvider(

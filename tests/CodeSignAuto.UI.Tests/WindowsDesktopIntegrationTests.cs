@@ -123,7 +123,7 @@ public sealed class WindowsDesktopIntegrationTests
         runtime.Window.ShowRestoreActivate();
         var summary = new CodeSignAuto.Protocol.ServiceSettingsSummary(
             7080,
-            CodeSignAuto.Protocol.ServiceSettingsSummary.FixedMaximumUploadBytes,
+            CodeSignAuto.Protocol.ServiceSettingsSummary.DefaultMaximumUploadBytes,
             24,
             "1.0.0");
         using var settings = new CodeSignAuto.App.UI.ViewModels.ServiceSettingsDialogViewModel(

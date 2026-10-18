@@ -14,6 +14,26 @@ public sealed class LocalJobMessagesTests
     private const string Lease = "00112233445566778899aabbccddeeff";
     private const string Hash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
+    [Theory]
+    [InlineData(536870913L)]
+    [InlineData(5368709120L)]
+    [InlineData(5368709121L)]
+    public async Task Large_upload_sizes_reach_the_configurable_service_policy(long size)
+    {
+        AgentMessage[] messages =
+        [
+            new LocalJobCreateRequest(RequestId, "release.exe", ".exe", size, "{}"),
+            new LocalJobUploadCompleted(RequestId, JobId, Lease, size, Hash),
+        ];
+        foreach (var message in messages)
+        {
+            await using var stream = new MemoryStream();
+            await LengthPrefixedJsonProtocol.WriteAsync(stream, message, default);
+            stream.Position = 0;
+            Assert.Equal(message, await LengthPrefixedJsonProtocol.ReadAsync<AgentMessage>(stream, default));
+        }
+    }
+
     [Fact]
     public async Task Strict_round_trip_preserves_every_local_job_contract()
     {

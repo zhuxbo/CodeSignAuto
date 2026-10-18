@@ -33,24 +33,39 @@
           <RowDefinition Height="Auto" />
           <RowDefinition Height="Auto" />
           <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <TextBlock Text="{localization:UiString ServiceSettingsHttpPort}" VerticalAlignment="Center" />
         <TextBox Grid.Column="1"
+                 VerticalContentAlignment="Center"
                  Text="{Binding ListenPortText, UpdateSourceTrigger=PropertyChanged}"
                  AutomationProperties.Name="{localization:UiString ServiceSettingsListenPort}" />
 
         <TextBlock Grid.Row="1" Text="{localization:UiString ServiceSettingsRetentionHours}" Margin="0,12,0,0" VerticalAlignment="Center" />
-        <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,12,0,0">
-          <TextBox Text="{Binding RetentionHoursText, UpdateSourceTrigger=PropertyChanged}"
-                   AutomationProperties.Name="{localization:UiString ServiceSettingsRetentionHours}" />
-          <TextBlock Text="{Binding RetentionDisplay}"
-                     Margin="0,4,0,0"
-                     Foreground="{DynamicResource TextSecondaryBrush}"
-                     AutomationProperties.Name="{localization:UiString ServiceSettingsRetentionDescription}" />
-        </StackPanel>
+        <TextBox Grid.Row="1" Grid.Column="1" Margin="0,12,0,0"
+                 VerticalContentAlignment="Center"
+                 Text="{Binding RetentionHoursText, UpdateSourceTrigger=PropertyChanged}"
+                 AutomationProperties.Name="{localization:UiString ServiceSettingsRetentionHours}" />
+        <TextBlock Grid.Row="2" Grid.Column="1"
+                   Text="{localization:UiString ServiceSettingsRetentionHint}"
+                   Margin="0,4,0,0" TextWrapping="Wrap"
+                   Foreground="{DynamicResource TextSecondaryBrush}"
+                   AutomationProperties.Name="{localization:UiString ServiceSettingsRetentionDescription}" />
 
-        <StackPanel Grid.Row="2" Grid.Column="1" Margin="0,14,0,0">
+        <TextBlock Grid.Row="3" Text="{localization:UiString ServiceSettingsMaximumUpload}" Margin="0,12,0,0" VerticalAlignment="Center" />
+        <TextBox Grid.Row="3" Grid.Column="1" Margin="0,12,0,0"
+                 VerticalContentAlignment="Center"
+                 Text="{Binding MaximumUploadMegabytesText, UpdateSourceTrigger=PropertyChanged}"
+                 AutomationProperties.Name="{localization:UiString ServiceSettingsMaximumUpload}" />
+        <TextBlock Grid.Row="4" Grid.Column="1"
+                   Text="{localization:UiString ServiceSettingsMaximumUploadHint}"
+                   Margin="0,4,0,0" TextWrapping="Wrap"
+                   Foreground="{DynamicResource TextSecondaryBrush}" />
+
+        <StackPanel Grid.Row="5" Grid.Column="1" Margin="0,14,0,0">
           <CheckBox IsChecked="{Binding RotateToken}"
                     Content="{localization:UiString ServiceSettingsRotateToken}"
                     AutomationProperties.Name="{localization:UiString ServiceSettingsRotateToken}" />

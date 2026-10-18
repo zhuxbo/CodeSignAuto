@@ -160,7 +160,7 @@
   <data name="QuickSignNoPdfCertificate" xml:space="preserve"><value>No PDF signing certificate is available</value></data>
   <data name="ErrorFileSignatureMismatch" xml:space="preserve"><value>File content does not match its extension</value></data>
   <data name="ErrorUnsupportedType" xml:space="preserve"><value>This file type is not supported</value></data>
-  <data name="ErrorFileTooLarge" xml:space="preserve"><value>The file exceeds the 512 MiB limit</value></data>
+  <data name="ErrorFileTooLarge" xml:space="preserve"><value>The file exceeds the configured size limit</value></data>
   <data name="ErrorLocalSourceEmpty" xml:space="preserve"><value>The file is empty</value></data>
   <data name="ErrorLocalCapabilityUnavailable" xml:space="preserve"><value>The selected signing capability is not ready</value></data>
   <data name="ErrorLocalJobUnavailable" xml:space="preserve"><value>The local signing service is unavailable</value></data>
@@ -261,7 +261,7 @@
   <data name="ServiceSettingsStatusArea" xml:space="preserve"><value>Service settings status</value></data>
   <data name="ServiceSettingsApiAddress" xml:space="preserve"><value>API address</value></data>
   <data name="ServiceSettingsMaximumUpload" xml:space="preserve"><value>Maximum upload</value></data>
-  <data name="ServiceSettingsRetentionHours" xml:space="preserve"><value>Result retention hours</value></data>
+  <data name="ServiceSettingsRetentionHours" xml:space="preserve"><value>Result retention</value></data>
   <data name="ServiceSettingsEditTitle" xml:space="preserve"><value>Edit service settings</value></data>
   <data name="ServiceSettingsEditDescription" xml:space="preserve"><value>Changes are completed in this administrator console; the service restarts and reconnects while applying them.</value></data>
   <data name="ServiceSettingsHttpPort" xml:space="preserve"><value>HTTP port</value></data>
@@ -278,7 +278,7 @@
   <data name="ServiceSettingsApplyAutomation" xml:space="preserve"><value>Apply service settings changes</value></data>
   <data name="ServiceSettingsKeepForever" xml:space="preserve"><value>Keep forever</value></data>
   <data name="ServiceSettingsHoursFormat" xml:space="preserve"><value>{0} hours</value></data>
-  <data name="ServiceSettingsRetentionInvalid" xml:space="preserve"><value>Enter an integer from 0 to 168</value></data>
+  <data name="ServiceSettingsRetentionInvalid" xml:space="preserve"><value>Enter an integer from 0 to 720</value></data>
   <data name="ServiceSettingsStateEditing" xml:space="preserve"><value>Editing service settings</value></data>
   <data name="ServiceSettingsStateApplying" xml:space="preserve"><value>Applying settings and restarting the service</value></data>
   <data name="ServiceSettingsStateRestarting" xml:space="preserve"><value>Service restarted; waiting for the connection</value></data>
@@ -322,4 +322,7 @@
   <data name="JobsClearHistory" xml:space="preserve"><value>Clear completed jobs</value></data>
   <data name="JobsClearHistoryConfirm" xml:space="preserve"><value>Delete completed job history and result files? Queued and active jobs will be kept. This cannot be undone.</value></data>
   <data name="JobsCleanupFailed" xml:space="preserve"><value>History cleanup did not finish. Refresh the list and try again.</value></data>
+  <data name="ServiceSettingsMaximumUploadHint" xml:space="preserve"><value>Unit: MB (MiB); default 512, maximum 5120. 0 means unlimited.</value></data>
+  <data name="ServiceSettingsRetentionHint" xml:space="preserve"><value>Unit: hours; default 24, maximum 720; 0 means no cleanup.</value></data>
+  <data name="ServiceSettingsUnlimited" xml:space="preserve"><value>Unlimited</value></data>
 </root>

@@ -104,6 +104,7 @@ internal sealed class ServiceSettingsDialogViewModel : INotifyPropertyChanged, I
     private readonly CancellationTokenSource _lifetime = new();
     private string _listenPortText;
     private string _retentionHoursText;
+    private string _maximumUploadMegabytesText;
     private bool _rotateToken;
     private string? _apiToken;
     private ServiceSettingsDialogState _state = ServiceSettingsDialogState.Editing;
@@ -136,6 +137,7 @@ internal sealed class ServiceSettingsDialogViewModel : INotifyPropertyChanged, I
         _delay = delay ?? (static (duration, token) => Task.Delay(duration, token));
         _listenPortText = settings.ListenPort.ToString(CultureInfo.InvariantCulture);
         _retentionHoursText = settings.RetentionHours.ToString(CultureInfo.InvariantCulture);
+        _maximumUploadMegabytesText = (settings.MaximumUploadBytes / UploadSizeLimit.BytesPerMegabyte).ToString(CultureInfo.InvariantCulture);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -144,6 +146,12 @@ internal sealed class ServiceSettingsDialogViewModel : INotifyPropertyChanged, I
     {
         get => _listenPortText;
         set => SetField(ref _listenPortText, value);
+    }
+
+    public string MaximumUploadMegabytesText
+    {
+        get => _maximumUploadMegabytesText;
+        set => SetField(ref _maximumUploadMegabytesText, value);
     }
 
     public string RetentionHoursText
@@ -160,7 +168,7 @@ internal sealed class ServiceSettingsDialogViewModel : INotifyPropertyChanged, I
 
     public string RetentionDisplay =>
         TryParseAsciiInteger(RetentionHoursText, out var retentionHours) &&
-        retentionHours is >= 0 and <= 168
+        retentionHours is >= 0 and <= 720
             ? retentionHours == 0
                 ? UiCulture.Text("ServiceSettingsKeepForever")
                 : UiCulture.Format("ServiceSettingsHoursFormat", retentionHours)
@@ -391,7 +399,9 @@ internal sealed class ServiceSettingsDialogViewModel : INotifyPropertyChanged, I
         if (!TryParseAsciiInteger(ListenPortText, out var listenPort) ||
             listenPort is < 1 or > 65535 ||
             !TryParseAsciiInteger(RetentionHoursText, out var retentionHours) ||
-            retentionHours is < 0 or > 168)
+            retentionHours is < 0 or > 720 ||
+            !TryParseAsciiInteger(MaximumUploadMegabytesText, out var maximumUploadMegabytes) ||
+            maximumUploadMegabytes is < 0 or > 5120)
         {
             return null;
         }
@@ -400,7 +410,8 @@ internal sealed class ServiceSettingsDialogViewModel : INotifyPropertyChanged, I
             listenPort,
             retentionHours,
             RotateToken,
-            RotateToken ? ApiToken : null);
+            RotateToken ? ApiToken : null,
+            maximumUploadMegabytes);
     }
 
     private static bool TryParseAsciiInteger(string? text, out int value)

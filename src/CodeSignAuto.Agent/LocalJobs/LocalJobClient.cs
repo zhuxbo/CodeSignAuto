@@ -130,6 +130,7 @@ public sealed class LocalJobClient : ILocalJobClient, IDisposable, IAsyncDisposa
     internal const int CopyBufferSize = 1024 * 1024;
 
     private readonly ILocalJobTransport _transport;
+    private readonly long _maximumInputBytes;
     private readonly string _spoolRoot;
     private readonly ILocalFileIdentityProvider _fileIdentities;
     private readonly ILocalJobFileAccess _fileAccess;
@@ -145,8 +146,9 @@ public sealed class LocalJobClient : ILocalJobClient, IDisposable, IAsyncDisposa
     public LocalJobClient(
         ILocalJobTransport transport,
         string spoolRoot,
-        ILocalFileIdentityProvider? fileIdentities = null)
-        : this(transport, spoolRoot, fileIdentities, null)
+        ILocalFileIdentityProvider? fileIdentities = null,
+        int maximumUploadMegabytes = 512)
+        : this(transport, spoolRoot, fileIdentities, null, maximumUploadMegabytes)
     {
     }
 
@@ -154,8 +156,10 @@ public sealed class LocalJobClient : ILocalJobClient, IDisposable, IAsyncDisposa
         ILocalJobTransport transport,
         string spoolRoot,
         ILocalFileIdentityProvider? fileIdentities,
-        ILocalJobFileAccess? fileAccess)
+        ILocalJobFileAccess? fileAccess,
+        int maximumUploadMegabytes = 512)
     {
+        _maximumInputBytes = UploadSizeLimit.EffectiveBytes(maximumUploadMegabytes);
         _transport = transport ?? throw new ArgumentNullException(nameof(transport));
         ArgumentException.ThrowIfNullOrWhiteSpace(spoolRoot);
         _spoolRoot = Path.GetFullPath(spoolRoot);
@@ -198,7 +202,7 @@ public sealed class LocalJobClient : ILocalJobClient, IDisposable, IAsyncDisposa
                 throw new LocalJobException("local_source_empty");
             }
 
-            if (declaredSize > MaximumInputBytes)
+            if (declaredSize > _maximumInputBytes)
             {
                 throw new LocalJobException("file_too_large");
             }

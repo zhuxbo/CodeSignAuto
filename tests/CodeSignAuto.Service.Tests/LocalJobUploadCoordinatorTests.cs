@@ -19,6 +19,25 @@ public sealed class LocalJobUploadCoordinatorTests
     private const string ParametersJson =
         "{\"appendSignature\":false,\"certificateSerialNumber\":\"52A1B4C9\",\"digestAlgorithm\":\"sha256\",\"kind\":\"authenticode\"}";
 
+    [Theory]
+    [InlineData(512, 536870913L, false)]
+    [InlineData(5120, 5368709120L, true)]
+    [InlineData(5120, 5368709121L, false)]
+    [InlineData(0, 5368709121L, true)]
+    public async Task Local_submission_checks_configured_limit_before_upload(int megabytes, long size, bool accepted)
+    {
+        using var fixture = new LocalFixture(maximumUploadMegabytes: megabytes);
+        var response = await fixture.Coordinator.CreateAsync(CreateRequest(size), Identity(), default);
+        if (accepted)
+        {
+            Assert.IsType<LocalJobUploadLease>(response);
+        }
+        else
+        {
+            Assert.Equal("file_too_large", Assert.IsType<LocalJobRejected>(response).ErrorCode);
+        }
+    }
+
     [Fact]
     public async Task Succeeded_api_job_exposes_result_metadata_for_create_new_save()
     {
@@ -999,7 +1018,8 @@ public sealed class LocalJobUploadCoordinatorTests
         public LocalFixture(
             ILocalJobAcceptanceObserver? acceptanceObserver = null,
             int retentionHours = 24,
-            IUpgradeAdmissionGate? upgradeGate = null)
+            IUpgradeAdmissionGate? upgradeGate = null,
+            int maximumUploadMegabytes = 512)
         {
             Directory.CreateDirectory(_root);
             DatabasePath = Path.Combine(_root, "jobs.db");
@@ -1016,7 +1036,8 @@ public sealed class LocalJobUploadCoordinatorTests
                 new XorLeaseProtector(),
                 acceptanceObserver: acceptanceObserver,
                 retentionHours: retentionHours,
-                upgradeGate: upgradeGate);
+                upgradeGate: upgradeGate,
+                maximumUploadMegabytes: maximumUploadMegabytes);
         }
 
         public string DatabasePath { get; }

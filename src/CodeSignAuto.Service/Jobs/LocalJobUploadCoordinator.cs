@@ -85,7 +85,6 @@ public sealed class LocalJobUploadCoordinator :
     ILocalUploadCleanup
 {
     public static readonly TimeSpan LeaseDuration = TimeSpan.FromMinutes(10);
-    public const long MaximumInputBytes = 512L * 1024 * 1024;
 
     private readonly IJobStore _jobs;
     private readonly ILocalUploadLeaseStore _leases;
@@ -99,6 +98,7 @@ public sealed class LocalJobUploadCoordinator :
     private readonly JobRetentionPolicy _retention;
     private readonly IUpgradeAdmissionGate _upgradeGate;
     private readonly Func<int>? _retentionHoursProvider;
+    private readonly long _maximumInputBytes;
 
     public LocalJobUploadCoordinator(
         IJobStore jobs,
@@ -111,7 +111,8 @@ public sealed class LocalJobUploadCoordinator :
         ILocalJobAcceptanceObserver? acceptanceObserver = null,
         int retentionHours = 24,
         IUpgradeAdmissionGate? upgradeGate = null,
-        Func<int>? retentionHoursProvider = null)
+        Func<int>? retentionHoursProvider = null,
+        int maximumUploadMegabytes = 512)
     {
         _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
         _leases = jobs as ILocalUploadLeaseStore
@@ -128,6 +129,7 @@ public sealed class LocalJobUploadCoordinator :
         _retention = new JobRetentionPolicy(retentionHours);
         _upgradeGate = upgradeGate ?? new UpgradeAdmissionGate();
         _retentionHoursProvider = retentionHoursProvider;
+        _maximumInputBytes = UploadSizeLimit.EffectiveBytes(maximumUploadMegabytes);
         if (_retentionHoursProvider is not null)
         {
             _ = new JobRetentionPolicy(_retentionHoursProvider());
@@ -552,7 +554,7 @@ public sealed class LocalJobUploadCoordinator :
 
     private SigningParameters ValidateCreate(LocalJobCreateRequest request)
     {
-        if (request.DeclaredSize is < 1 or > MaximumInputBytes ||
+        if (request.DeclaredSize < 1 ||
             request.RequestId == Guid.Empty ||
             request.OriginalName.Length is < 1 or > 255 ||
             !string.Equals(Path.GetFileName(request.OriginalName), request.OriginalName, StringComparison.Ordinal) ||
@@ -561,6 +563,11 @@ public sealed class LocalJobUploadCoordinator :
             !string.Equals(Path.GetExtension(request.OriginalName), request.Extension, StringComparison.Ordinal))
         {
             throw new ValidationException("invalid_parameters");
+        }
+
+        if (request.DeclaredSize > _maximumInputBytes)
+        {
+            throw new ValidationException("file_too_large");
         }
 
         var parameters = SigningParameters.Parse(request.CanonicalParametersJson);
@@ -584,7 +591,7 @@ public sealed class LocalJobUploadCoordinator :
         CancellationToken cancellationToken)
     {
         var input = upload.Stream;
-        if (!input.CanSeek || input.Length != lease.DeclaredSize || input.Length is < 1 or > MaximumInputBytes)
+        if (!input.CanSeek || input.Length != lease.DeclaredSize || input.Length < 1 || input.Length > _maximumInputBytes)
         {
             throw new SpoolException("local_upload_size_mismatch");
         }

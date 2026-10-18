@@ -10,7 +10,8 @@ internal sealed record ServiceConfigurationEditRequest(
     int ListenPort,
     int RetentionHours,
     bool RotateToken,
-    string? ApiToken = null)
+    string? ApiToken = null,
+    int? MaximumUploadMegabytes = null)
 {
     public override string ToString() =>
         $"ServiceConfigurationEditRequest {{ ListenPort = {ListenPort}, RetentionHours = {RetentionHours}, RotateToken = {RotateToken} }}";
@@ -224,6 +225,7 @@ internal sealed class ServiceConfigurationEditor : IServiceConfigurationEditor
             {
                 ListenPort = request.ListenPort,
                 RetentionHours = request.RetentionHours,
+                MaximumUploadMegabytes = request.MaximumUploadMegabytes ?? original.MaximumUploadMegabytes,
             });
 
             var summary = _platform.CreateSettingsSummary(updated);
@@ -252,7 +254,8 @@ internal sealed class ServiceConfigurationEditor : IServiceConfigurationEditor
     private static void ValidateRequest(ServiceConfigurationEditRequest request)
     {
         if (request.ListenPort is < 1 or > 65535 ||
-            request.RetentionHours is < 0 or > 168 ||
+            request.RetentionHours is < 0 or > 720 ||
+            request.MaximumUploadMegabytes is < 0 or > 5120 ||
             !string.IsNullOrEmpty(request.ApiToken) &&
             (!request.RotateToken || !SensitiveOneTimeApiToken.IsValid(request.ApiToken)))
         {

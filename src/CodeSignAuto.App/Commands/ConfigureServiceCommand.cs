@@ -310,10 +310,10 @@ public static class ConfigureServiceCommand
                 1,
                 65535);
             var retention = ParseInt(
-                await PromptAsync(input, output, $"结果保留小时（当前 {original.RetentionHours}，0-168，留空保持）：", cancellationToken).ConfigureAwait(false),
+                await PromptAsync(input, output, $"结果保留小时（当前 {original.RetentionHours}，0-720，留空保持）：", cancellationToken).ConfigureAwait(false),
                 original.RetentionHours,
                 0,
-                168);
+                720);
             var rotate = string.Equals(
                 (await PromptAsync(input, output, "轮换 API token？输入 y 确认（默认 n）：", cancellationToken).ConfigureAwait(false))?.Trim(),
                 "y",
@@ -463,7 +463,7 @@ internal sealed class WindowsConfigureServicePlatform : IConfigureServicePlatfor
         ArgumentNullException.ThrowIfNull(configuration);
         return new ServiceSettingsSummary(
             configuration.ListenPort,
-            ServiceSettingsSummary.FixedMaximumUploadBytes,
+            configuration.MaximumUploadMegabytes * UploadSizeLimit.BytesPerMegabyte,
             configuration.RetentionHours,
             ApplicationVersion.ReadIdentity(typeof(ConfigureServiceCommand).Assembly));
     }

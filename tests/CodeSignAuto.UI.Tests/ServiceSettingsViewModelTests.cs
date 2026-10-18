@@ -12,6 +12,31 @@ namespace CodeSignAuto.UI.Tests;
 
 public sealed class ServiceSettingsViewModelTests
 {
+    [Theory]
+    [InlineData("0", true)]
+    [InlineData("512", true)]
+    [InlineData("5120", true)]
+    [InlineData("5121", false)]
+    [InlineData("-1", false)]
+    [InlineData("", false)]
+    [InlineData("1.5", false)]
+    public async Task Upload_limit_is_validated_and_forwarded(string input, bool valid)
+    {
+        var editor = new EditorFake(new ServiceConfigurationEditResult(Summary(), null));
+        using var vm = DialogViewModel(Summary(), editor: editor);
+        Assert.Equal("512", vm.MaximumUploadMegabytesText);
+        vm.MaximumUploadMegabytesText = input;
+        Assert.Equal(valid, await vm.ApplyAsync(default));
+        if (valid)
+        {
+            Assert.Equal(int.Parse(input), editor.LastRequest!.MaximumUploadMegabytes);
+        }
+        else
+        {
+            Assert.Equal(0, editor.ApplyCalls);
+        }
+    }
+
     [Fact]
     public async Task Custom_token_is_forwarded_only_for_rotation_and_cleared_after_apply()
     {
@@ -126,7 +151,7 @@ public sealed class ServiceSettingsViewModelTests
     [InlineData("7080", "2147483648")]
     [InlineData("7080", "+1")]
     [InlineData("7080", "-1")]
-    [InlineData("7080", "169")]
+    [InlineData("7080", "721")]
     public async Task Dialog_rejects_invalid_raw_numeric_input_without_calling_editor(
         string listenPort,
         string retentionHours)
@@ -163,7 +188,7 @@ public sealed class ServiceSettingsViewModelTests
 
     [Theory]
     [InlineData("0", "永久保留")]
-    [InlineData("168", "168 小时")]
+    [InlineData("720", "720 小时")]
     public async Task Dialog_accepts_retention_boundaries(string retentionHours, string display)
     {
         var changed = Summary(retention: int.Parse(retentionHours, System.Globalization.CultureInfo.InvariantCulture));
@@ -378,7 +403,7 @@ public sealed class ServiceSettingsViewModelTests
         int retention = 24) =>
         new(
             port,
-            ServiceSettingsSummary.FixedMaximumUploadBytes,
+            ServiceSettingsSummary.DefaultMaximumUploadBytes,
             retention,
             identity);
 

@@ -2038,7 +2038,7 @@ function Assert-InstalledState {
     $configuration = ConvertFrom-StrictJson (Get-Content -LiteralPath $serviceConfigPath -Raw)
     Assert-ExactProperties $configuration @(
         'tokenHash', 'signingUserSid', 'dataRoot', 'spoolRoot', 'listenPort',
-        'ownerMarker', 'installInstanceId', 'executablePath', 'agentConfigurationPath', 'retentionHours')
+        'ownerMarker', 'installInstanceId', 'executablePath', 'agentConfigurationPath', 'retentionHours', 'maximumUploadMegabytes')
     $expectedTokenHash = (Get-Sha256Text $ApiTokenValue).ToLowerInvariant()
     if ($configuration.tokenHash -isnot [string] -or $configuration.tokenHash -cne $expectedTokenHash -or
         $configuration.signingUserSid -isnot [string] -or $configuration.signingUserSid -cne $SigningSid.Value -or
@@ -2054,7 +2054,9 @@ function Assert-InstalledState {
         $configuration.agentConfigurationPath -isnot [string] -or
             [System.IO.Path]::GetFileName($configuration.agentConfigurationPath) -ine 'agent.json' -or
         $configuration.retentionHours -isnot [int] -or $configuration.retentionHours -lt 0 -or
-            $configuration.retentionHours -gt 168) {
+            $configuration.retentionHours -gt 168 -or
+        $configuration.maximumUploadMegabytes -isnot [int] -or
+            $configuration.maximumUploadMegabytes -lt 0 -or $configuration.maximumUploadMegabytes -gt 5120) {
         throw 'acceptance_install_configuration_invalid'
     }
 

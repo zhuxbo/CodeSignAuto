@@ -5,6 +5,20 @@ namespace CodeSignAuto.Protocol.Tests;
 
 public sealed class ManagementPagesTests
 {
+    [Theory]
+    [InlineData(0L)]
+    [InlineData(5368709120L)]
+    public async Task Configurable_upload_limit_roundtrips(long bytes)
+    {
+        var summary = new ServiceSettingsSummary(7080, bytes, 24, "1.0.0");
+        var message = new ServiceSettingsResponse(Guid.NewGuid(), summary, null, null);
+        await using var stream = new MemoryStream();
+        await LengthPrefixedJsonProtocol.WriteAsync(stream, message, default);
+        stream.Position = 0;
+        var result = await LengthPrefixedJsonProtocol.ReadAsync<ServiceSettingsResponse>(stream, default);
+        Assert.Equal(bytes, result.Summary!.MaximumUploadBytes);
+    }
+
     [Fact]
     public async Task History_cleanup_contract_roundtrips_and_rejects_unbounded_or_invalid_requests()
     {
@@ -143,7 +157,7 @@ public sealed class ManagementPagesTests
     {
         var summary = new ServiceSettingsSummary(
             7080,
-            ServiceSettingsSummary.FixedMaximumUploadBytes,
+            ServiceSettingsSummary.DefaultMaximumUploadBytes,
             24,
             "1.0.0-0.dev.17+build.7");
         var response = new ServiceSettingsResponse(Guid.NewGuid(), summary, null, null);
@@ -155,7 +169,7 @@ public sealed class ManagementPagesTests
 
         Assert.Equal(7080, roundtrip.Summary!.ListenPort);
         Assert.Equal(24, roundtrip.Summary.RetentionHours);
-        Assert.Equal(ServiceSettingsSummary.FixedMaximumUploadBytes, roundtrip.Summary.MaximumUploadBytes);
+        Assert.Equal(ServiceSettingsSummary.DefaultMaximumUploadBytes, roundtrip.Summary.MaximumUploadBytes);
         Assert.Equal("1.0.0-0.dev.17", roundtrip.Summary.ProductVersion);
     }
 
@@ -169,7 +183,7 @@ public sealed class ManagementPagesTests
     {
         Assert.Throws<ArgumentException>(() => new ServiceSettingsSummary(
             7080,
-            ServiceSettingsSummary.FixedMaximumUploadBytes,
+            ServiceSettingsSummary.DefaultMaximumUploadBytes,
             24,
             identity));
     }

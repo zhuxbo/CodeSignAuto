@@ -70,7 +70,9 @@ public sealed class ServiceSettingsViewModel : INotifyPropertyChanged, IDisposab
 
     public string? MaximumUploadText => Settings is null
         ? null
-        : $"{Settings.MaximumUploadBytes / (1024L * 1024L)} MB";
+        : Settings.MaximumUploadBytes == 0
+            ? UiCulture.Text("ServiceSettingsUnlimited")
+            : $"{Settings.MaximumUploadBytes / (1024L * 1024L)} MB";
 
     public string? ErrorCode
     {

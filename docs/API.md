@@ -8,7 +8,7 @@
 - API 版本前缀：`/v1`
 - 除 `GET /health/live` 外，所有接口都要求 Bearer token。
 - 请求和响应 JSON 使用 UTF-8、camelCase 字段名和严格 schema。未知字段、重复字段、错误大小写或错误类型都会被拒绝。
-- 文件上传上限为 512 MiB；`parameters` 上限为 64 KiB。
+- 文件上传默认上限为 512 MiB，可在“服务设置”中修改为 0–5120 MiB（0 为不限制，应用后服务重启生效）；`parameters` 上限为 64 KiB。
 - 服务只接受 multipart 表单上传，不接受服务器本地文件路径或远程 URL。
 - 响应不会包含内部路径、Windows SID、连接 ID、命令行、请求头或激活 secret。
 

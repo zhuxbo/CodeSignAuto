@@ -146,7 +146,7 @@ public sealed class UiTestManagementClient : IAgentManagementClient, IAgentAdmin
         cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult(new ServiceSettingsSummary(
             7080,
-            ServiceSettingsSummary.FixedMaximumUploadBytes,
+            ServiceSettingsSummary.DefaultMaximumUploadBytes,
             24,
             "1.0.0"));
     }

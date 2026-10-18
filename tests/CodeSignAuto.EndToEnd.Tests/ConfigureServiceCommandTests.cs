@@ -14,6 +14,18 @@ namespace CodeSignAuto.EndToEnd.Tests;
 
 public sealed class ConfigureServiceCommandTests
 {
+    [Theory]
+    [InlineData(0)]
+    [InlineData(5120)]
+    public async Task Editor_persists_upload_limit_and_reports_it(int megabytes)
+    {
+        var platform = new PlatformFake { Configuration = Configuration() };
+        var result = await new ServiceConfigurationEditor(platform).ApplyAsync(
+            new ServiceConfigurationEditRequest(8080, 24, false, MaximumUploadMegabytes: megabytes), default);
+        Assert.Equal(megabytes, platform.Applied!.MaximumUploadMegabytes);
+        Assert.Equal(megabytes * UploadSizeLimit.BytesPerMegabyte, result.Summary.MaximumUploadBytes);
+    }
+
     [Fact]
     public async Task Custom_token_is_hashed_without_invoking_random_factory()
     {
@@ -216,7 +228,7 @@ public sealed class ConfigureServiceCommandTests
         var invalidPlatform = new PlatformFake();
         var invalid = await Assert.ThrowsAsync<ConfigureServiceException>(() =>
             new ServiceConfigurationEditor(invalidPlatform).ApplyAsync(
-                new ServiceConfigurationEditRequest(8080, 169, RotateToken: false),
+                new ServiceConfigurationEditRequest(8080, 721, RotateToken: false),
                 CancellationToken.None));
 
         Assert.Equal("configure_service_input_invalid", invalid.Code);
@@ -252,7 +264,7 @@ public sealed class ConfigureServiceCommandTests
     public async Task Planner_changes_only_allowlisted_fields_and_rotates_token_transactionally()
     {
         var platform = new PlatformFake { Configuration = Configuration() };
-        var input = new StringReader("8443\n48\ny\ny\n");
+        var input = new StringReader("8443\n720\ny\ny\n");
         var output = new StringWriter();
         var error = new StringWriter();
 
@@ -262,7 +274,7 @@ public sealed class ConfigureServiceCommandTests
         Assert.Equal(0, exit);
         var updated = Assert.IsType<ServiceConfiguration>(platform.Applied);
         Assert.Equal(8443, updated.ListenPort);
-        Assert.Equal(48, updated.RetentionHours);
+        Assert.Equal(720, updated.RetentionHours);
         Assert.Equal(platform.Configuration.SigningUserSid, updated.SigningUserSid);
         Assert.Equal(platform.Configuration.DataRoot, updated.DataRoot);
         Assert.Equal(platform.Configuration.InstallInstanceId, updated.InstallInstanceId);
@@ -910,7 +922,7 @@ public sealed class ConfigureServiceCommandTests
 
             return new ServiceSettingsSummary(
                 configuration.ListenPort,
-                ServiceSettingsSummary.FixedMaximumUploadBytes,
+                configuration.MaximumUploadMegabytes * UploadSizeLimit.BytesPerMegabyte,
                 configuration.RetentionHours,
                 "0.2.0");
         }

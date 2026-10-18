@@ -173,7 +173,7 @@ public sealed record TerminalJobDeltaResponse(
 
 public sealed record ServiceSettingsSummary
 {
-    public const long FixedMaximumUploadBytes = 512L * 1024 * 1024;
+    public const long DefaultMaximumUploadBytes = 512L * 1024 * 1024;
 
     [JsonConstructor]
     public ServiceSettingsSummary(
@@ -186,8 +186,8 @@ public sealed record ServiceSettingsSummary
         var validProductVersion = productVersion is { Length: > 0 and <= 64 } &&
             ParsedProductVersion.TryParse(productVersion, out parsedProductVersion);
         if (listenPort is < 1 or > 65535 ||
-            maximumUploadBytes != FixedMaximumUploadBytes ||
-            retentionHours is < 0 or > 168 ||
+            maximumUploadBytes is < 0 or > 5120L * 1024 * 1024 ||
+            retentionHours is < 0 or > 720 ||
             !validProductVersion)
         {
             throw new ArgumentException("The service settings summary is invalid.");

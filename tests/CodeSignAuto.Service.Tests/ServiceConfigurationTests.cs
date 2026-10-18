@@ -11,6 +11,39 @@ namespace CodeSignAuto.Service.Tests;
 public sealed class ServiceConfigurationTests
 {
     [Fact]
+    public void Existing_configuration_without_upload_limit_defaults_to_512()
+    {
+        using var fixture = new ConfigurationFixture();
+        var json = System.Text.Json.Nodes.JsonNode.Parse(
+            JsonSerializer.Serialize(fixture.ValidConfiguration(), JsonSerializerOptions.Web))!.AsObject();
+        json.Remove("maximumUploadMegabytes");
+        Assert.Equal(512, ServiceConfigurationLoader.Deserialize(json.ToJsonString()).MaximumUploadMegabytes);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(512)]
+    [InlineData(5120)]
+    public void Upload_limit_roundtrips_and_distinguishes_configuration(int megabytes)
+    {
+        using var fixture = new ConfigurationFixture();
+        var configuration = fixture.ValidConfiguration() with { MaximumUploadMegabytes = megabytes };
+        var loaded = ServiceConfigurationLoader.Deserialize(JsonSerializer.Serialize(configuration, JsonSerializerOptions.Web));
+        Assert.Equal(megabytes, loaded.MaximumUploadMegabytes);
+        Assert.False(ServiceConfigurationLoader.MatchesExpected(loaded, loaded with { MaximumUploadMegabytes = megabytes + 1 }));
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(5121)]
+    public void Upload_limit_rejects_invalid_configuration(int megabytes)
+    {
+        using var fixture = new ConfigurationFixture();
+        Assert.Throws<ServiceConfigurationException>(() => ServiceConfigurationLoader.Validate(
+            fixture.ValidConfiguration() with { MaximumUploadMegabytes = megabytes }));
+    }
+
+    [Fact]
     public async Task Strict_service_configuration_round_trips_complete_runtime_contract()
     {
         using var fixture = new ConfigurationFixture();
@@ -186,7 +219,7 @@ public sealed class ServiceConfigurationTests
     [Theory]
     [InlineData(0)]
     [InlineData(1)]
-    [InlineData(168)]
+    [InlineData(720)]
     public async Task Service_restart_maps_loaded_retention_into_job_runtime(int retentionHours)
     {
         using var fixture = new ConfigurationFixture();
@@ -208,7 +241,7 @@ public sealed class ServiceConfigurationTests
     [Theory]
     [InlineData(0)]
     [InlineData(1)]
-    [InlineData(168)]
+    [InlineData(720)]
     public void Service_configuration_accepts_the_complete_retention_range(int retentionHours)
     {
         using var fixture = new ConfigurationFixture();
@@ -221,7 +254,7 @@ public sealed class ServiceConfigurationTests
 
     [Theory]
     [InlineData(-1)]
-    [InlineData(169)]
+    [InlineData(721)]
     public void Invalid_retention_is_rejected_before_service_storage_mutation(int retentionHours)
     {
         using var fixture = new ConfigurationFixture();
@@ -276,7 +309,7 @@ public sealed class ServiceConfigurationTests
         Assert.NotNull(settings);
         Assert.Equal(expected.ListenPort, settings.ListenPort);
         Assert.Equal(expected.RetentionHours, settings.RetentionHours);
-        Assert.Equal(ServiceSettingsSummary.FixedMaximumUploadBytes, settings.MaximumUploadBytes);
+        Assert.Equal(ServiceSettingsSummary.DefaultMaximumUploadBytes, settings.MaximumUploadBytes);
     }
 
     private static ProductComponentVersions CurrentComponentVersions()

@@ -66,7 +66,7 @@ internal sealed class AgentRuntimePipeSessionFactory : IAgentPipeSessionFactory,
         if (_managementBridge is not null)
         {
             _managedClient = _clients();
-            _managedLocalJobs = new LocalJobClient(_managedClient, _configuration.SpoolPath);
+            _managedLocalJobs = new LocalJobClient(_managedClient, _configuration.SpoolPath, maximumUploadMegabytes: 0);
         }
     }
 

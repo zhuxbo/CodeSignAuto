@@ -689,7 +689,7 @@ public sealed class WindowsUpgradeTransactionTests
         public Task<ServiceSettingsSummary> GetServiceSettingsAsync(CancellationToken cancellationToken) =>
             Task.FromResult(new ServiceSettingsSummary(
                 18080,
-                ServiceSettingsSummary.FixedMaximumUploadBytes,
+                ServiceSettingsSummary.DefaultMaximumUploadBytes,
                 24,
                 ProductVersionProvider()));
 

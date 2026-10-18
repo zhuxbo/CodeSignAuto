@@ -499,11 +499,6 @@ public sealed class QuickSignViewModel : INotifyPropertyChanged, IDisposable
                 throw new LocalJobException("local_source_empty");
             }
 
-            if (stream.Length > LocalJobClient.MaximumInputBytes)
-            {
-                throw new LocalJobException("file_too_large");
-            }
-
             Span<byte> prefix = stackalloc byte[8];
             var read = stream.Read(prefix);
             FileKind kind;

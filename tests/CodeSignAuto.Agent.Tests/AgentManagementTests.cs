@@ -43,7 +43,7 @@ public sealed class AgentManagementTests
         var settingsTask = client.GetServiceSettingsAsync(default);
         await stream.WaitForWrittenMessageCountAsync(3);
         var summary = new ServiceSettingsSummary(
-            7080, ServiceSettingsSummary.FixedMaximumUploadBytes, 24,
+            7080, ServiceSettingsSummary.DefaultMaximumUploadBytes, 24,
             "1.0.0");
         await stream.EnqueueAsync(new ServiceSettingsResponse(SecondRequestId, summary, null, null));
         Assert.Equivalent(summary, await settingsTask, strict: true);

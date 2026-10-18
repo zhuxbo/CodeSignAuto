@@ -14,7 +14,8 @@ public sealed record ServiceConfiguration(
     string InstallInstanceId,
     string ExecutablePath,
     string AgentConfigurationPath,
-    int RetentionHours = 24);
+    int RetentionHours = 24,
+    int MaximumUploadMegabytes = 512);
 
 public sealed class ServiceConfigurationException : Exception
 {
@@ -113,6 +114,7 @@ public sealed class ServiceConfigurationLoader : IServiceConfigurationLoader
         string.Equals(actual.SpoolRoot, expected.SpoolRoot, StringComparison.Ordinal) &&
         actual.ListenPort == expected.ListenPort &&
         actual.RetentionHours == expected.RetentionHours &&
+        actual.MaximumUploadMegabytes == expected.MaximumUploadMegabytes &&
         string.Equals(actual.OwnerMarker, expected.OwnerMarker, StringComparison.Ordinal) &&
         string.Equals(actual.InstallInstanceId, expected.InstallInstanceId, StringComparison.Ordinal) &&
         string.Equals(actual.ExecutablePath, expected.ExecutablePath, StringComparison.Ordinal) &&
@@ -127,7 +129,8 @@ public sealed class ServiceConfigurationLoader : IServiceConfigurationLoader
             !IsCanonicalAbsolutePath(configuration.SpoolRoot) ||
             !IsDirectChild(configuration.DataRoot, configuration.SpoolRoot, "spool") ||
             configuration.ListenPort is < 1 or > 65535 ||
-            configuration.RetentionHours is < 0 or > 168 ||
+            configuration.RetentionHours is < 0 or > 720 ||
+            configuration.MaximumUploadMegabytes is < 0 or > 5120 ||
             !string.Equals(configuration.OwnerMarker, "CodeSignAuto/v1", StringComparison.Ordinal) ||
             !InstallOwnershipMarker.IsInstanceId(configuration.InstallInstanceId) ||
             !IsCanonicalExecutable(configuration.ExecutablePath, "CodeSignAuto.exe") ||
