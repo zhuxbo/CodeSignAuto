@@ -65,11 +65,11 @@
                                TextTrimming="CharacterEllipsis"
                                AutomationProperties.Name="{Binding OriginalName}" />
                     <TextBlock TextWrapping="Wrap" Margin="0,4,0,0">
-                      <Run Text="{Binding KindText}" />
+                      <Run Text="{Binding KindText, Mode=OneWay}" />
                       <Run Text=" · " />
-                      <Run Text="{Binding ErrorCode, TargetNullValue={localization:UiString StatusNoError}}" />
+                      <Run Text="{Binding ErrorCode, Mode=OneWay, TargetNullValue={localization:UiString StatusNoError}}" />
                       <Run Text="{localization:UiString JobsCorrelationSeparator}" />
-                      <Run Text="{Binding CorrelationId}" />
+                      <Run Text="{Binding CorrelationId, Mode=OneWay}" />
                     </TextBlock>
                   </StackPanel>
                   <TextBlock Grid.Column="2" Margin="0,0,16,0"
