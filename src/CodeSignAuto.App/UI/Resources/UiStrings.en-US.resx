@@ -180,12 +180,12 @@
   <data name="JobsKindPdf" xml:space="preserve"><value>PDF document</value></data>
   <data name="JobsKindSoftware" xml:space="preserve"><value>Software signing</value></data>
   <data name="JobsStateQueued" xml:space="preserve"><value>Queued</value></data>
-  <data name="JobsStateWaiting" xml:space="preserve"><value>Waiting for signing agent</value></data>
+  <data name="JobsStateWaiting" xml:space="preserve"><value>Waiting</value></data>
   <data name="JobsStateSigning" xml:space="preserve"><value>Signing</value></data>
   <data name="JobsStateVerifying" xml:space="preserve"><value>Verifying</value></data>
   <data name="JobsStateSucceeded" xml:space="preserve"><value>Completed</value></data>
   <data name="JobsStateFailed" xml:space="preserve"><value>Failed</value></data>
-  <data name="JobsStateExpired" xml:space="preserve"><value>Result removed</value></data>
+  <data name="JobsStateExpired" xml:space="preserve"><value>Removed</value></data>
   <data name="JobsPdfFilter" xml:space="preserve"><value>PDF documents|*.pdf</value></data>
   <data name="JobsSoftwareFilter" xml:space="preserve"><value>Signed software|*.exe;*.dll;*.msi;*.sys;*.cat|All files|*.*</value></data>
   <data name="JobsSaveDialogTitle" xml:space="preserve"><value>Save a copy of the signed result</value></data>

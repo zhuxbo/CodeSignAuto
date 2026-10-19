@@ -180,12 +180,12 @@
   <data name="JobsKindPdf" xml:space="preserve"><value>PDF 文档</value></data>
   <data name="JobsKindSoftware" xml:space="preserve"><value>软件签名</value></data>
   <data name="JobsStateQueued" xml:space="preserve"><value>排队中</value></data>
-  <data name="JobsStateWaiting" xml:space="preserve"><value>等待签名代理</value></data>
+  <data name="JobsStateWaiting" xml:space="preserve"><value>待代理</value></data>
   <data name="JobsStateSigning" xml:space="preserve"><value>签名中</value></data>
   <data name="JobsStateVerifying" xml:space="preserve"><value>验证中</value></data>
   <data name="JobsStateSucceeded" xml:space="preserve"><value>已完成</value></data>
-  <data name="JobsStateFailed" xml:space="preserve"><value>失败</value></data>
-  <data name="JobsStateExpired" xml:space="preserve"><value>结果已清理</value></data>
+  <data name="JobsStateFailed" xml:space="preserve"><value>已失败</value></data>
+  <data name="JobsStateExpired" xml:space="preserve"><value>已清理</value></data>
   <data name="JobsPdfFilter" xml:space="preserve"><value>PDF 文档|*.pdf</value></data>
   <data name="JobsSoftwareFilter" xml:space="preserve"><value>签名软件|*.exe;*.dll;*.msi;*.sys;*.cat|所有文件|*.*</value></data>
   <data name="JobsSaveDialogTitle" xml:space="preserve"><value>保存签名结果副本</value></data>
