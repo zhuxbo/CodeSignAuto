@@ -427,9 +427,9 @@
       "codesignauto.agent": {
         "type": "Project",
         "dependencies": {
-          "Pkcs11Interop": "[5.3.0, )",
           "CodeSignAuto.Core": "[1.0.0, )",
           "CodeSignAuto.Protocol": "[1.0.0, )",
+          "Pkcs11Interop": "[5.3.0, )",
           "System.Security.Cryptography.ProtectedData": "[10.0.10, )"
         }
       },
@@ -448,17 +448,20 @@
       "codesignauto.service": {
         "type": "Project",
         "dependencies": {
+          "CodeSignAuto.Core": "[1.0.0, )",
+          "CodeSignAuto.Protocol": "[1.0.0, )",
           "Microsoft.Data.Sqlite": "[10.0.10, )",
           "Microsoft.Extensions.Hosting.WindowsServices": "[10.0.10, )",
           "PdfPig": "[0.1.15, )",
           "SQLitePCLRaw.bundle_e_sqlite3": "[2.1.12, )",
-          "CodeSignAuto.Core": "[1.0.0, )",
-          "CodeSignAuto.Protocol": "[1.0.0, )",
           "System.Security.Cryptography.ProtectedData": "[10.0.10, )"
         }
       },
       "CodeSignAutoSetup": {
-        "type": "Project"
+        "type": "Project",
+        "dependencies": {
+          "CodeSignAuto.Core": "[1.0.0, )"
+        }
       },
       "Microsoft.Data.Sqlite": {
         "type": "CentralTransitive",
