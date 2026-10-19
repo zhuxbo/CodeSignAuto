@@ -328,8 +328,9 @@ public sealed class JobDispatcher : IJobDispatcherRuntime, IDisposable
         {
             throw;
         }
-        catch (Exception)
+        catch (Exception error)
         {
+            CodeSignAuto.Core.Diagnostics.DiagnosticLog.Write("job_dispatch_failed", error);
             _blockedConnectionId = active.ConnectionId;
             await ReleaseActiveLeaseAsync("recovery_exhausted", cancellationToken).ConfigureAwait(false);
         }
@@ -438,6 +439,7 @@ public sealed class JobDispatcher : IJobDispatcherRuntime, IDisposable
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or SpoolException)
         {
+            CodeSignAuto.Core.Diagnostics.DiagnosticLog.Write("job_cleanup_deferred", error);
             // Startup/background maintenance retries cleanup after a committed success.
         }
     }

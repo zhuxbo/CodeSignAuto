@@ -2,6 +2,7 @@ namespace CodeSignAuto.App;
 
 public enum ApplicationEntryKind
 {
+    ExportDiagnostics,
     Desktop,
     UiTest,
     AgentConsole,
@@ -30,6 +31,8 @@ public sealed record ApplicationEntryRoute(
         ArgumentNullException.ThrowIfNull(arguments);
         return arguments switch
         {
+            ["diagnostics", "export", "--output", var output] when Path.IsPathFullyQualified(output) && !output.Any(char.IsControl) =>
+                new(ApplicationEntryKind.ExportDiagnostics, [output], ShowInitially: false),
             [] => new(ApplicationEntryKind.Desktop, [], ShowInitially: true),
             ["--ui-test-state", var state] when UI.Testing.UiTestState.TryParse(state, out _) =>
                 new(ApplicationEntryKind.UiTest, [state], ShowInitially: true),

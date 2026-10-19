@@ -23,6 +23,7 @@
     <EmbeddedResource Include="$(SetupMetadataPath)" LogicalName="CodeSignAuto.Setup.Metadata.json" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="../CodeSignAuto.Core/CodeSignAuto.Core.csproj" />
     <InternalsVisibleTo Include="CodeSignAuto.EndToEnd.Tests" />
   </ItemGroup>
 </Project>

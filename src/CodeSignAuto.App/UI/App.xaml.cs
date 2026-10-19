@@ -951,6 +951,8 @@ internal sealed class WpfDesktopRuntime :
         try
         {
             var application = new DesktopWpfApplication();
+            application.DispatcherUnhandledException += (_, args) =>
+                CodeSignAuto.Core.Diagnostics.DiagnosticLog.Write("wpf_dispatcher_exception", args.Exception);
             _application = application;
             theme = new ThemeService(new WindowsThemeSettingsSource(), new WpfThemeResourceApplier());
             var mainWindow = _isolatedDirectory is null
@@ -981,6 +983,7 @@ internal sealed class WpfDesktopRuntime :
         }
         catch (Exception error)
         {
+            CodeSignAuto.Core.Diagnostics.DiagnosticLog.Write("desktop_runtime_failed", error);
             _ready.TrySetException(error);
             _runCompletion.TrySetException(error);
         }

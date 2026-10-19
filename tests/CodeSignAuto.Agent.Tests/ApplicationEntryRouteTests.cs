@@ -5,6 +5,18 @@ namespace CodeSignAuto.Agent.Tests;
 
 public sealed class ApplicationEntryRouteTests
 {
+    [Fact]
+    public void Diagnostics_export_is_independent_of_desktop_and_requires_an_absolute_target()
+    {
+        var target = Path.Combine(Path.GetTempPath(), "report.zip");
+        var route = ApplicationEntryRoute.Parse(["diagnostics", "export", "--output", target]);
+        Assert.Equal(ApplicationEntryKind.ExportDiagnostics, route.Kind);
+        Assert.False(route.ShowInitially);
+        Assert.Equal([target], route.Arguments);
+        Assert.Equal(ApplicationEntryKind.Invalid,
+            ApplicationEntryRoute.Parse(["diagnostics", "export", "--output", "relative.zip"]).Kind);
+    }
+
     [Theory]
     [InlineData("manual")]
     [InlineData("service")]

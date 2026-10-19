@@ -393,6 +393,42 @@ API token 只存在于服务模式，可在“服务设置”中轮换。
 - 必须复制并确认后才能关闭对话框。
 - 新配置生效后，旧 token 立即失效。
 
+### 故障诊断日志
+
+安装器、桌面、Agent 和 Service 默认记录结构化诊断日志；安装、升级、回滚和卸载也记录
+关键阶段和结果。每个进程使用独立 JSONL 文件，位于该进程运行账户的
+`%LocalAppData%\CodeSignAuto\logs\diagnostics`。Service 以 LocalSystem 运行时，目录通常在
+`C:\Windows\System32\config\systemprofile\AppData\Local\CodeSignAuto\logs\diagnostics`；
+签名用户与管理员桌面的日志分别保存在各自账户下。
+
+记录包含 UTC 时间、产品/.NET/Windows 版本、进程、运行标识、事件代码、异常类型、HResult、
+原生错误码和异常链的调用堆栈。日志不记录命令行、环境变量、请求正文、配置、签名文件内容，
+也不记录可能包含凭据的异常 Message/Data/ActualValue 或堆栈源码路径。
+每条记录立即刷新；文件约 4 MiB 滚动，每个账户目录保留最近 16 个文件，创建新文件时清理
+超过 14 天的旧文件。正在写入的文件不会被其他进程删除。日志不可写时不阻断业务。
+
+需要更详细事件时，在 `%ProgramData%\CodeSignAuto\diagnostics.json`（机器范围）或
+当前运行账户的 `%LocalAppData%\CodeSignAuto\diagnostics.json` 写入 `{"debug": true}`，
+然后重启需要诊断的进程；恢复为 `false` 或删除文件可关闭。该文件仅控制日志级别，不是开发用
+`development.local.json`，不包含签名凭据。
+
+主界面打不开时，也可在**管理员 PowerShell** 中导出诊断包（输出文件须不存在）：
+
+```powershell
+$exe = 'C:\Program Files\CodeSignAuto\CodeSignAuto.exe'
+$zip = Join-Path $env:USERPROFILE 'Desktop\CodeSignAuto-diagnostics.zip'
+$process = Start-Process -FilePath $exe `
+  -ArgumentList ('diagnostics export --output "{0}"' -f $zip) `
+  -NoNewWindow -Wait -PassThru
+$process.ExitCode
+```
+
+命令收集已注册账户及 LocalSystem 的新格式诊断日志，不读取配置、数据库、凭证、签名文件或
+旧格式日志。压缩包中的 `manifest.json` 记录各来源的账户 SID、收集数量、跳过数量和缺失/无权限状态；
+普通权限导出可能缺少其他账户日志。每个来源最多收集 16 个文件，总输入上限 128 MiB。
+提供诊断包时一并说明出错时间和操作步骤。进程被强杀、系统断电、原生崩溃或日志目录不可写时，
+不能保证得到托管异常堆栈；旧版本也不能补录未曾写入的异常。
+
 ### 卸载
 
 优先从 Windows“设置 → 应用 → 已安装的应用”卸载，也可运行：

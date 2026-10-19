@@ -1,3 +1,4 @@
+using CodeSignAuto.Core.Diagnostics;
 using System.Text.Json;
 using Microsoft.Win32;
 
@@ -20,6 +21,8 @@ internal static class Program
     [STAThread]
     private static int Main(string[] arguments)
     {
+        using var diagnosticSession = DiagnosticLog.Start("Setup");
+        Application.ThreadException += HandleThreadException;
         var culture = SetupCulture.ResolveDefault(System.Globalization.CultureInfo.CurrentUICulture);
         try
         {
@@ -27,6 +30,7 @@ internal static class Program
         }
         catch (SetupBootstrapperException error)
         {
+            DiagnosticLog.Write(error.Code, error);
             MessageBox.Show(
                 error.GetLocalizedMessage(culture),
                 SetupCulture.GetString("WindowMainTitle", culture),
@@ -62,6 +66,7 @@ internal static class Program
         }
         catch (SetupBootstrapperException error)
         {
+            DiagnosticLog.Write(error.Code, error);
             MessageBox.Show(
                 error.GetLocalizedMessage(culture),
                 SetupCulture.GetString("WindowMainTitle", culture),
@@ -69,8 +74,9 @@ internal static class Program
                 MessageBoxIcon.Error);
             return 1;
         }
-        catch
+        catch (Exception failure)
         {
+            DiagnosticLog.Write("setup_entry_failed", failure);
             var error = new SetupBootstrapperException("setup_failed");
             MessageBox.Show(
                 error.GetLocalizedMessage(culture),
@@ -79,6 +85,12 @@ internal static class Program
                 MessageBoxIcon.Error);
             return 1;
         }
+    }
+    private static void HandleThreadException(object sender, System.Threading.ThreadExceptionEventArgs args)
+    {
+        DiagnosticLog.Write("winforms_thread_exception", args.Exception);
+        using var dialog = new ThreadExceptionDialog(args.Exception);
+        if (dialog.ShowDialog() == DialogResult.Abort) Application.Exit();
     }
 }
 

@@ -1,3 +1,4 @@
+using CodeSignAuto.Core.Diagnostics;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
@@ -19,9 +20,20 @@ internal static class Program
     public static int Main(string[] args)
     {
         var route = ApplicationEntryRoute.Parse(args);
+        using var diagnosticSession = DiagnosticLog.Start(route.Kind.ToString());
         var standardIoAvailable = WindowsStandardIo.Prepare(
             ShouldAttachParentConsole(route));
-        return RunAsync(route, standardIoAvailable).GetAwaiter().GetResult();
+        try
+        {
+            var result = RunAsync(route, standardIoAvailable).GetAwaiter().GetResult();
+            DiagnosticLog.Write("process_completed", result: result);
+            return result;
+        }
+        catch (Exception error)
+        {
+            DiagnosticLog.Write("entry_failed", error);
+            throw;
+        }
     }
 
     internal static async Task<int> RunAsync(string[] args, CancellationToken cancellationToken = default)
@@ -38,6 +50,8 @@ internal static class Program
     {
         switch (route.Kind)
         {
+            case ApplicationEntryKind.ExportDiagnostics:
+                return ExportDiagnosticsCommand.Execute(route.Arguments[0], Console.Out, Console.Error);
             case ApplicationEntryKind.Pkcs11Helper:
                 return await Pkcs11HelperHost.ExecuteAsync(
                     route.Arguments,
@@ -204,7 +218,7 @@ internal static class Program
                 return 0;
             default:
                 Console.Error.WriteLine(
-                    "Install: run the signed CodeSignAutoSetup-<version>-win-x64.exe with no arguments. Usage: CodeSignAuto.exe | CodeSignAuto.exe --version | CodeSignAuto.exe uninstall [--purge-data --confirm PURGE] | agent (--console|--background) | service [--console [--allow-http-loopback]] | advanced: configure-otp < stdin | provision-agent-user --mode (existing-user|provision-user|repair-user) --user LOCAL_NAME | install --signing-user DOMAIN\\user --agent-config ABSOLUTE_JSON [--listen-port 7080] [--open-firewall]");
+                    "Install: run the signed CodeSignAutoSetup-<version>-win-x64.exe with no arguments. Usage: CodeSignAuto.exe diagnostics export --output ABSOLUTE_ZIP | CodeSignAuto.exe | CodeSignAuto.exe --version | CodeSignAuto.exe uninstall [--purge-data --confirm PURGE] | agent (--console|--background) | service [--console [--allow-http-loopback]] | advanced: configure-otp < stdin | provision-agent-user --mode (existing-user|provision-user|repair-user) --user LOCAL_NAME | install --signing-user DOMAIN\\user --agent-config ABSOLUTE_JSON [--listen-port 7080] [--open-firewall]");
                 return 2;
         }
     }
