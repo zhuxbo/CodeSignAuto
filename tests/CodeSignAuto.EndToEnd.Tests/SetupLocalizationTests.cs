@@ -305,13 +305,14 @@ public sealed class SetupLocalizationTests
     }
 
     [WindowsFact]
-    public void Pdf_install_errors_have_actionable_messages_in_both_languages()
+    public void Install_errors_have_actionable_messages_in_both_languages()
     {
         foreach (var cultureName in new[] { "zh-CN", "en-US" })
         {
             var culture = SetupCulture.ResolveSelection(cultureName);
             foreach (var code in new[]
                      {
+                         "upgrade_downgrade_not_allowed", "upgrade_version_not_newer",
                          "pdf_extension_files_in_use", "pdf_extension_downgrade_not_allowed",
                          "pdf_extension_target_exists", "pdf_extension_main_invalid",
                          "pdf_extension_access_denied", "pdf_extension_install_state_uncertain",

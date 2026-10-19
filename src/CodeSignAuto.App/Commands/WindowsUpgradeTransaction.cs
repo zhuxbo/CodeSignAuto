@@ -225,10 +225,7 @@ internal sealed class WindowsUpgradeTransaction : IServiceUpgradeTransaction
         var oldVersion = ProductVersion.Parse(oldRegistration.DisplayVersion);
         var newVersion = ProductVersion.Parse(
             CodeSignAuto.App.ApplicationVersion.ReadIdentity(typeof(WindowsUpgradeTransaction).Assembly));
-        if (newVersion.ComparePrecedenceTo(oldVersion) <= 0)
-        {
-            throw new SetupException("upgrade_version_not_newer");
-        }
+        UpgradeVersionPolicy.RequireSupported(oldVersion, newVersion);
 
         await VerifyPersistedCompatibilityAsync(configuration, cancellationToken).ConfigureAwait(false);
         var control = new UpgradeControlClient();
