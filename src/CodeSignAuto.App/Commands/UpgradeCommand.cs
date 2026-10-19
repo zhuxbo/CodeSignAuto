@@ -47,7 +47,7 @@ internal sealed class UpgradeOrchestrator
         if (transaction is IServiceUpgradeTransaction service &&
             !service.HasInteractiveSigningSession)
         {
-            throw new SetupException("restart_required");
+            throw new SetupException("upgrade_session_required");
         }
 
         try

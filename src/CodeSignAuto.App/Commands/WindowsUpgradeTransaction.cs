@@ -69,7 +69,7 @@ internal sealed class UpgradeLegacyQuiescenceVerifier : IUpgradeLegacyQuiescence
         }
         catch
         {
-            throw new SetupException("restart_required");
+            throw new SetupException("upgrade_quiescence_failed");
         }
     }
 }
@@ -234,19 +234,13 @@ internal sealed class WindowsUpgradeTransaction : IServiceUpgradeTransaction
         var control = new UpgradeControlClient();
         try
         {
-            var current = await control.GetServiceSettingsAsync(cancellationToken).ConfigureAwait(false);
-            if (!string.Equals(current.ProductVersion, oldVersion.Display, StringComparison.Ordinal))
-            {
-                throw new SetupException("owned_resource_mismatch");
-            }
-
-            var snapshot = await control.RefreshAsync(cancellationToken).ConfigureAwait(false);
+            var startup = new WindowsInstallStartupRuntime();
+            var sessions = new WindowsActiveSessionLookup();
+            bool HasSession() => sessions.HasActiveSession(configuration.SigningUserSid);
+            var snapshot = await PrepareRuntimeAsync(
+                control, startup, HasSession, oldVersion.Display, cancellationToken).ConfigureAwait(false);
             var expectAuthenticode = snapshot.Authenticode.Configured;
             var expectPdf = snapshot.Pdf.Configured;
-            if (!IsRuntimeSnapshotAcceptable(snapshot, expectAuthenticode, expectPdf))
-            {
-                throw new SetupException("restart_required");
-            }
 
             var sourceRoot = Environment.ProcessPath is { } processPath
                 ? Path.GetDirectoryName(Path.GetFullPath(processPath))
@@ -260,8 +254,7 @@ internal sealed class WindowsUpgradeTransaction : IServiceUpgradeTransaction
                 configuration.ExecutablePath,
                 newVersion.Identity,
                 ownerMarker);
-            var sessions = new WindowsActiveSessionLookup();
-            var hasInteractiveSession = sessions.HasActiveSession(configuration.SigningUserSid);
+            var hasInteractiveSession = HasSession();
             return new WindowsUpgradeTransaction(
                 configuration,
                 receipt,
@@ -275,7 +268,7 @@ internal sealed class WindowsUpgradeTransaction : IServiceUpgradeTransaction
                     () => Guid.NewGuid().ToString("N"),
                     new WindowsAtomicProtectedDirectoryOperations(),
                     upgrade: true),
-                new WindowsInstallStartupRuntime(),
+                startup,
                 control,
                 new UpgradeRegistrationStore(),
                 new UpgradeLegacyQuiescenceVerifier(),
@@ -288,12 +281,85 @@ internal sealed class WindowsUpgradeTransaction : IServiceUpgradeTransaction
         catch (ManagementUnavailableException)
         {
             control.Dispose();
-            throw new SetupException("restart_required");
+            throw new SetupException("upgrade_runtime_unavailable");
         }
         catch
         {
             control.Dispose();
             throw;
+        }
+    }
+
+    // Ownership and persisted-state checks must complete before attempting runtime recovery.
+    internal static async Task<ManagementSnapshot> PrepareRuntimeAsync(
+        IUpgradeControlClient control,
+        IWindowsInstallStartupRuntime startup,
+        Func<bool> hasSession,
+        string expectedVersion,
+        CancellationToken cancellationToken,
+        int maxAttempts = 31,
+        Func<CancellationToken, Task>? delay = null)
+    {
+        using var recovery = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        recovery.CancelAfter(TimeSpan.FromSeconds(90));
+        var recoveryToken = recovery.Token;
+        try
+        {
+            delay ??= token => Task.Delay(TimeSpan.FromSeconds(1), token);
+            var serviceStartAttempted = false;
+            var agentStartAttempted = false;
+            for (var attempt = 0; attempt < maxAttempts; attempt++)
+            {
+                recoveryToken.ThrowIfCancellationRequested();
+                if (!hasSession())
+                {
+                    throw new SetupException("upgrade_session_required");
+                }
+
+                var serviceAvailable = false;
+                try
+                {
+                    var settings = await control.GetServiceSettingsAsync(recoveryToken).ConfigureAwait(false);
+                    if (!string.Equals(settings.ProductVersion, expectedVersion, StringComparison.Ordinal))
+                    {
+                        throw new SetupException("owned_resource_mismatch");
+                    }
+
+                    serviceAvailable = true;
+                    var snapshot = await control.RefreshAsync(recoveryToken).ConfigureAwait(false);
+                    if (IsRuntimeSnapshotAcceptable(snapshot, snapshot.Authenticode.Configured, snapshot.Pdf.Configured))
+                    {
+                        return snapshot;
+                    }
+
+                }
+                catch (ManagementUnavailableException)
+                {
+                    if (!serviceAvailable && !serviceStartAttempted)
+                    {
+                        serviceStartAttempted = true;
+                        // Starts a stopped service; never stops a running service with unknown job state.
+                        await startup.StartAndVerifyServiceAsync(ServiceName, recoveryToken).ConfigureAwait(false);
+                    }
+                    else if (serviceAvailable && !agentStartAttempted)
+                    {
+                        agentStartAttempted = true;
+                        await startup.StartAndVerifyTaskAsync(AgentTaskName, true, recoveryToken)
+                            .ConfigureAwait(false);
+                    }
+                }
+
+                if (attempt + 1 < maxAttempts)
+                {
+                    await delay(recoveryToken).ConfigureAwait(false);
+                }
+            }
+
+            throw new SetupException("upgrade_runtime_unavailable");
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new SetupException("upgrade_runtime_unavailable");
         }
     }
 
@@ -356,7 +422,7 @@ internal sealed class WindowsUpgradeTransaction : IServiceUpgradeTransaction
                             _expectAuthenticode,
                             _expectPdf))
                     {
-                        throw new SetupException("restart_required");
+                        throw new SetupException("upgrade_runtime_unavailable");
                     }
 
                     _drainAttempted = false;
@@ -378,7 +444,7 @@ internal sealed class WindowsUpgradeTransaction : IServiceUpgradeTransaction
             }
 
             _drainAttempted = false;
-            throw new SetupException("restart_required");
+            throw new SetupException("upgrade_runtime_unavailable");
         }
     }
 
@@ -389,12 +455,12 @@ internal sealed class WindowsUpgradeTransaction : IServiceUpgradeTransaction
             var snapshot = await _control.LogoutAsync(cancellationToken).ConfigureAwait(false);
             if (snapshot.SimplySignProcessRunning)
             {
-                throw new SetupException("restart_required");
+                throw new SetupException("upgrade_logout_failed");
             }
         }
         catch (ManagementUnavailableException)
         {
-            throw new SetupException("restart_required");
+            throw new SetupException("upgrade_logout_failed");
         }
     }
 
@@ -464,7 +530,7 @@ internal sealed class WindowsUpgradeTransaction : IServiceUpgradeTransaction
     {
         if (!_interactiveSessionAvailable())
         {
-            throw new SetupException("restart_required");
+            throw new SetupException("upgrade_session_required");
         }
 
         try

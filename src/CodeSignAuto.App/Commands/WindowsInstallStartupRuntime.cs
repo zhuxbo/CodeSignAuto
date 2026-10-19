@@ -58,7 +58,12 @@ internal sealed class WindowsInstallStartupRuntime : IWindowsInstallStartupRunti
         bool requireRunning,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var before = _taskOperations.ReadState(name);
+        if (before.Running)
+        {
+            return;
+        }
         var runAttempted = false;
         try
         {

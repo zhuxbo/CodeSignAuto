@@ -1533,6 +1533,15 @@ public sealed class InstallCommandTests
             runtime.Calls);
     }
 
+    [Fact]
+    public async Task Already_running_agent_task_is_not_retriggered_or_stopped()
+    {
+        var operations = new RecordingTaskLaunchOperations { Running = true };
+        await new WindowsInstallStartupRuntime(operations).StartAndVerifyTaskAsync(
+            "CodeSignAuto.Agent", true, CancellationToken.None);
+        Assert.Equal(["read"], operations.Calls);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -3070,6 +3079,7 @@ public sealed class InstallCommandTests
 
     private sealed class RecordingTaskLaunchOperations : IWindowsTaskLaunchOperations
     {
+        public bool Running { get; init; }
         public List<string> Calls { get; } = [];
         public Exception? RunFailure { get; init; }
         public Exception? WaitFailure { get; init; }
@@ -3078,7 +3088,7 @@ public sealed class InstallCommandTests
         public WindowsTaskRunState ReadState(string name)
         {
             Calls.Add("read");
-            return new WindowsTaskRunState(false, DateTime.MinValue);
+            return new WindowsTaskRunState(Running, DateTime.MinValue);
         }
 
         public Task RunAsync(string name, CancellationToken cancellationToken)

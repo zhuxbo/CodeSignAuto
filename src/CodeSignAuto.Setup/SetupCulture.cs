@@ -64,6 +64,14 @@ internal static class SetupCulture
             "autologon_cleanup_busy" => "ErrorAutoLogonCleanupBusy",
             "autologon_cleanup_failed" => "ErrorAutoLogonCleanupFailed",
             "install_media_target_exists" => "ErrorInstallMediaTargetExists",
+            "upgrade_files_in_use" => "ErrorUpgradeFilesInUse",
+            "upgrade_media_access_denied" => "ErrorUpgradeMediaAccessDenied",
+            "upgrade_media_unreadable" => "ErrorUpgradeMediaUnreadable",
+            "upgrade_session_required" => "ErrorUpgradeSessionRequired",
+            "upgrade_runtime_unavailable" or "service_start_failed" or "agent_start_failed" => "ErrorSigningRuntimeUnavailable",
+            "upgrade_logout_failed" => "ErrorUpgradeLogoutFailed",
+            "upgrade_quiescence_failed" => "ErrorUpgradeQuiescenceFailed",
+            "upgrade_drain_timeout" => "ErrorUpgradeDrainTimeout",
             _ => "ErrorGeneric",
         };
         var reason = resourceKey == "ErrorAutoLogonConflict"

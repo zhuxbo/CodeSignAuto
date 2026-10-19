@@ -246,9 +246,27 @@ Service upgrades drain jobs before replacement and preserve:
 
 Do not manually overwrite Program Files after any of these errors:
 
-- `restart_required`;
+- `upgrade_session_required`;
 - `upgrade_drain_timeout`;
 - `upgrade_state_uncertain`.
+
+Normal in-place upgrades do not require a Windows restart. Exit the console from the tray
+(closing the window only hides it), then run a newer Setup without uninstalling first.
+After ownership validation, Setup can start a stopped Service or Agent and wait for recovery;
+it does not forcibly stop signing jobs whose state is unknown. Activation credentials remain
+intact, although the signing session is closed and must log in again on demand.
+
+Transient file access conflicts are retried for a bounded period. `upgrade_files_in_use`
+means close applications using the installation folder and retry. For
+`upgrade_media_access_denied` or `upgrade_media_unreadable`, check permissions, security
+software, and disk state. `upgrade_runtime_unavailable` requires checking background
+components and signing status; `upgrade_logout_failed` requires finishing jobs and closing
+SimplySign without clearing activation. `upgrade_drain_timeout` requires waiting for jobs
+or uploads, not restarting Windows. `upgrade_quiescence_failed` requires checking the older
+job database without deleting it. `upgrade_session_required` requires restoring the signing
+user's active session, or restarting Windows to restore it through existing AutoLogon.
+Service upgrades require an active signing-user session. Setup does not create a new
+interactive logon session.
 
 ## Activation, login, and local signing
 

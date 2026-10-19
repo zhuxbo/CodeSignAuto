@@ -70,4 +70,12 @@ ASP.NET Core Runtime：https://dotnet.microsoft.com/en-us/download/dotnet/10.0
   <data name="ErrorInstallMediaTargetExists" xml:space="preserve"><value>检测到已有的 CodeSignAuto 安装目录。若刚完成卸载，请重启 Windows 完成受保护的清理后再安装；安装程序不会覆盖来源不明的文件。</value></data>
   <data name="ErrorGeneric" xml:space="preserve"><value>安装未完成。请检查系统要求并修正问题后重新运行安装程序。</value></data>
   <data name="ErrorCodeFormat" xml:space="preserve"><value>错误代码：{0}</value></data>
+  <data name="ErrorUpgradeFilesInUse" xml:space="preserve"><value>程序文件仍被占用。请从托盘退出 CodeSignAuto，关闭占用安装目录的程序后重试；无需先卸载或清除激活信息。</value></data>
+  <data name="ErrorUpgradeMediaAccessDenied" xml:space="preserve"><value>无法访问或替换程序文件。请检查安装目录权限或安全软件拦截后重试；不要删除程序或认证数据。</value></data>
+  <data name="ErrorUpgradeMediaUnreadable" xml:space="preserve"><value>无法读取现有程序文件。请检查磁盘和文件状态后重试；重启不一定能解决此问题。</value></data>
+  <data name="ErrorUpgradeSessionRequired" xml:space="preserve"><value>专用签名用户没有可用的活动会话。请恢复该用户会话，或重启 Windows 通过现有自动登录恢复后重试；激活信息无需重新导入。</value></data>
+  <data name="ErrorSigningRuntimeUnavailable" xml:space="preserve"><value>签名服务或 Agent 尚未就绪。请检查后台组件及签名状态后重试；安装程序不会强制中断未知状态的任务。</value></data>
+  <data name="ErrorUpgradeLogoutFailed" xml:space="preserve"><value>无法正常退出签名会话。请确认签名任务结束并关闭 SimplySign 后重试；不要清除激活信息。</value></data>
+  <data name="ErrorUpgradeQuiescenceFailed" xml:space="preserve"><value>无法确认旧版任务数据库已空闲。请检查数据库、权限及磁盘状态后重试，不要删除任务数据。</value></data>
+  <data name="ErrorUpgradeDrainTimeout" xml:space="preserve"><value>等待任务或上传结束超时，尚未替换程序。请等待任务完成后重新运行安装程序，无需重启 Windows。</value></data>
 </root>

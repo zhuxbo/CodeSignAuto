@@ -240,11 +240,24 @@ PDF helper 不是主程序安装前提。
 - 专用用户、AutoLogon 和 DPAPI 激活；
 - 兼容的 PDF 扩展。
 
-遇到以下错误时，不要手工覆盖 Program Files：
+正常原地升级无需重启 Windows。请先从托盘“退出”控制台（关闭窗口只会隐藏），
+再运行更高版本的 Setup；不要先卸载或手工覆盖 Program Files。
+服务模式会在核验安装身份后尝试启动已停止的 Service / Agent，并等待状态恢复；
+不会强制停止状态不明的签名任务。升级会结束当前签名登录会话，但保留激活凭证，
+后续可点击登录或在签名时按需登录。
 
-- `restart_required`；
-- `upgrade_drain_timeout`；
-- `upgrade_state_uncertain`。
+文件短暂占用时安装器会有限重试。仍无法继续时按具体原因处理：
+
+- `upgrade_files_in_use`：退出占用程序后重试；
+- `upgrade_media_access_denied` / `upgrade_media_unreadable`：检查目录权限、安全软件或磁盘状态；
+- `upgrade_session_required`：恢复专用签名用户活动会话，或重启以通过现有 AutoLogon 恢复；
+- `upgrade_runtime_unavailable`：检查后台组件及签名状态；
+- `upgrade_logout_failed`：确认任务结束并关闭 SimplySign 后重试，无需清除激活；
+- `upgrade_drain_timeout`：等待任务和上传完成后重试，无需重启；
+- `upgrade_quiescence_failed`：检查旧版任务数据库、权限及磁盘，不要删除任务数据；
+- `upgrade_state_uncertain`：保留现场，不要手工覆盖程序文件。
+
+服务升级要求专用签名用户处于活动会话；安装器不会创建新的交互登录会话。
 
 ## 激活、登录与本机签名
 

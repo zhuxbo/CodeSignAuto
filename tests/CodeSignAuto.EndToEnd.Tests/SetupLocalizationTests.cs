@@ -11,6 +11,26 @@ namespace CodeSignAuto.EndToEnd.Tests;
 public sealed class SetupLocalizationTests
 {
     [Theory]
+    [InlineData("upgrade_files_in_use", "ErrorUpgradeFilesInUse")]
+    [InlineData("upgrade_media_access_denied", "ErrorUpgradeMediaAccessDenied")]
+    [InlineData("upgrade_media_unreadable", "ErrorUpgradeMediaUnreadable")]
+    [InlineData("upgrade_session_required", "ErrorUpgradeSessionRequired")]
+    [InlineData("upgrade_runtime_unavailable", "ErrorSigningRuntimeUnavailable")]
+    [InlineData("service_start_failed", "ErrorSigningRuntimeUnavailable")]
+    [InlineData("agent_start_failed", "ErrorSigningRuntimeUnavailable")]
+    [InlineData("upgrade_logout_failed", "ErrorUpgradeLogoutFailed")]
+    [InlineData("upgrade_quiescence_failed", "ErrorUpgradeQuiescenceFailed")]
+    [InlineData("upgrade_drain_timeout", "ErrorUpgradeDrainTimeout")]
+    public void Upgrade_errors_explain_the_recovery_action_in_both_languages(string code, string key)
+    {
+        foreach (var name in new[] { "zh-CN", "en-US" })
+        {
+            var culture = SetupCulture.ResolveSelection(name);
+            Assert.Contains(SetupCulture.GetString(key, culture), SetupCulture.DescribeError(code, culture));
+        }
+    }
+
+    [Theory]
     [InlineData("zh-CN", "zh-CN")]
     [InlineData("zh-HK", "zh-CN")]
     [InlineData("en-US", "en-US")]

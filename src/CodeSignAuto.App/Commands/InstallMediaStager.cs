@@ -449,7 +449,16 @@ internal sealed class WindowsInstallMediaStager : IInstallMediaStager, IUpgradeM
         }
     }
 
-    public async Task VerifyUpgradeTargetReplaceableAsync(
+    public Task VerifyUpgradeTargetReplaceableAsync(
+        InstallMediaPlan plan,
+        CancellationToken cancellationToken) => RetryFileAccessAsync(
+            () => VerifyUpgradeTargetOnceAsync(plan, cancellationToken),
+            () => SameIdentity(_existingTargetIdentity, ReadDirectoryIdentity(plan.TargetRoot)),
+            UpgradeMoveMaximumAttempts,
+            token => Task.Delay(UpgradeMoveRetryDelay, token),
+            cancellationToken);
+
+    private async Task VerifyUpgradeTargetOnceAsync(
         InstallMediaPlan plan,
         CancellationToken cancellationToken)
     {
@@ -498,18 +507,9 @@ internal sealed class WindowsInstallMediaStager : IInstallMediaStager, IUpgradeM
             _oldTargetLease = after;
             after = null;
         }
-        catch (SetupException error) when (error.Code is
-            "install_media_copy_failed" or "install_media_source_changed")
+        catch (IOException error) when (!IsRenameBlocked(error) && !IsAccessDenied(error))
         {
-            throw new SetupException("restart_required");
-        }
-        catch (IOException)
-        {
-            throw new SetupException("restart_required");
-        }
-        catch (Win32Exception error) when (IsRenameBlocked(error))
-        {
-            throw new SetupException("restart_required");
+            throw new SetupException("upgrade_media_unreadable");
         }
         finally
         {
@@ -582,7 +582,7 @@ internal sealed class WindowsInstallMediaStager : IInstallMediaStager, IUpgradeM
         }
         catch (Exception error) when (IsRenameBlocked(error))
         {
-            throw new SetupException("restart_required");
+            throw new SetupException("upgrade_files_in_use");
         }
         catch
         {
@@ -1202,7 +1202,7 @@ internal sealed class WindowsInstallMediaStager : IInstallMediaStager, IUpgradeM
         return code is 32 or 33;
     }
 
-    internal static async Task MoveDirectoryWithRetryAsync(
+    internal static Task MoveDirectoryWithRetryAsync(
         Action move,
         Func<bool> stateIsSafeToRetry,
         int maxAttempts,
@@ -1210,6 +1210,19 @@ internal sealed class WindowsInstallMediaStager : IInstallMediaStager, IUpgradeM
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(move);
+        return RetryFileAccessAsync(
+            () => { move(); return Task.CompletedTask; },
+            stateIsSafeToRetry, maxAttempts, delay, cancellationToken);
+    }
+
+    internal static async Task RetryFileAccessAsync(
+        Func<Task> operation,
+        Func<bool> stateIsSafeToRetry,
+        int maxAttempts,
+        Func<CancellationToken, Task> delay,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
         ArgumentNullException.ThrowIfNull(stateIsSafeToRetry);
         ArgumentNullException.ThrowIfNull(delay);
         if (maxAttempts < 1)
@@ -1222,10 +1235,10 @@ internal sealed class WindowsInstallMediaStager : IInstallMediaStager, IUpgradeM
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                move();
+                await operation().ConfigureAwait(false);
                 return;
             }
-            catch (Exception error) when (IsAccessDenied(error))
+            catch (Exception error) when (IsAccessDenied(error) || IsRenameBlocked(error))
             {
                 bool stateIsSafe;
                 try
@@ -1243,7 +1256,9 @@ internal sealed class WindowsInstallMediaStager : IInstallMediaStager, IUpgradeM
                 }
                 if (attempt >= maxAttempts)
                 {
-                    throw new SetupException("restart_required");
+                    throw new SetupException(IsRenameBlocked(error)
+                        ? "upgrade_files_in_use"
+                        : "upgrade_media_access_denied");
                 }
 
                 await delay(cancellationToken).ConfigureAwait(false);
@@ -1252,7 +1267,7 @@ internal sealed class WindowsInstallMediaStager : IInstallMediaStager, IUpgradeM
     }
 
     private static bool IsAccessDenied(Exception error) =>
-        (error.HResult & 0xffff) == 5;
+        (error is Win32Exception windows ? windows.NativeErrorCode : error.HResult & 0xffff) == 5;
 
     private sealed record MediaTreeEntry(string Path, string RelativePath, bool Directory);
 

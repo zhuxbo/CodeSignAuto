@@ -10,6 +10,107 @@ namespace CodeSignAuto.EndToEnd.Tests;
 public sealed class WindowsUpgradeTransactionTests
 {
     [Fact]
+    public async Task Upgrade_preflight_recovers_stopped_service_and_agent_without_stopping_them()
+    {
+        var startup = new FakeStartupRuntime();
+        var control = new FakeUpgradeControl
+        {
+            SettingsFailureCount = 1,
+            SnapshotProvider = () => startup.Events.Contains("start-task")
+                ? Snapshot(Capability(SimplySignSessionState.LoginRequired), CapabilitySnapshot.NotConfigured())
+                : throw new ManagementUnavailableException(Guid.NewGuid()),
+        };
+        var snapshot = await WindowsUpgradeTransaction.PrepareRuntimeAsync(
+            control, startup, () => true, "1.0.0", CancellationToken.None,
+            maxAttempts: 3, delay: _ => Task.CompletedTask);
+        Assert.True(snapshot.AgentConnected);
+        Assert.Equal(["start-service", "start-task"], startup.Events);
+    }
+
+    [Fact]
+    public async Task Healthy_upgrade_preflight_does_not_touch_runtime()
+    {
+        var startup = new FakeStartupRuntime();
+        await WindowsUpgradeTransaction.PrepareRuntimeAsync(
+            new FakeUpgradeControl(), startup, () => true, "1.0.0", CancellationToken.None);
+        Assert.Empty(startup.Events);
+    }
+
+    [Fact]
+    public async Task Upgrade_preflight_requires_session_without_starting_components()
+    {
+        var startup = new FakeStartupRuntime();
+        var error = await Assert.ThrowsAsync<SetupException>(() =>
+            WindowsUpgradeTransaction.PrepareRuntimeAsync(
+                new FakeUpgradeControl(), startup, () => false, "1.0.0", CancellationToken.None));
+        Assert.Equal("upgrade_session_required", error.Code);
+        Assert.Empty(startup.Events);
+    }
+
+    [Fact]
+    public async Task Upgrade_preflight_does_not_restart_unresponsive_running_agent()
+    {
+        var startup = new FakeStartupRuntime();
+        var control = new FakeUpgradeControl
+        {
+            SnapshotProvider = () => Snapshot(Capability(SimplySignSessionState.LoginRequired),
+                CapabilitySnapshot.NotConfigured(), heartbeatAgeMilliseconds: 999999),
+        };
+        var error = await Assert.ThrowsAsync<SetupException>(() =>
+            WindowsUpgradeTransaction.PrepareRuntimeAsync(
+                control, startup, () => true, "1.0.0", CancellationToken.None,
+                maxAttempts: 2, delay: _ => Task.CompletedTask));
+        Assert.Equal("upgrade_runtime_unavailable", error.Code);
+        Assert.Empty(startup.Events);
+    }
+
+    [Fact]
+    public async Task Upgrade_preflight_rejects_version_mismatch_without_recovery()
+    {
+        var startup = new FakeStartupRuntime();
+        var error = await Assert.ThrowsAsync<SetupException>(() =>
+            WindowsUpgradeTransaction.PrepareRuntimeAsync(
+                new FakeUpgradeControl(), startup, () => true, "2.0.0", CancellationToken.None));
+        Assert.Equal("owned_resource_mismatch", error.Code);
+        Assert.Empty(startup.Events);
+    }
+
+    [Fact]
+    public async Task Unavailable_service_is_started_at_most_once_and_never_stopped()
+    {
+        var startup = new FakeStartupRuntime();
+        var error = await Assert.ThrowsAsync<SetupException>(() =>
+            WindowsUpgradeTransaction.PrepareRuntimeAsync(
+                new FakeUpgradeControl { SettingsFailureCount = 10 }, startup, () => true,
+                "1.0.0", CancellationToken.None, maxAttempts: 3, delay: _ => Task.CompletedTask));
+        Assert.Equal("upgrade_runtime_unavailable", error.Code);
+        Assert.Equal(["start-service"], startup.Events);
+    }
+
+    [Fact]
+    public async Task Unavailable_agent_is_started_at_most_once_and_never_stopped()
+    {
+        var startup = new FakeStartupRuntime();
+        var error = await Assert.ThrowsAsync<SetupException>(() =>
+            WindowsUpgradeTransaction.PrepareRuntimeAsync(
+                new FakeUpgradeControl { SnapshotProvider = () => throw new ManagementUnavailableException(Guid.NewGuid()) },
+                startup, () => true, "1.0.0", CancellationToken.None,
+                maxAttempts: 3, delay: _ => Task.CompletedTask));
+        Assert.Equal("upgrade_runtime_unavailable", error.Code);
+        Assert.Equal(["start-task"], startup.Events);
+    }
+
+    [Fact]
+    public async Task Upgrade_preflight_cancellation_does_not_start_components()
+    {
+        var startup = new FakeStartupRuntime();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            WindowsUpgradeTransaction.PrepareRuntimeAsync(
+                new FakeUpgradeControl(), startup, () => true, "1.0.0", new CancellationToken(true)));
+        Assert.Empty(startup.Events);
+    }
+
+    [Fact]
     public void Upgrade_discovery_does_not_treat_abnormal_service_configuration_entries_as_uninstalled()
     {
         var root = Directory.CreateTempSubdirectory("CodeSignAuto.Upgrade.Discovery.").FullName;
@@ -295,7 +396,7 @@ public sealed class WindowsUpgradeTransactionTests
                 TextWriter.Null,
                 CancellationToken.None));
 
-        Assert.Equal("restart_required", error.Code);
+        Assert.Equal("upgrade_runtime_unavailable", error.Code);
         Assert.Equal(0, fixture.LegacyQuiescence.Calls);
         Assert.False(fixture.Media.Activated);
     }
@@ -320,14 +421,17 @@ public sealed class WindowsUpgradeTransactionTests
     [Theory]
     [InlineData(unchecked((int)0x80070020))]
     [InlineData(unchecked((int)0x80070021))]
-    public void Windows_sharing_and_lock_violations_map_to_restart_required(int hresult)
+    public void Windows_sharing_and_lock_violations_are_retryable(int hresult)
     {
         Assert.True(WindowsInstallMediaStager.IsRenameBlocked(
             new IOException("injected sharing violation", hresult)));
     }
 
-    [Fact]
-    public async Task Upgrade_directory_move_retries_transient_access_denied()
+    [Theory]
+    [InlineData(5)]
+    [InlineData(32)]
+    [InlineData(33)]
+    public async Task Upgrade_directory_move_retries_transient_file_access_failure(int code)
     {
         var attempts = 0;
         var delays = 0;
@@ -338,7 +442,7 @@ public sealed class WindowsUpgradeTransactionTests
                 attempts++;
                 if (attempts == 1)
                 {
-                    throw new IOException("injected access denied", unchecked((int)0x80070005));
+                    throw new IOException("injected file access failure", unchecked((int)0x80070000) | code);
                 }
             },
             () => true,
@@ -352,6 +456,37 @@ public sealed class WindowsUpgradeTransactionTests
 
         Assert.Equal(2, attempts);
         Assert.Equal(1, delays);
+    }
+
+    [Theory]
+    [InlineData(32)]
+    [InlineData(33)]
+    public async Task Persistent_native_file_lock_reports_in_use_after_bounded_retry(int code)
+    {
+        var attempts = 0;
+        var error = await Assert.ThrowsAsync<SetupException>(() =>
+            WindowsInstallMediaStager.RetryFileAccessAsync(
+                () => { attempts++; throw new Win32Exception(code); },
+                () => true, 3, _ => Task.CompletedTask, CancellationToken.None));
+        Assert.Equal("upgrade_files_in_use", error.Code);
+        Assert.Equal(3, attempts);
+    }
+
+    [Fact]
+    public async Task File_retry_does_not_hide_changed_media_or_retry_cancellation()
+    {
+        var attempts = 0;
+        var error = await Assert.ThrowsAsync<SetupException>(() =>
+            WindowsInstallMediaStager.RetryFileAccessAsync(
+                () => { attempts++; throw new SetupException("install_media_source_changed"); },
+                () => true, 3, _ => Task.CompletedTask, CancellationToken.None));
+        Assert.Equal("install_media_source_changed", error.Code);
+        Assert.Equal(1, attempts);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            WindowsInstallMediaStager.RetryFileAccessAsync(
+                () => { attempts++; return Task.CompletedTask; },
+                () => true, 3, _ => Task.CompletedTask, new CancellationToken(true)));
+        Assert.Equal(1, attempts);
     }
 
     [Fact]
@@ -378,7 +513,7 @@ public sealed class WindowsUpgradeTransactionTests
     }
 
     [Fact]
-    public async Task Upgrade_directory_move_maps_persistent_access_denied_to_restart_required()
+    public async Task Upgrade_directory_move_reports_persistent_access_denied()
     {
         var attempts = 0;
         var delays = 0;
@@ -401,7 +536,7 @@ public sealed class WindowsUpgradeTransactionTests
                 },
                 CancellationToken.None));
 
-        Assert.Equal("restart_required", error.Code);
+        Assert.Equal("upgrade_media_access_denied", error.Code);
         Assert.Equal(3, attempts);
         Assert.Equal(2, delays);
     }
@@ -450,7 +585,8 @@ public sealed class WindowsUpgradeTransactionTests
     private static ManagementSnapshot Snapshot(
         CapabilitySnapshot authenticode,
         CapabilitySnapshot pdf,
-        int queuedJobCount = 0)
+        int queuedJobCount = 0,
+        long heartbeatAgeMilliseconds = 0)
     {
         var now = DateTimeOffset.UtcNow;
         return new ManagementSnapshot(
@@ -461,7 +597,7 @@ public sealed class WindowsUpgradeTransactionTests
             true,
             1,
             1,
-            0,
+            heartbeatAgeMilliseconds,
             false,
             null,
             authenticode,
@@ -685,18 +821,26 @@ public sealed class WindowsUpgradeTransactionTests
         public Exception? DrainFailure { get; set; }
         public Exception? ResumeFailure { get; set; }
         public int QueuedJobCount { get; set; }
+        public int SettingsFailureCount { get; set; }
+        public Func<ManagementSnapshot>? SnapshotProvider { get; set; }
 
-        public Task<ServiceSettingsSummary> GetServiceSettingsAsync(CancellationToken cancellationToken) =>
-            Task.FromResult(new ServiceSettingsSummary(
+        public Task<ServiceSettingsSummary> GetServiceSettingsAsync(CancellationToken cancellationToken)
+        {
+            if (SettingsFailureCount-- > 0)
+            {
+                throw new ManagementUnavailableException(Guid.NewGuid());
+            }
+            return Task.FromResult(new ServiceSettingsSummary(
                 18080,
                 ServiceSettingsSummary.DefaultMaximumUploadBytes,
                 24,
                 ProductVersionProvider()));
+        }
 
         public Task<ManagementSnapshot> RefreshAsync(CancellationToken cancellationToken)
         {
             Events.Add("refresh");
-            return Task.FromResult(Snapshot(
+            return Task.FromResult(SnapshotProvider?.Invoke() ?? Snapshot(
                 Capability(SimplySignSessionState.LoginRequired),
                 CapabilitySnapshot.NotConfigured(),
                 QueuedJobCount));

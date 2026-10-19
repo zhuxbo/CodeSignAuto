@@ -46,7 +46,7 @@ public sealed class UpgradeCommandTests
         var error = await Assert.ThrowsAsync<SetupException>(() =>
             new UpgradeOrchestrator().ExecuteAsync(transaction, TextWriter.Null, CancellationToken.None));
 
-        Assert.Equal("restart_required", error.Code);
+        Assert.Equal("upgrade_session_required", error.Code);
         Assert.Empty(transaction.Events);
     }
 
@@ -66,7 +66,7 @@ public sealed class UpgradeCommandTests
 
     [Theory]
     [InlineData("stage", "install_media_verification_failed")]
-    [InlineData("replaceable", "restart_required")]
+    [InlineData("replaceable", "upgrade_files_in_use")]
     [InlineData("start-service", "service_start_failed")]
     [InlineData("start-agent", "agent_start_failed")]
     public async Task Controlled_failure_rolls_back_to_the_old_runtime(
@@ -149,7 +149,7 @@ public sealed class UpgradeCommandTests
                 var code = stage switch
                 {
                     "stage" => "install_media_verification_failed",
-                    "replaceable" => "restart_required",
+                    "replaceable" => "upgrade_files_in_use",
                     "start-service" => "service_start_failed",
                     "start-agent" => "agent_start_failed",
                     _ => "upgrade_failed",
