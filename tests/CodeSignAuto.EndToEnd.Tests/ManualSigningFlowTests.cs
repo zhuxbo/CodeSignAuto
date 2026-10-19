@@ -410,7 +410,7 @@ public sealed class ManualSigningFlowTests
             SessionTrigger trigger,
             CancellationToken cancellationToken) => Task.FromResult(Snapshot());
 
-        public Task<IReadySignLease> AcquireReadySignLeaseAsync(CancellationToken cancellationToken) =>
+        public Task<IReadySignLease> AcquireReadySignLeaseAsync(CancellationToken cancellationToken, string? certificateSerialNumber = null) =>
             Task.FromResult<IReadySignLease>(new ReadyLease(Catalog, cancellationToken));
 
         public void Invalidate() { }

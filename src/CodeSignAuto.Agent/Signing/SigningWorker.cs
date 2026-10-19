@@ -110,7 +110,7 @@ public sealed class SigningWorker
 
             var context = new SigningContext(command.JobId, command.Extension);
             var lease = await _sessionManager
-                .AcquireReadySignLeaseAsync(cancellationToken)
+                .AcquireReadySignLeaseAsync(cancellationToken, parameters.CertificateSerialNumber)
                 .ConfigureAwait(false);
             var leaseTransferred = false;
             try

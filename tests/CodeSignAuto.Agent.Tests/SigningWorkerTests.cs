@@ -839,7 +839,7 @@ public sealed class SigningWorkerTests
             CancellationToken cancellationToken) => Task.FromResult(Ready());
 
         public async Task<IReadySignLease> AcquireReadySignLeaseAsync(
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken, string? certificateSerialNumber = null)
         {
             await _leaseGate.WaitAsync(cancellationToken);
             CallCount++;

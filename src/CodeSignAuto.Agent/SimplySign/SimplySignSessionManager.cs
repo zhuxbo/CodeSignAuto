@@ -42,7 +42,7 @@ public interface ISimplySignSessionManager : IDisposable, IAsyncDisposable
         SessionTrigger trigger,
         CancellationToken cancellationToken);
 
-    Task<IReadySignLease> AcquireReadySignLeaseAsync(CancellationToken cancellationToken);
+    Task<IReadySignLease> AcquireReadySignLeaseAsync(CancellationToken cancellationToken, string? certificateSerialNumber = null);
 
     Task<SimplySignSessionSnapshot> LogoutAsync(CancellationToken cancellationToken) =>
         Task.FromException<SimplySignSessionSnapshot>(
@@ -191,7 +191,7 @@ public sealed class SimplySignSessionManager : ISimplySignSessionManager
     }
 
     public async Task<IReadySignLease> AcquireReadySignLeaseAsync(
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, string? certificateSerialNumber = null)
     {
         BeginOperation();
         var linked = CancellationTokenSource.CreateLinkedTokenSource(
@@ -213,6 +213,20 @@ public sealed class SimplySignSessionManager : ISimplySignSessionManager
             if (!snapshot.Ready)
             {
                 throw new SimplySignException(NormalizeSigningFailure(snapshot));
+            }
+
+            // SimplySign may expose certificates one at a time after login.
+            var deadline = _driver.UtcNow + LoginProbeTimeout;
+            while (certificateSerialNumber is not null &&
+                !catalog.BySerialNumber.ContainsKey(certificateSerialNumber) &&
+                !catalog.AmbiguousSerialNumbers.Contains(certificateSerialNumber) &&
+                _driver.UtcNow < deadline)
+            {
+                var remaining = deadline - _driver.UtcNow;
+                await _driver.DelayAsync(
+                    remaining < ProbeInterval ? remaining : ProbeInterval,
+                    operationLease.CancellationToken).ConfigureAwait(false);
+                catalog = await _catalog.RefreshAsync(operationLease.CancellationToken).ConfigureAwait(false);
             }
 
             return new ReadySignLease(this, snapshot, catalog, operationLease, linked);

@@ -17,6 +17,61 @@ public sealed class UnattendedReloginTests
     private static readonly CertificateAlias Code = Alias("codesign", "aa00", "bb00");
     private static readonly CertificateAlias Document = Alias("document", "cc00", "dd00");
 
+    [Theory]
+    [InlineData(0, true)]
+    [InlineData(2, true)]
+    [InlineData(int.MaxValue, false)]
+    public async Task Pdf_job_waits_for_its_certificate_after_relogin(int missingProbes, bool succeeds)
+    {
+        var driver = new ExpiringDriver(initiallyReady: false);
+        var catalog = new ExpiringCatalog(driver) { MissingPdfProbes = missingProbes };
+        await using var gate = new SigningOperationGate();
+        await using var manager = new SimplySignSessionManager(driver, gate, catalog);
+        var root = Path.Combine(Path.GetTempPath(), "CodeSignAuto.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var pdf = new RecordingPdfSigner();
+            var worker = new SigningWorker(null, pdf, manager, root);
+            var result = await worker.ExecuteAsync(CreateCommand(root, 0), (_, _, _) => Task.CompletedTask, default);
+
+            if (succeeds)
+            {
+                Assert.IsType<JobCompleted>(result);
+                Assert.Equal(1, pdf.CallCount);
+                Assert.Equal(TimeSpan.FromSeconds(missingProbes + 1), driver.UtcNow - DateTimeOffset.UnixEpoch);
+            }
+            else
+            {
+                Assert.Equal("certificate_not_found", Assert.IsType<JobFailed>(result).ErrorCode);
+                Assert.Equal(0, pdf.CallCount);
+                Assert.InRange(driver.UtcNow - DateTimeOffset.UnixEpoch, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(32));
+            }
+            Assert.Equal(1, driver.LoginCalls);
+            Assert.True(await gate.TryRunHealthCheckAsync(_ => Task.CompletedTask, default));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Cancellation_while_waiting_for_target_certificate_releases_the_signing_gate()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var driver = new ExpiringDriver(initiallyReady: true) { OnDelay = cancellation.Cancel };
+        var catalog = new ExpiringCatalog(driver) { MissingPdfProbes = int.MaxValue };
+        await using var gate = new SigningOperationGate();
+        await using var manager = new SimplySignSessionManager(driver, gate, catalog);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            manager.AcquireReadySignLeaseAsync(cancellation.Token, "CC00"));
+
+        Assert.Equal(0, driver.LoginCalls);
+        Assert.True(await gate.TryRunHealthCheckAsync(_ => Task.CompletedTask, default));
+    }
+
     [Fact]
     public async Task Expired_ready_snapshot_relogs_in_before_the_next_sign_lease()
     {
@@ -347,6 +402,7 @@ public sealed class UnattendedReloginTests
         public int ProcessChecks { get; private set; }
         public int MaximumProbeConcurrency { get; private set; }
         public bool NeverReady { get; init; }
+        public Action? OnDelay { get; init; }
 
         public SimplySignProcessState CheckProcessOnly()
         {
@@ -420,6 +476,7 @@ public sealed class UnattendedReloginTests
         {
             cancellationToken.ThrowIfCancellationRequested();
             UtcNow += delay;
+            OnDelay?.Invoke();
             return Task.CompletedTask;
         }
 
@@ -429,6 +486,7 @@ public sealed class UnattendedReloginTests
     private sealed class ExpiringCatalog(ExpiringDriver driver) : ICertificateCatalog
     {
         private long _generation;
+        public int MissingPdfProbes { get; set; }
 
         public int RefreshCalls { get; private set; }
 
@@ -453,6 +511,17 @@ public sealed class UnattendedReloginTests
                     ["AA00"] = [Certificate("AA00", supportsAuthenticode: true, supportsPdf: false)],
                     ["CC00"] = [Certificate("CC00", supportsAuthenticode: false, supportsPdf: true)],
                 });
+            if (MissingPdfProbes > 0)
+            {
+                MissingPdfProbes--;
+                Current = Current with
+                {
+                    BySerialNumber = new Dictionary<string, IReadOnlyList<SigningCertificate>>
+                    {
+                        ["AA00"] = Current.BySerialNumber["AA00"],
+                    },
+                };
+            }
             return Current;
         }
 

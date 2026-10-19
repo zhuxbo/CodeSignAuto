@@ -177,7 +177,7 @@ public sealed class SimplySignHealthMonitorTests
         public Task<SimplySignSessionSnapshot> EnsureReadyAsync(
             SessionTrigger trigger,
             CancellationToken cancellationToken) => Task.FromResult(Ready());
-        public Task<IReadySignLease> AcquireReadySignLeaseAsync(CancellationToken cancellationToken) =>
+        public Task<IReadySignLease> AcquireReadySignLeaseAsync(CancellationToken cancellationToken, string? certificateSerialNumber = null) =>
             throw new NotSupportedException();
         public void Invalidate()
         {

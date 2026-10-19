@@ -485,7 +485,7 @@ public sealed class AgentRuntimeCompositionTests
             CancellationToken cancellationToken) => CheckAsync(trigger, cancellationToken);
 
         public Task<IReadySignLease> AcquireReadySignLeaseAsync(
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken, string? certificateSerialNumber = null)
         {
             ReadyLeaseCalls++;
             return Task.FromResult<IReadySignLease>(new RecordingReadyLease(
