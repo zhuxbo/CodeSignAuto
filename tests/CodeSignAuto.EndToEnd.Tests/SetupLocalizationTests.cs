@@ -304,6 +304,28 @@ public sealed class SetupLocalizationTests
         });
     }
 
+    [WindowsFact]
+    public void Pdf_install_errors_have_actionable_messages_in_both_languages()
+    {
+        foreach (var cultureName in new[] { "zh-CN", "en-US" })
+        {
+            var culture = SetupCulture.ResolveSelection(cultureName);
+            foreach (var code in new[]
+                     {
+                         "pdf_extension_files_in_use", "pdf_extension_downgrade_not_allowed",
+                         "pdf_extension_target_exists", "pdf_extension_main_invalid",
+                         "pdf_extension_access_denied", "pdf_extension_install_state_uncertain",
+                         "pdf_extension_registration_invalid", "pdf_extension_install_failed",
+                         "pdf_extension_backup_cleanup_failed", "pdf_extension_media_invalid",
+                     })
+            {
+                var message = SetupCulture.DescribeError(code, culture);
+                Assert.Contains(code, message, StringComparison.Ordinal);
+                Assert.DoesNotContain(SetupCulture.GetString("ErrorGeneric", culture), message, StringComparison.Ordinal);
+            }
+        }
+    }
+
     private static IReadOnlyDictionary<string, string> ReadResourceSet(
         ResourceManager manager,
         CultureInfo culture)
