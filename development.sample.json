@@ -1,0 +1,21 @@
+{
+  "build": {
+    "host": "<build-host-ip>",
+    "sshUser": "Administrator",
+    "sshIdentityFile": "/path/to/ssh/private-key",
+    "workspaceParent": "C:\\Users\\Administrator",
+    "repositoryDirectoryTemplate": "CodeSignAuto-release-{version}",
+    "dotnetRoot": "C:\\path\\to\\dotnet",
+    "gitExecutable": "C:\\path\\to\\git.exe",
+    "uvExecutable": "C:\\path\\to\\uv.exe",
+    "pythonExecutable": "C:\\path\\to\\python.exe",
+    "signingReferencePath": "C:\\path\\to\\known-good-signed.exe"
+  },
+  "signing": {
+    "host": "<signing-host-ip>",
+    "sshUser": "Administrator",
+    "sshIdentityFile": "/path/to/ssh/private-key",
+    "baseUrl": "http://<signing-host-ip>:7080",
+    "bearerToken": ""
+  }
+}

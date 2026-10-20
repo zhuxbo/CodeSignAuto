@@ -19,6 +19,7 @@ description: 在 CodeSignAuto 仓库中进行新会话上手、Windows 构建测
 
 ## 环境与安全
 
+- 开发环境配置使用仓库根目录的 `development.local.json`（已忽略，不提交），字段示例见 `development.sample.json`。本地配置允许保存签名 token 文本，但不得整体打印或纳入日志；sample 只保留占位值，不得写入实际主机地址或凭证。
 - Windows 构建机可使用本地 SSH 配置执行构建和测试。
 - Windows 发布验证机只安装、重启、登录、调用 API 和做真实签名验证，禁止构建源码。
 - 优先 SSH 和仓库脚本；只有必须观察 WPF 交互时才使用桌面操作。
@@ -36,6 +37,15 @@ description: 在 CodeSignAuto 仓库中进行新会话上手、Windows 构建测
 6. 按授权分 Task 本地提交，使用 `type: 中文概括`，不添加 AI 署名。
 
 ## 发布门禁
+
+### 本地开发配置与构建流程
+
+1. 首次使用将 `development.sample.json` 复制为 `development.local.json`，限制为当前用户可读写（macOS/Linux 使用 `chmod 600`）。分别填写 `build` 和 `signing` 的 `host`、`sshUser`、`sshIdentityFile`；两处 key 路径均属于发起 SSH 的开发电脑，可分别配置。`build` 下其余路径属于 Windows 构建机。
+2. `signing.baseUrl` 使用签名服务的内网 IP 和实际监听端口；直连服务不带公网代理的 `/sign` 前缀。将用户提供的 token 文本去除首尾空白后写入 `signing.bearerToken`，不保存 token 文件路径。复制和使用凭证时仅由程序读取，不输出内容。
+3. 根据当次任务确定版本，在构建机的 `build.workspaceParent` 下按 `build.repositoryDirectoryTemplate` 准备完整历史、干净的源码。用 `build.sshIdentityFile` 连接 `build.host` / `build.sshUser`；将 `build.gitExecutable` 所在目录加入 PATH，并按需用 `build.pythonExecutable` 设置 `UV_PYTHON`。需要 SSH 检查签名机时，使用 `signing.host`、`signing.sshUser` 和 `signing.sshIdentityFile`，签名 API 仍使用 `signing.baseUrl`。
+4. 现有构建脚本不会自动加载 JSON。开发操作读取配置后，先检查 `signing.baseUrl` 的 `/health/live`；通过 SSH 标准输入将 `signing.bearerToken` 写入构建机随机临时目录内的文件，ACL 仅允许构建账户和 SYSTEM，禁止将 token 拼进命令行。
+5. 调用下面的包装器：`SigningBaseUrl` 对应 `signing.baseUrl`，`BearerTokenPath` 使用远端临时文件路径，`SigningReferencePath`、`DotnetRoot`、`UvPath` 分别对应 `build.signingReferencePath`、`build.dotnetRoot`、`build.uvExecutable`。无论成功失败，都在 `finally` 删除远端临时凭证文件和目录。
+6. 完成下述安装包验证后汇报结果。配置不设默认交付机器或目录；只有当次任务明确要求交付时才传输安装包。
 
 在完整、干净、非 shallow 的仓库先运行：
 
