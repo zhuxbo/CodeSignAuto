@@ -9,6 +9,7 @@ using CodeSignAuto.Agent.Signing;
 using CodeSignAuto.App;
 using CodeSignAuto.App.Tools;
 using CodeSignAuto.Core.Security;
+using CodeSignAuto.Core.Versioning;
 using CodeSignAuto.Service;
 
 namespace CodeSignAuto.App.Commands;
@@ -195,6 +196,13 @@ internal sealed class WindowsPdfExtensionOperations : IPdfExtensionOperations
     private bool _stagingCreated;
     private bool _promoted;
     private bool _alreadyInstalled;
+    private PdfExtensionManifest? _previousManifest;
+    private PdfExtensionUninstallRegistration? _previousRegistration;
+    private LocalFileIdentity? _previousRootIdentity;
+    private PdfExtensionPaths? _backup;
+    private bool _backupMoved;
+    private bool _registrationChangeStarted;
+    private bool _committed;
 
     internal WindowsPdfExtensionOperations()
         : this(
@@ -332,12 +340,22 @@ internal sealed class WindowsPdfExtensionOperations : IPdfExtensionOperations
                     mainExecutable,
                     installed.ProductVersion,
                     target.Root);
-                if (installed != manifest || !_registrationStore.IsExact(registration))
+                if (!_registrationStore.IsExact(registration))
                 {
-                    throw new InstallException("pdf_extension_target_exists");
+                    throw new InstallException("pdf_extension_registration_invalid");
                 }
 
-                _alreadyInstalled = true;
+                if (ProductVersion.Parse(manifest.ProductVersion)
+                    .ComparePrecedenceTo(ProductVersion.Parse(installed.ProductVersion)) < 0)
+                {
+                    throw new InstallException("pdf_extension_downgrade_not_allowed");
+                }
+
+                _alreadyInstalled = installed == manifest;
+                _previousManifest = installed;
+                _previousRegistration = registration;
+                using var rootHandle = WindowsNoFollowSecurity.OpenDirectoryHandle(target.Root);
+                _previousRootIdentity = RequireSingleLinkIdentity(rootHandle);
             }
 
             _sourceLease = lease;
@@ -352,6 +370,14 @@ internal sealed class WindowsPdfExtensionOperations : IPdfExtensionOperations
         catch (InstallException)
         {
             throw;
+        }
+        catch (Exception failure) when (IsFileInUse(failure))
+        {
+            throw new InstallException("pdf_extension_files_in_use");
+        }
+        catch (Exception failure) when (IsAccessDenied(failure))
+        {
+            throw new InstallException("pdf_extension_access_denied");
         }
         catch
         {
@@ -438,6 +464,43 @@ internal sealed class WindowsPdfExtensionOperations : IPdfExtensionOperations
                     cancellationToken)
                 .ConfigureAwait(false);
 
+            if (_previousManifest is not null)
+            {
+                VerifyRootIdentity(plan.Target.Root, _previousRootIdentity);
+                var current = await _verifier.ReadAndVerifyInstalledAsync(
+                        plan.Target, _context.ProcessPath, plan.SigningUserSid, cancellationToken)
+                    .ConfigureAwait(false);
+                if (current != _previousManifest || !_registrationStore.IsExact(_previousRegistration!))
+                {
+                    throw new InstallException("pdf_extension_install_state_uncertain");
+                }
+
+                // Detect a running helper before moving any installed files.
+                foreach (var file in Directory.EnumerateFiles(plan.Target.Root))
+                {
+                    using var handle = WindowsNoFollowSecurity.OpenRenameSourceHandle(file);
+                    _ = RequireSingleLinkIdentity(handle);
+                }
+
+                var backupRoot = Path.Combine(_context.ProgramFilesRoot,
+                    $"CodeSignAuto PDF Support.backup-{plan.InstanceId}");
+                _backup = new PdfExtensionPaths(
+                    backupRoot,
+                    Path.Combine(backupRoot, "extension.json"),
+                    Path.Combine(backupRoot, "CodeSignAutoPdfSigner.exe"),
+                    Path.Combine(backupRoot, "LICENSE.txt"),
+                    Path.Combine(backupRoot, "THIRD-PARTY-NOTICES.txt"));
+                if (NoFollowFile.InspectPathEntry(backupRoot) != NoFollowPathEntryKind.Missing)
+                {
+                    throw new InstallException("pdf_extension_target_exists");
+                }
+
+                VerifyRootIdentity(plan.Target.Root, _previousRootIdentity);
+                Directory.Move(plan.Target.Root, backupRoot);
+                _backupMoved = true;
+                VerifyRootIdentity(backupRoot, _previousRootIdentity);
+            }
+
             Directory.Move(staging.Root, plan.Target.Root);
             _promoted = true;
             VerifyRootIdentity(plan.Target.Root, _publishedRootIdentity);
@@ -447,10 +510,29 @@ internal sealed class WindowsPdfExtensionOperations : IPdfExtensionOperations
                     plan.SigningUserSid,
                     cancellationToken)
                 .ConfigureAwait(false);
+            if (_previousRegistration is not null)
+            {
+                _registrationChangeStarted = true;
+                _registrationStore.Remove(_previousRegistration);
+            }
+
             _registrationStore.Create(PdfExtensionUninstallRegistration.Create(
                 _context.ProcessPath,
                 plan.Manifest.ProductVersion,
                 plan.Target.Root));
+            _committed = true;
+            if (_backupMoved)
+            {
+                try
+                {
+                    DeleteOwnedRoot(_backup!, _previousRootIdentity, signingUser);
+                }
+                catch
+                {
+                    throw new InstallException("pdf_extension_backup_cleanup_failed");
+                }
+            }
+
             CompleteInstall();
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -463,10 +545,14 @@ internal sealed class WindowsPdfExtensionOperations : IPdfExtensionOperations
             RollbackInstall(plan, staging, signingUser);
             throw;
         }
-        catch
+        catch (Exception failure)
         {
             RollbackInstall(plan, staging, signingUser);
-            throw new InstallException("pdf_extension_install_failed");
+            throw new InstallException(IsFileInUse(failure)
+                ? "pdf_extension_files_in_use"
+                : IsAccessDenied(failure)
+                    ? "pdf_extension_access_denied"
+                    : "pdf_extension_install_failed");
         }
     }
 
@@ -564,6 +650,12 @@ internal sealed class WindowsPdfExtensionOperations : IPdfExtensionOperations
         PdfExtensionPaths staging,
         SecurityIdentifier signingUser)
     {
+        if (_committed)
+        {
+            CompleteInstall();
+            return;
+        }
+
         try
         {
             if (_promoted)
@@ -573,6 +665,25 @@ internal sealed class WindowsPdfExtensionOperations : IPdfExtensionOperations
             else if (_stagingCreated)
             {
                 DeleteOwnedStaging(staging, _publishedRootIdentity, signingUser);
+            }
+
+            if (_backupMoved)
+            {
+                VerifyRootIdentity(_backup!.Root, _previousRootIdentity);
+                Directory.Move(_backup.Root, plan.Target.Root);
+                VerifyRootIdentity(plan.Target.Root, _previousRootIdentity);
+            }
+
+            if (_registrationChangeStarted && !_registrationStore.IsExact(_previousRegistration!))
+            {
+                var replacement = PdfExtensionUninstallRegistration.Create(
+                    _context.ProcessPath, plan.Manifest.ProductVersion, plan.Target.Root);
+                if (_registrationStore.IsExact(replacement))
+                {
+                    _registrationStore.Remove(replacement);
+                }
+
+                _registrationStore.Create(_previousRegistration!);
             }
 
             CompleteInstall();
@@ -599,7 +710,21 @@ internal sealed class WindowsPdfExtensionOperations : IPdfExtensionOperations
         _stagingCreated = false;
         _promoted = false;
         _alreadyInstalled = false;
+        _previousManifest = null;
+        _previousRegistration = null;
+        _previousRootIdentity = null;
+        _backup = null;
+        _backupMoved = false;
+        _registrationChangeStarted = false;
+        _committed = false;
     }
+
+    private static bool IsAccessDenied(Exception failure) =>
+        failure is UnauthorizedAccessException or System.ComponentModel.Win32Exception { NativeErrorCode: 5 };
+
+    private static bool IsFileInUse(Exception failure) =>
+        failure is IOException && (failure.HResult & 0xffff) is 32 or 33 ||
+        failure is System.ComponentModel.Win32Exception { NativeErrorCode: 32 or 33 };
 
     private static void DeleteOwnedRoot(
         PdfExtensionPaths paths,

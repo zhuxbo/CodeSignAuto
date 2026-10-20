@@ -78,4 +78,14 @@ ASP.NET Core Runtime：https://dotnet.microsoft.com/en-us/download/dotnet/10.0
   <data name="ErrorUpgradeLogoutFailed" xml:space="preserve"><value>无法正常退出签名会话。请确认签名任务结束并关闭 SimplySign 后重试；不要清除激活信息。</value></data>
   <data name="ErrorUpgradeQuiescenceFailed" xml:space="preserve"><value>无法确认旧版任务数据库已空闲。请检查数据库、权限及磁盘状态后重试，不要删除任务数据。</value></data>
   <data name="ErrorUpgradeDrainTimeout" xml:space="preserve"><value>等待任务或上传结束超时，尚未替换程序。请等待任务完成后重新运行安装程序，无需重启 Windows。</value></data>
+  <data name="ErrorPdfFilesInUse" xml:space="preserve"><value>PDF 扩展文件正在使用中。请等待 PDF 签名任务结束，关闭占用扩展目录的程序后重试；无需卸载主程序或清除激活信息。</value></data>
+  <data name="ErrorPdfDowngrade" xml:space="preserve"><value>已安装的 PDF 扩展版本高于此安装包。请使用相同或更新版本的 PDF 扩展安装包。</value></data>
+  <data name="ErrorPdfTargetExists" xml:space="preserve"><value>PDF 扩展目标或临时目录已存在，且无法安全替换。请检查安装日志并确认目录归属，不要直接删除未知文件。</value></data>
+  <data name="ErrorPdfMainInvalid" xml:space="preserve"><value>未找到有效的 CodeSignAuto 主程序安装。请先安装或修复主程序，再运行 PDF 扩展安装包。</value></data>
+  <data name="ErrorPdfAccessDenied" xml:space="preserve"><value>无法访问 PDF 扩展文件或安装目录。请以管理员身份运行，并检查目录权限及安全软件拦截。</value></data>
+  <data name="ErrorPdfStateUncertain" xml:space="preserve"><value>PDF 扩展安装状态校验或恢复失败。请保留现有扩展、备份目录和诊断日志，检查后再重试。</value></data>
+  <data name="ErrorPdfRegistrationInvalid" xml:space="preserve"><value>PDF 扩展的卸载注册信息不匹配，无法安全覆盖。请检查安装状态和诊断日志后再重试。</value></data>
+  <data name="ErrorPdfInstallFailed" xml:space="preserve"><value>PDF 扩展安装失败，未完成替换；已有扩展已保留或恢复。请检查诊断日志后重试。</value></data>
+  <data name="ErrorPdfBackupCleanupFailed" xml:space="preserve"><value>新版 PDF 扩展已安装，但旧文件备份未能清理。请保留备份目录，确认无文件占用后再清理；无需重新安装。</value></data>
+  <data name="ErrorPdfMediaInvalid" xml:space="preserve"><value>PDF 扩展安装文件校验失败或文件已改变。请重新获取完整的官方安装包后重试。</value></data>
 </root>

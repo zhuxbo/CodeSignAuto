@@ -223,9 +223,9 @@ public sealed class PdfExtensionCommandTests
 
         Assert.Equal(
             [
+                "CodeSignAutoPdfSigner.exe",
                 "extension.json",
                 "LICENSE.txt",
-                "CodeSignAutoPdfSigner.exe",
                 "THIRD-PARTY-NOTICES.txt",
             ],
             Directory.EnumerateFiles(fixture.TargetRoot)
@@ -398,6 +398,88 @@ public sealed class PdfExtensionCommandTests
             registration.RemovedRegistration?.OwnerMarker);
     }
 
+    [WindowsAdministratorTheory]
+    [InlineData("0.17.0")]
+    [InlineData("0.16.0")]
+    public async Task Windows_installer_replaces_an_older_or_same_version_extension(string version)
+    {
+        using var fixture = new WindowsInstallFixture();
+        var registration = new RecordingRegistrationStore();
+        var original = fixture.CreateOperations(new RecordingArtifactVerifier(fixture.Manifest), registration);
+        await original.PublishInstallAsync(
+            await original.PlanInstallAsync(fixture.MediaRoot, CancellationToken.None), CancellationToken.None);
+        var replacement = fixture.ReplaceMedia(version);
+        var verifier = new RecordingArtifactVerifier(replacement) { InstalledManifest = fixture.Manifest };
+        var upgrade = fixture.CreateOperations(verifier, registration);
+
+        await upgrade.PublishInstallAsync(
+            await upgrade.PlanInstallAsync(fixture.MediaRoot, CancellationToken.None), CancellationToken.None);
+
+        Assert.Equal("replacement-helper", File.ReadAllText(Path.Combine(fixture.TargetRoot, "CodeSignAutoPdfSigner.exe")));
+        Assert.True(registration.IsExact(PdfExtensionUninstallRegistration.Create(
+            fixture.MainExecutable, version, fixture.TargetRoot)));
+        Assert.DoesNotContain(Directory.EnumerateDirectories(fixture.ProgramFilesRoot),
+            path => path.StartsWith(fixture.TargetRoot + ".", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [WindowsAdministratorFact]
+    public async Task Windows_installer_rejects_pdf_downgrade_without_changing_existing_files()
+    {
+        using var fixture = new WindowsInstallFixture();
+        var registration = new RecordingRegistrationStore();
+        var original = fixture.CreateOperations(new RecordingArtifactVerifier(fixture.Manifest), registration);
+        await original.PublishInstallAsync(
+            await original.PlanInstallAsync(fixture.MediaRoot, CancellationToken.None), CancellationToken.None);
+        var replacement = fixture.ReplaceMedia("0.15.0");
+        var upgrade = fixture.CreateOperations(new RecordingArtifactVerifier(replacement)
+            { InstalledManifest = fixture.Manifest }, registration);
+
+        var failure = await Assert.ThrowsAsync<InstallException>(() =>
+            upgrade.PlanInstallAsync(fixture.MediaRoot, CancellationToken.None));
+
+        Assert.Equal("pdf_extension_downgrade_not_allowed", failure.Code);
+        Assert.Equal("signed-helper-fixture", File.ReadAllText(Path.Combine(fixture.TargetRoot, "CodeSignAutoPdfSigner.exe")));
+        Assert.Equal(["register"], registration.Events);
+    }
+
+    [WindowsAdministratorTheory]
+    [InlineData("final-verification")]
+    [InlineData("registration")]
+    [InlineData("locked-file")]
+    public async Task Windows_installer_preserves_old_pdf_on_replacement_failure(string failurePoint)
+    {
+        using var fixture = new WindowsInstallFixture();
+        var registration = new RecordingRegistrationStore();
+        var original = fixture.CreateOperations(new RecordingArtifactVerifier(fixture.Manifest), registration);
+        await original.PublishInstallAsync(
+            await original.PlanInstallAsync(fixture.MediaRoot, CancellationToken.None), CancellationToken.None);
+        var oldManifest = File.ReadAllBytes(Path.Combine(fixture.TargetRoot, "extension.json"));
+        var replacement = fixture.ReplaceMedia("0.17.0");
+        var verifier = new RecordingArtifactVerifier(replacement)
+        {
+            InstalledManifest = fixture.Manifest,
+            FailFinalVerification = failurePoint == "final-verification",
+        };
+        var upgrade = fixture.CreateOperations(verifier, registration);
+        var plan = await upgrade.PlanInstallAsync(fixture.MediaRoot, CancellationToken.None);
+        registration.FailNextCreate = failurePoint == "registration";
+        using var locked = failurePoint == "locked-file"
+            ? new FileStream(Path.Combine(fixture.TargetRoot, "CodeSignAutoPdfSigner.exe"),
+                FileMode.Open, FileAccess.Read, FileShare.Read)
+            : null;
+
+        var failure = await Assert.ThrowsAsync<InstallException>(() =>
+            upgrade.PublishInstallAsync(plan, CancellationToken.None));
+
+        Assert.Equal(failurePoint == "locked-file" ? "pdf_extension_files_in_use" : "pdf_extension_install_failed", failure.Code);
+        Assert.Equal(oldManifest, File.ReadAllBytes(Path.Combine(fixture.TargetRoot, "extension.json")));
+        Assert.Equal("signed-helper-fixture", File.ReadAllText(Path.Combine(fixture.TargetRoot, "CodeSignAutoPdfSigner.exe")));
+        Assert.True(registration.IsExact(PdfExtensionUninstallRegistration.Create(
+            fixture.MainExecutable, fixture.Manifest.ProductVersion, fixture.TargetRoot)));
+        Assert.DoesNotContain(Directory.EnumerateDirectories(fixture.ProgramFilesRoot),
+            path => path.StartsWith(fixture.TargetRoot + ".", StringComparison.OrdinalIgnoreCase));
+    }
+
     private sealed class RecordingPdfExtensionOperations : IPdfExtensionOperations
     {
         public bool IsAdministrator { get; init; } = true;
@@ -475,6 +557,10 @@ public sealed class PdfExtensionCommandTests
     {
         public List<string> Events { get; } = [];
 
+        public PdfExtensionManifest? InstalledManifest { get; init; }
+
+        public bool FailFinalVerification { get; init; }
+
         public Task<PdfExtensionManifest> VerifySourceAsync(
             PdfExtensionPaths paths,
             string mainExecutable,
@@ -494,6 +580,11 @@ public sealed class PdfExtensionCommandTests
             string signingUserSid,
             CancellationToken cancellationToken)
         {
+            if (FailFinalVerification && !paths.Root.Contains(".part-", StringComparison.Ordinal))
+            {
+                throw new IOException("injected_final_verification_failure");
+            }
+
             Assert.True(File.Exists(paths.Manifest));
             Assert.True(File.Exists(paths.Helper));
             Events.Add(paths.Root.Contains(".part-", StringComparison.Ordinal)
@@ -509,7 +600,7 @@ public sealed class PdfExtensionCommandTests
             CancellationToken cancellationToken)
         {
             Events.Add("verify-existing");
-            return Task.FromResult(manifest);
+            return Task.FromResult(InstalledManifest ?? manifest);
         }
     }
 
@@ -519,12 +610,20 @@ public sealed class PdfExtensionCommandTests
 
         public List<string> Events { get; } = [];
 
+        public bool FailNextCreate { get; set; }
+
         public bool TargetExistedWhenCreated { get; private set; }
 
         public PdfExtensionUninstallRegistration? RemovedRegistration { get; private set; }
 
         public void Create(PdfExtensionUninstallRegistration registration)
         {
+            if (FailNextCreate)
+            {
+                FailNextCreate = false;
+                throw new IOException("injected_registration_failure");
+            }
+
             Assert.Null(_registration);
             _registration = registration;
             Events.Add("register");
@@ -656,6 +755,22 @@ public sealed class PdfExtensionCommandTests
                 verifier,
                 registration,
                 () => "0123456789abcdef0123456789abcdef");
+
+        public PdfExtensionManifest ReplaceMedia(string version)
+        {
+            var helper = Path.Combine(MediaRoot, "CodeSignAutoPdfSigner.exe");
+            File.WriteAllText(helper, "replacement-helper");
+            var manifest = Manifest with
+            {
+                ProductVersion = version,
+                HelperVersion = version,
+                HelperLength = new FileInfo(helper).Length,
+                HelperSha256 = new string('d', 64),
+            };
+            File.WriteAllText(Path.Combine(MediaRoot, "extension.json"), JsonSerializer.Serialize(manifest,
+                new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
+            return manifest;
+        }
 
         public void AddUnknownMediaFile()
         {
