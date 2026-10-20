@@ -32,6 +32,7 @@
     </Grid>
 
     <Border Style="{DynamicResource StatusPanelStyle}"
+            Padding="18,6,18,18"
             Margin="0,20,0,0"
             AutomationProperties.Name="{localization:UiString JobsStatusArea}">
       <StackPanel>
@@ -41,8 +42,21 @@
         <TextBlock Text="{Binding ErrorText}"
                    Foreground="{DynamicResource TextSecondaryBrush}"
                    TextWrapping="Wrap"
-                   AutomationProperties.Name="{Binding ErrorText}" />
-        <ItemsControl ItemsSource="{Binding Items}" Margin="0,4,0,0" Grid.IsSharedSizeScope="True">
+                   AutomationProperties.Name="{Binding ErrorText}">
+          <TextBlock.Style>
+            <Style TargetType="TextBlock">
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding ErrorText}" Value="{x:Null}">
+                  <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding ErrorText}" Value="">
+                  <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </TextBlock.Style>
+        </TextBlock>
+        <ItemsControl ItemsSource="{Binding Items}" Grid.IsSharedSizeScope="True">
           <ItemsControl.ItemTemplate>
             <DataTemplate>
               <Border BorderBrush="{DynamicResource BorderBrush}"
