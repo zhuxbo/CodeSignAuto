@@ -84,6 +84,13 @@ description: 在 CodeSignAuto 仓库中进行新会话上手、Windows 构建测
 5. 如验证 PDF，再独立安装 PDF Setup，确认扩展校验通过后签一个新 PDF；未安装扩展时代码签名仍应完整 ready。
 6. 验证卸载的幂等、精确所有权和残留；不得清理未知文件。
 
+## 部署机故障取证
+
+- 先保留现场并读取对应运行账户的 `%LocalAppData%\CodeSignAuto\logs\diagnostics`；安装器、桌面、Agent、Service 的运行身份不同，不能只看管理员账户。
+- 主界面不可用时，以管理员权限运行 `CodeSignAuto.exe diagnostics export --output <绝对路径.zip>`；检查包内 `manifest.json` 的缺失、跳过和权限状态，不把部分导出说成完整取证。
+- Debug 开关为 `%ProgramData%\CodeSignAuto\diagnostics.json` 或对应账户的 `%LocalAppData%\CodeSignAuto\diagnostics.json` 中的 `{"debug": true}`，重启对应进程后生效；只有用户授权改变现场时才启用或重启。
+- 日志事件代码、进程和 UTC 时间用于关联升级阶段与异常链；异常原文不落盘，避免携带凭据。不得为了补全日志而导出配置、数据库、凭证或整个进程内存。
+
 ## 汇报格式
 
 按“代码/测试、构建、签名、安装、真实签名、未验证项”分开报告。列出提交号和门禁结果，但不暴露凭据、内部完整证书身份或 secret-bearing 路径。

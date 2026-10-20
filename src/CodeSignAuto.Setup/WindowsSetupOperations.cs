@@ -1,3 +1,4 @@
+using CodeSignAuto.Core.Diagnostics;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Reflection;
@@ -553,8 +554,10 @@ internal static class SetupProcessExecution
             }
         }
 
+        DiagnosticLog.Write("setup_child_starting", debug: true);
         using var process = Process.Start(start)
             ?? throw new SetupBootstrapperException("setup_process_failed");
+        DiagnosticLog.Write("setup_child_started", result: process.Id);
         var stdout = ReadOutputAsync(process.StandardOutput, progress);
         var stderr = process.StandardError.ReadToEndAsync();
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -564,10 +567,12 @@ internal static class SetupProcessExecution
             await process.WaitForExitAsync(deadline.Token).ConfigureAwait(false);
             await stdout.ConfigureAwait(false);
             var standardError = await stderr.ConfigureAwait(false);
+            DiagnosticLog.Write("setup_child_completed", result: process.ExitCode);
             if (surfaceStableStandardError &&
                 process.ExitCode != 0 &&
                 TryReadStableError(standardError) is { } stableError)
             {
+                DiagnosticLog.Write(stableError);
                 throw new SetupBootstrapperException(stableError);
             }
             return process.ExitCode;
@@ -590,8 +595,9 @@ internal static class SetupProcessExecution
             await DrainAsync(stdout, stderr).ConfigureAwait(false);
             throw;
         }
-        catch
+        catch (Exception error)
         {
+            DiagnosticLog.Write("setup_child_failed", error);
             TryKill(process);
             await DrainAsync(stdout, stderr).ConfigureAwait(false);
             throw new SetupBootstrapperException("setup_process_failed");

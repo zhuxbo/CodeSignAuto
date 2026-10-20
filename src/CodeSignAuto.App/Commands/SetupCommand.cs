@@ -1,3 +1,4 @@
+using CodeSignAuto.Core.Diagnostics;
 using System.Text.Json;
 using CodeSignAuto.Service;
 
@@ -100,10 +101,12 @@ internal sealed class WindowsManualSetupPreflight : IManualSetupPreflight
         }
         catch (ProvisionAgentUserException error)
         {
+            DiagnosticLog.Write("setupcommand_failed", error);
             throw new SetupException(error.Code);
         }
-        catch
+        catch (Exception diagnosticFailure)
         {
+            DiagnosticLog.Write("setupcommand_failed", diagnosticFailure);
             throw new SetupException("resource_preflight_failed");
         }
     }
@@ -119,12 +122,16 @@ internal sealed class ManualSetupOrchestrator(
     public async Task ExecuteAsync(TextWriter output, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(output);
+        DiagnosticLog.Write("setup_media_plan");
         var mediaPlan = await mediaStager.PlanAsync(cancellationToken).ConfigureAwait(false);
         string? reservedDataRoot = null;
         try
         {
+            DiagnosticLog.Write("setup_preflight");
             var inspection = preflight.Inspect();
+            DiagnosticLog.Write("setup_media_stage");
             await mediaStager.StageAsync(mediaPlan, cancellationToken).ConfigureAwait(false);
+            DiagnosticLog.Write("setup_reserve");
             reservedDataRoot = resourceReservation.Reserve();
             var installPlan = new ManualInstallPlanner(installEnvironment).Plan();
             if (!string.Equals(
@@ -142,6 +149,7 @@ internal sealed class ManualSetupOrchestrator(
                     installEnvironment.SigningUserSid,
                     cancellationToken)
                 .ConfigureAwait(false);
+            DiagnosticLog.Write("setup_install");
             await new ManualInstallOrchestrator(installExecutor)
                 .ExecuteAsync(installPlan, cancellationToken)
                 .ConfigureAwait(false);
@@ -155,25 +163,30 @@ internal sealed class ManualSetupOrchestrator(
         }
         catch (Exception original)
         {
+            DiagnosticLog.Write("setupcommand_failed", original);
             var uncertain = false;
             if (reservedDataRoot is not null)
             {
                 try
                 {
+                    DiagnosticLog.Write("setup_rollback_resources");
                     await resourceReservation.RollbackAsync(reservedDataRoot).ConfigureAwait(false);
                 }
-                catch
+                catch (Exception diagnosticFailure)
                 {
+                    DiagnosticLog.Write("setupcommand_failed", diagnosticFailure);
                     uncertain = true;
                 }
             }
 
             try
             {
+                DiagnosticLog.Write("setup_rollback_media");
                 await mediaStager.RollbackAsync(mediaPlan).ConfigureAwait(false);
             }
-            catch
+            catch (Exception diagnosticFailure)
             {
+                DiagnosticLog.Write("setupcommand_failed", diagnosticFailure);
                 uncertain = true;
             }
 
@@ -237,6 +250,7 @@ internal sealed class SetupOrchestrator(
     public async Task ExecuteAsync(TextWriter output, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(output);
+        DiagnosticLog.Write("setup_media_plan");
         var mediaPlan = await mediaStager.PlanAsync(cancellationToken).ConfigureAwait(false);
         SetupPreflightResult? inspection = null;
         string? reservedDataRoot = null;
@@ -244,10 +258,14 @@ internal sealed class SetupOrchestrator(
         SetupGeneratedConfiguration? generated = null;
         try
         {
+            DiagnosticLog.Write("setup_preflight");
             inspection = await preflight.InspectAsync(ManagedUserName, cancellationToken)
                 .ConfigureAwait(false);
+            DiagnosticLog.Write("setup_media_stage");
             await mediaStager.StageAsync(mediaPlan, cancellationToken).ConfigureAwait(false);
+            DiagnosticLog.Write("setup_reserve");
             reservedDataRoot = resourceReservation.Reserve();
+            DiagnosticLog.Write("setup_provision");
             user = await provisioner.ProvisionAsync(
                     ManagedUserName,
                     (createdUser, hookCancellationToken) => mediaStager.AuthorizeAsync(
@@ -256,22 +274,27 @@ internal sealed class SetupOrchestrator(
                         hookCancellationToken),
                     cancellationToken)
                 .ConfigureAwait(false);
+            DiagnosticLog.Write("setup_configuration");
             generated = await configurationWriter.WriteAsync(user, inspection, cancellationToken)
                 .ConfigureAwait(false);
+            DiagnosticLog.Write("setup_install");
             await installer.InstallAsync(user, generated, output, cancellationToken)
                 .ConfigureAwait(false);
         }
         catch (Exception original)
         {
+            DiagnosticLog.Write("setupcommand_failed", original);
             var uncertain = OriginalStateIsUncertain(original);
             if (generated is not null)
             {
                 try
                 {
+                    DiagnosticLog.Write("setup_rollback_configuration");
                     await configurationWriter.DeleteAsync(generated).ConfigureAwait(false);
                 }
-                catch
+                catch (Exception diagnosticFailure)
                 {
+                    DiagnosticLog.Write("setupcommand_failed", diagnosticFailure);
                     uncertain = true;
                 }
             }
@@ -280,10 +303,12 @@ internal sealed class SetupOrchestrator(
             {
                 try
                 {
+                    DiagnosticLog.Write("setup_rollback_user");
                     await provisioner.RollbackAsync(user).ConfigureAwait(false);
                 }
-                catch
+                catch (Exception diagnosticFailure)
                 {
+                    DiagnosticLog.Write("setupcommand_failed", diagnosticFailure);
                     uncertain = true;
                 }
             }
@@ -292,10 +317,12 @@ internal sealed class SetupOrchestrator(
             {
                 try
                 {
+                    DiagnosticLog.Write("setup_rollback_resources");
                     await resourceReservation.RollbackAsync(reservedDataRoot).ConfigureAwait(false);
                 }
-                catch
+                catch (Exception diagnosticFailure)
                 {
+                    DiagnosticLog.Write("setupcommand_failed", diagnosticFailure);
                     uncertain = true;
                 }
             }
@@ -304,10 +331,12 @@ internal sealed class SetupOrchestrator(
             {
                 try
                 {
+                    DiagnosticLog.Write("setup_rollback_media");
                     await mediaStager.RollbackAsync(mediaPlan).ConfigureAwait(false);
                 }
-                catch
+                catch (Exception diagnosticFailure)
                 {
+                    DiagnosticLog.Write("setupcommand_failed", diagnosticFailure);
                     uncertain = true;
                 }
             }
@@ -325,8 +354,9 @@ internal sealed class SetupOrchestrator(
         {
             await configurationWriter.DeleteAsync(generated).ConfigureAwait(false);
         }
-        catch
+        catch (Exception diagnosticFailure)
         {
+            DiagnosticLog.Write("setupcommand_failed", diagnosticFailure);
             await output.WriteLineAsync("setup_temporary_configuration_cleanup_failed")
                 .ConfigureAwait(false);
         }
@@ -387,6 +417,7 @@ internal static class SetupAgentConfigurationFactory
         }
         catch (AgentConfigurationException error)
         {
+            DiagnosticLog.Write(error.Code, error);
             throw new SetupException(error.Code);
         }
     }
@@ -482,10 +513,12 @@ internal sealed class WindowsSetupPreflight(IWindowsAutoLogonPlatform autoLogonP
         }
         catch (InstallException error)
         {
+            DiagnosticLog.Write(error.Code, error);
             throw new SetupException(error.Code);
         }
-        catch
+        catch (Exception diagnosticFailure)
         {
+            DiagnosticLog.Write("setupcommand_failed", diagnosticFailure);
             throw new SetupException("resource_preflight_failed");
         }
     }
@@ -498,8 +531,9 @@ internal sealed class WindowsSetupPreflight(IWindowsAutoLogonPlatform autoLogonP
                 WindowsNoFollowSecurity.ReadDirectory(path));
             return true;
         }
-        catch
+        catch (Exception diagnosticFailure)
         {
+            DiagnosticLog.Write("setupcommand_failed", diagnosticFailure);
             return false;
         }
     }
@@ -564,6 +598,7 @@ internal sealed class WindowsSetupResourceReservation : ISetupResourceReservatio
         }
         catch (InstallException error)
         {
+            DiagnosticLog.Write(error.Code, error);
             throw new SetupException(error.Code == "uninstall_path_invalid"
                 ? "setup_resource_conflict"
                 : "setup_state_uncertain");
@@ -599,8 +634,9 @@ internal sealed class WindowsSetupResourceReservation : ISetupResourceReservatio
         {
             throw;
         }
-        catch
+        catch (Exception diagnosticFailure)
         {
+            DiagnosticLog.Write("setupcommand_failed", diagnosticFailure);
             throw new SetupException("setup_state_uncertain");
         }
     }
@@ -658,12 +694,14 @@ internal sealed class TemporarySetupConfigurationWriter : ISetupConfigurationWri
         }
         catch (Exception original)
         {
+            DiagnosticLog.Write("setupcommand_failed", original);
             try
             {
                 File.Delete(path);
             }
-            catch
+            catch (Exception diagnosticFailure)
             {
+                DiagnosticLog.Write("setupcommand_failed", diagnosticFailure);
                 throw new SetupException("setup_state_uncertain");
             }
 
@@ -693,8 +731,9 @@ internal sealed class TemporarySetupConfigurationWriter : ISetupConfigurationWri
         {
             throw;
         }
-        catch
+        catch (Exception diagnosticFailure)
         {
+            DiagnosticLog.Write("setupcommand_failed", diagnosticFailure);
             throw new SetupException("setup_state_uncertain");
         }
     }
@@ -816,27 +855,32 @@ public static class SetupCommand
         }
         catch (SetupException setupError)
         {
+            DiagnosticLog.Write(setupError.Code, setupError);
             await error.WriteLineAsync(FormatFailure(setupError.Code)).ConfigureAwait(false);
             return 1;
         }
         catch (ProvisionAgentUserException provisionError)
         {
+            DiagnosticLog.Write("setupcommand_failed", provisionError);
             await error.WriteLineAsync(ProvisionAgentUserCommand.FormatFailure(provisionError))
                 .ConfigureAwait(false);
             return 1;
         }
         catch (AgentConfigurationException configurationError)
         {
+            DiagnosticLog.Write(configurationError.Code, configurationError);
             await error.WriteLineAsync(configurationError.Code).ConfigureAwait(false);
             return 1;
         }
         catch (ServiceConfigurationException configurationError)
         {
+            DiagnosticLog.Write(configurationError.Code, configurationError);
             await error.WriteLineAsync(configurationError.Code).ConfigureAwait(false);
             return 1;
         }
         catch (InstallException installError)
         {
+            DiagnosticLog.Write(installError.Code, installError);
             await error.WriteLineAsync(installError.Code).ConfigureAwait(false);
             return 1;
         }
@@ -844,8 +888,9 @@ public static class SetupCommand
         {
             return 1;
         }
-        catch
+        catch (Exception diagnosticFailure)
         {
+            DiagnosticLog.Write("setupcommand_failed", diagnosticFailure);
             await error.WriteLineAsync("setup_failed").ConfigureAwait(false);
             return 1;
         }

@@ -44,6 +44,10 @@ public sealed class TextWriterAgentDiagnosticSink(TextWriter writer) : IAgentDia
     private void ReportCore(AgentDiagnostic diagnostic, string? actualTotpSecret)
     {
         ArgumentNullException.ThrowIfNull(diagnostic);
+        CodeSignAuto.Core.Diagnostics.DiagnosticLog.Write(
+            diagnostic.StableCode,
+            diagnostic.Exception ?? diagnostic.Process?.FailureException,
+            result: diagnostic.Process?.ExitCode);
         try
         {
             var text = Format(diagnostic);

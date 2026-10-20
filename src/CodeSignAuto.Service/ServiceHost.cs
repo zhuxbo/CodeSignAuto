@@ -188,6 +188,7 @@ public static class ServiceHost
         string stage,
         Exception error)
     {
+        CodeSignAuto.Core.Diagnostics.DiagnosticLog.Write(stableCode, error);
         try
         {
             logger.LogError(
@@ -403,6 +404,7 @@ public static class ServiceHost
             cancellationToken).ConfigureAwait(false);
 
         var builder = WebApplication.CreateBuilder();
+        builder.Logging.AddProvider(new DiagnosticLoggerProvider());
         if (!runtime.Console)
         {
             builder.Host.UseWindowsService();
@@ -412,6 +414,11 @@ public static class ServiceHost
         Configure(builder, CreateOptions(runtime, componentVersions));
         var application = builder.Build();
         MapPipeline(application);
+        CodeSignAuto.Core.Diagnostics.DiagnosticLog.Write("service_starting");
+        application.Lifetime.ApplicationStarted.Register(() =>
+            CodeSignAuto.Core.Diagnostics.DiagnosticLog.Write("service_started"));
+        application.Lifetime.ApplicationStopping.Register(() =>
+            CodeSignAuto.Core.Diagnostics.DiagnosticLog.Write("service_stopping"));
         await application.RunAsync(cancellationToken).ConfigureAwait(false);
     }
 

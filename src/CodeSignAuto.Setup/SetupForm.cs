@@ -1,3 +1,4 @@
+using CodeSignAuto.Core.Diagnostics;
 using System.Globalization;
 
 namespace CodeSignAuto.Setup;
@@ -176,6 +177,7 @@ internal sealed class SetupForm : Form
             return;
         }
 
+        DiagnosticLog.Write("install_clicked");
         _running = true;
         var returnToModeSelection = false;
         _install.Enabled = false;
@@ -188,6 +190,7 @@ internal sealed class SetupForm : Form
         {
             var progress = new Progress<SetupProgress>(value =>
             {
+                DiagnosticLog.Write(value.Message, result: value.Percent);
                 _progress.Value = value.Percent;
                 SetStatus(value.Message);
             });
@@ -204,6 +207,7 @@ internal sealed class SetupForm : Form
                 try
                 {
                     ExitCode = await _bootstrapper.RunAsync(mode, progress, CancellationToken.None);
+                    DiagnosticLog.Write("install_completed", result: ExitCode);
                     SetStatus(
                         ExitCode == 0 ? "StatusInstallComplete" : "StatusInstallFailedCode",
                         ExitCode == 0 ? [] : [ExitCode]);
@@ -272,8 +276,9 @@ internal sealed class SetupForm : Form
                 }
             }
         }
-        catch
+        catch (Exception error)
         {
+            DiagnosticLog.Write("setup_form_failed", error);
             ExitCode = 1;
             SetStatus("StatusInstallFailed");
             var failure = new SetupBootstrapperException("setup_failed");
@@ -305,6 +310,7 @@ internal sealed class SetupForm : Form
 
     private void ShowFailure(SetupBootstrapperException error)
     {
+        DiagnosticLog.Write(error.Code, error);
         ExitCode = 1;
         SetStatus("StatusInstallFailed");
         MessageBox.Show(

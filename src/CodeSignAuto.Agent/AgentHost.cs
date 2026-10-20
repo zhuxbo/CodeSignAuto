@@ -174,11 +174,13 @@ public sealed class AgentHost
             return;
         }
 
+        CodeSignAuto.Core.Diagnostics.DiagnosticLog.Write("agent_readiness_loaded");
         while (!shutdown.IsCancellationRequested)
         {
             var pipeSession = _pipeSessions.Create(session);
             try
             {
+                CodeSignAuto.Core.Diagnostics.DiagnosticLog.Write("agent_pipe_connecting", debug: true);
                 await RunPipeSessionAsync(
                     pipeSession,
                     session,

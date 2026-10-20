@@ -15,6 +15,7 @@ internal static class UiAsyncExceptionBoundary
         }
         catch (Exception error) when (error is not OutOfMemoryException)
         {
+            CodeSignAuto.Core.Diagnostics.DiagnosticLog.Write("ui_async_failed", error);
             try
             {
                 await reportFailure().ConfigureAwait(true);

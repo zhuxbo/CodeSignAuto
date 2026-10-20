@@ -1,3 +1,4 @@
+using CodeSignAuto.Core.Diagnostics;
 using CodeSignAuto.Service;
 
 namespace CodeSignAuto.App.Commands;
@@ -44,8 +45,11 @@ internal static class UninstallDiagnostics
             $"receipt={FormatReceiptMode(receiptMode)} " +
             $"service_configuration={(serviceConfigurationExists ? "present" : "missing")}");
 
-    public static void WriteSuccess(TextWriter writer) =>
+    public static void WriteSuccess(TextWriter writer)
+    {
+        DiagnosticLog.Write("uninstall_completed");
         SafeWrite(writer, "stage=completed");
+    }
 
     public static void WriteFailure(TextWriter writer, string code) =>
         SafeWrite(writer, $"stage=failed code={NormalizeCode(code)}");
@@ -522,8 +526,9 @@ internal sealed class WindowsInstalledMediaUninstallPreflight : IInstalledMediaU
         {
             throw;
         }
-        catch
+        catch (Exception diagnosticFailure)
         {
+            DiagnosticLog.Write("uninstallcommand_failed", diagnosticFailure);
             throw new InstallException("owned_resource_mismatch");
         }
     }
@@ -538,6 +543,7 @@ public sealed class UninstallOrchestrator(IUninstallActionExecutor executor)
     {
         ArgumentNullException.ThrowIfNull(plan);
         ArgumentNullException.ThrowIfNull(output);
+        DiagnosticLog.Write("uninstall_preflight");
         await executor.PreflightAsync(plan, cancellationToken).ConfigureAwait(false);
         if (plan.Actions.Any(action => action is PurgeControlledData))
         {
@@ -548,6 +554,7 @@ public sealed class UninstallOrchestrator(IUninstallActionExecutor executor)
 
         foreach (var action in plan.Actions)
         {
+            DiagnosticLog.Write("uninstall_" + action.GetType().Name);
             await executor.ExecuteAsync(action, cancellationToken).ConfigureAwait(false);
         }
 
@@ -728,8 +735,9 @@ internal sealed class WindowsManualInstalledMediaUninstallPreflight
         {
             throw;
         }
-        catch
+        catch (Exception diagnosticFailure)
         {
+            DiagnosticLog.Write("uninstallcommand_failed", diagnosticFailure);
             throw new InstallException("owned_resource_mismatch");
         }
     }
@@ -894,9 +902,11 @@ public sealed class ManualUninstallOrchestrator(WindowsManualUninstallActionExec
     {
         ArgumentNullException.ThrowIfNull(plan);
         ArgumentNullException.ThrowIfNull(output);
+        DiagnosticLog.Write("uninstall_preflight");
         await executor.PreflightAsync(plan, cancellationToken).ConfigureAwait(false);
         foreach (var action in plan.Actions)
         {
+            DiagnosticLog.Write("uninstall_" + action.GetType().Name);
             await executor.ExecuteAsync(action, cancellationToken).ConfigureAwait(false);
         }
 
@@ -1321,12 +1331,14 @@ public static class UninstallCommand
         }
         catch (ServiceConfigurationException configurationError)
         {
+            DiagnosticLog.Write(configurationError.Code, configurationError);
             UninstallDiagnostics.WriteFailure(diagnosticWriter, configurationError.Code);
             await error.WriteLineAsync(configurationError.Code).ConfigureAwait(false);
             return 1;
         }
         catch (InstallException uninstallError)
         {
+            DiagnosticLog.Write(uninstallError.Code, uninstallError);
             UninstallDiagnostics.WriteFailure(diagnosticWriter, uninstallError.Code);
             await error.WriteLineAsync(uninstallError.Code).ConfigureAwait(false);
             return 1;
@@ -1339,6 +1351,7 @@ public static class UninstallCommand
         catch (Exception exception) when (
             exception is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
         {
+            DiagnosticLog.Write("uninstall_failed", exception);
             UninstallDiagnostics.WriteFailure(diagnosticWriter, "uninstall_failed");
             await error.WriteLineAsync("uninstall_failed").ConfigureAwait(false);
             return 1;
