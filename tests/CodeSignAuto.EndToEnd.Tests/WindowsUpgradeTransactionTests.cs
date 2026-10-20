@@ -173,6 +173,26 @@ public sealed class WindowsUpgradeTransactionTests
     }
 
     [Fact]
+    public async Task Service_same_version_replacement_preserves_configuration_and_receipt()
+    {
+        var fixture = new TransactionFixture();
+        var configuration = fixture.Configuration;
+        var receipt = InstallationReceipt.ForService(configuration);
+        fixture.ExistingReceipt = receipt;
+        fixture.ReceiptStore.Current = receipt;
+
+        await new UpgradeOrchestrator().ExecuteAsync(
+            fixture.CreateTransaction("1.0.0"), TextWriter.Null, CancellationToken.None);
+
+        Assert.Same(configuration, fixture.Configuration);
+        Assert.Equal(receipt, fixture.ReceiptStore.Current);
+        Assert.Empty(fixture.ReceiptStore.Events);
+        Assert.Equal(["1.0.0->1.0.0"], fixture.Registrations.Replacements);
+        Assert.True(fixture.Media.Activated);
+        Assert.False(fixture.Media.RollbackCalled);
+    }
+
+    [Fact]
     public async Task Partial_agent_stop_failure_restarts_agent_resumes_admission_and_verifies_old_runtime()
     {
         var fixture = new TransactionFixture();
@@ -248,8 +268,10 @@ public sealed class WindowsUpgradeTransactionTests
         Assert.Equal(fixture.ExistingReceipt, fixture.ReceiptStore.Current);
     }
 
-    [Fact]
-    public async Task Manual_upgrade_replaces_media_and_registration_without_rewriting_receipt()
+    [Theory]
+    [InlineData("2.0.0")]
+    [InlineData("1.0.0")]
+    public async Task Manual_upgrade_replaces_media_and_registration_without_rewriting_receipt(string incomingVersion)
     {
         var receipt = ManualReceipt();
         var receiptStore = new FakeInstallationReceiptStore { Current = receipt };
@@ -260,7 +282,7 @@ public sealed class WindowsUpgradeTransactionTests
             receipt,
             receiptStore,
             ProductUninstallRegistration.Create(receipt.ExecutablePath, "1.0.0", owner),
-            ProductUninstallRegistration.Create(receipt.ExecutablePath, "2.0.0", owner),
+            ProductUninstallRegistration.Create(receipt.ExecutablePath, incomingVersion, owner),
             media,
             registrations);
 
@@ -271,7 +293,7 @@ public sealed class WindowsUpgradeTransactionTests
 
         Assert.Equal(InstallationMode.Manual, transaction.Mode);
         Assert.Equal(receipt.SigningUserSid, media.AuthorizedSid);
-        Assert.Equal(["1.0.0->2.0.0"], registrations.Replacements);
+        Assert.Equal([$"1.0.0->{incomingVersion}"], registrations.Replacements);
         Assert.Equal(receipt, receiptStore.Current);
         Assert.Empty(receiptStore.Events);
     }
@@ -680,16 +702,16 @@ public sealed class WindowsUpgradeTransactionTests
         public InstallationReceipt? ExistingReceipt { get; set; }
         public ServiceConfiguration Configuration => _configuration;
 
-        public WindowsUpgradeTransaction CreateTransaction()
+        public WindowsUpgradeTransaction CreateTransaction(string incomingVersion = "2.0.0")
         {
             var owner = InstallOwnershipMarker.Create(_configuration.InstallInstanceId);
-            Control.ProductVersionProvider = () => Media.Activated ? "2.0.0" : "1.0.0";
+            Control.ProductVersionProvider = () => Media.Activated ? incomingVersion : "1.0.0";
             return new WindowsUpgradeTransaction(
                 _configuration,
                 ExistingReceipt,
                 ReceiptStore,
                 ProductUninstallRegistration.Create(_configuration.ExecutablePath, "1.0.0", owner),
-                ProductUninstallRegistration.Create(_configuration.ExecutablePath, "2.0.0", owner),
+                ProductUninstallRegistration.Create(_configuration.ExecutablePath, incomingVersion, owner),
                 Media,
                 Startup,
                 Control,

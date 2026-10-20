@@ -88,4 +88,6 @@ ASP.NET Core Runtime：https://dotnet.microsoft.com/en-us/download/dotnet/10.0
   <data name="ErrorPdfInstallFailed" xml:space="preserve"><value>PDF 扩展安装失败，未完成替换；已有扩展已保留或恢复。请检查诊断日志后重试。</value></data>
   <data name="ErrorPdfBackupCleanupFailed" xml:space="preserve"><value>新版 PDF 扩展已安装，但旧文件备份未能清理。请保留备份目录，确认无文件占用后再清理；无需重新安装。</value></data>
   <data name="ErrorPdfMediaInvalid" xml:space="preserve"><value>PDF 扩展安装文件校验失败或文件已改变。请重新获取完整的官方安装包后重试。</value></data>
+  <data name="ErrorUpgradeDowngrade" xml:space="preserve"><value>已安装的 CodeSignAuto 版本高于此安装包，不支持降级。请使用相同或更高版本的安装包；现有配置和激活信息无需清除。</value></data>
+  <data name="ErrorUpgradeVersionNotNewer" xml:space="preserve"><value>当前安装流程拒绝相同或更低版本，主程序未更新。请使用支持同版本覆盖的新安装包或更高版本；主程序更新成功前，PDF 扩展仍使用旧安装逻辑。</value></data>
 </root>

@@ -75,6 +75,8 @@ internal static class SetupCulture
             "pdf_extension_backup_cleanup_failed" => "ErrorPdfBackupCleanupFailed",
             "pdf_extension_media_invalid" or "pdf_extension_media_changed" or
                 "pdf_extension_artifact_invalid" or "pdf_extension_manifest_invalid" => "ErrorPdfMediaInvalid",
+            "upgrade_downgrade_not_allowed" => "ErrorUpgradeDowngrade",
+            "upgrade_version_not_newer" => "ErrorUpgradeVersionNotNewer",
             "upgrade_files_in_use" => "ErrorUpgradeFilesInUse",
             "upgrade_media_access_denied" => "ErrorUpgradeMediaAccessDenied",
             "upgrade_media_unreadable" => "ErrorUpgradeMediaUnreadable",

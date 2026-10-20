@@ -1,10 +1,31 @@
 using CodeSignAuto.App.Commands;
+using CodeSignAuto.Core.Versioning;
 using Xunit;
 
 namespace CodeSignAuto.EndToEnd.Tests;
 
 public sealed class UpgradeCommandTests
 {
+    [Theory]
+    [InlineData("0.1.7", "0.1.7")]
+    [InlineData("0.1.7+old", "0.1.7+rebuilt")]
+    [InlineData("0.1.6", "0.1.7")]
+    [InlineData("0.1.7-rc.1", "0.1.7")]
+    public void Main_install_accepts_same_version_replacement_and_upgrade(string installed, string incoming)
+    {
+        UpgradeVersionPolicy.RequireSupported(ProductVersion.Parse(installed), ProductVersion.Parse(incoming));
+    }
+
+    [Theory]
+    [InlineData("0.1.7", "0.1.6")]
+    [InlineData("0.1.7", "0.1.7-rc.1")]
+    public void Main_install_rejects_downgrade_with_a_specific_error(string installed, string incoming)
+    {
+        var failure = Assert.Throws<SetupException>(() =>
+            UpgradeVersionPolicy.RequireSupported(ProductVersion.Parse(installed), ProductVersion.Parse(incoming)));
+        Assert.Equal("upgrade_downgrade_not_allowed", failure.Code);
+    }
+
     [Fact]
     public async Task Manual_upgrade_runs_only_the_common_media_transaction()
     {

@@ -1,4 +1,5 @@
 using CodeSignAuto.Core.Diagnostics;
+using CodeSignAuto.Core.Versioning;
 namespace CodeSignAuto.App.Commands;
 
 internal interface IUpgradeTransaction
@@ -32,6 +33,17 @@ internal static class UpgradeModePolicy
         if (requested != installed)
         {
             throw new SetupException("installation_mode_change_requires_reinstall");
+        }
+    }
+}
+
+internal static class UpgradeVersionPolicy
+{
+    public static void RequireSupported(ProductVersion installed, ProductVersion incoming)
+    {
+        if (incoming.ComparePrecedenceTo(installed) < 0)
+        {
+            throw new SetupException("upgrade_downgrade_not_allowed");
         }
     }
 }

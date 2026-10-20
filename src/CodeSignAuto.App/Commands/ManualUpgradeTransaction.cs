@@ -109,10 +109,7 @@ internal sealed class ManualUpgradeTransaction : IUpgradeTransaction
         var oldVersion = ProductVersion.Parse(oldRegistration.DisplayVersion);
         var newVersion = ProductVersion.Parse(
             CodeSignAuto.App.ApplicationVersion.ReadIdentity(typeof(ManualUpgradeTransaction).Assembly));
-        if (newVersion.ComparePrecedenceTo(oldVersion) <= 0)
-        {
-            throw new SetupException("upgrade_version_not_newer");
-        }
+        UpgradeVersionPolicy.RequireSupported(oldVersion, newVersion);
 
         var sourceRoot = Environment.ProcessPath is { } processPath
             ? Path.GetDirectoryName(Path.GetFullPath(processPath))

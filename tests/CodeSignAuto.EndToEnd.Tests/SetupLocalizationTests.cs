@@ -312,6 +312,7 @@ public sealed class SetupLocalizationTests
             var culture = SetupCulture.ResolveSelection(cultureName);
             foreach (var code in new[]
                      {
+                         "upgrade_downgrade_not_allowed", "upgrade_version_not_newer",
                          "pdf_extension_files_in_use", "pdf_extension_downgrade_not_allowed",
                          "pdf_extension_target_exists", "pdf_extension_main_invalid",
                          "pdf_extension_access_denied", "pdf_extension_install_state_uncertain",
